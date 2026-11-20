@@ -7,7 +7,7 @@
 <script>
 // ---- self-update: checks the public mirror when online, keeps the newest build on this computer ----
 // Newer build saved earlier -> run that instead of this file. Add ?local to the address to skip it.
-var TT_BUILD=1795180923108;
+var TT_BUILD=1795183736614;
 (function(){
   var REMOTE="https://raw.githubusercontent.com/blsxf/express-pawn-tools/main/tagtool/", KEY="tagtool.update";
   function db(){ return new Promise(function(res,rej){ var r=indexedDB.open("tagtool",1);
@@ -3135,9 +3135,11 @@ var TIDEART=(function(){
       e(cx,cy,rx,ry,c){ for(let y=Math.floor(cy-ry-1);y<=cy+ry;y++) for(let x=Math.floor(cx-rx-1);x<=cx+rx;x++){
         const dx=(x+.5-cx)/rx, dy=(y+.5-cy)/ry; if(dx*dx+dy*dy<=1) A.p(x,y,c); } },
       // shaded ball: soft light top-left, shade bottom-right, a little shine
+      // light comes from the top-left: highlights lean warm, shadows lean cool violet, and each edge is dithered by hand
       b(cx,cy,rx,ry,c,shine){ for(let y=Math.floor(cy-ry-1);y<=cy+ry;y++) for(let x=Math.floor(cx-rx-1);x<=cx+rx;x++){
         const nx=(x+.5-cx)/rx, ny=(y+.5-cy)/ry; if(nx*nx+ny*ny>1) continue;
-        let k=c; if(nx*.55+ny*.85>.5) k=dk(c,.2); else if((nx+.32)*(nx+.32)+(ny+.4)*(ny+.4)<.22) k=lt(c,.22);
+        const sh=nx*.55+ny*.85, hl=(nx+.32)*(nx+.32)+(ny+.4)*(ny+.4), chk=(x+y)%2===0;
+        let k=c; if(sh>.56||(sh>.44&&chk)) k=mix(dk(c,.22),"#5a3fd0",.12); else if(hl<.2||(hl<.27&&chk)) k=mix(c,"#fff2c0",.3);
         if(shine!==false&&(nx+.42)*(nx+.42)+(ny+.5)*(ny+.5)<.035) k=lt(c,.75);
         A.p(x,y,k); } },
       l(x0,y0,x1,y1,c){ x0|=0;y0|=0;x1|=0;y1|=0; const dx=Math.abs(x1-x0), dy=-Math.abs(y1-y0), sx=x0<x1?1:-1, sy=y0<y1?1:-1; let er=dx+dy;
@@ -3145,11 +3147,20 @@ var TIDEART=(function(){
       // cute eye: s=1 tiny, 2 small, 3 big (with sparkle)
       eye(x,y,s){ if(s===1){ A.r(x,y,1,2,INK); return; }
         if(s===2){ A.r(x,y,2,3,INK); A.p(x,y,"#ffffff"); return; }
-        A.r(x,y,3,4,INK); A.r(x+1,y-1,1,1,INK); A.r(x+1,y+4,1,1,INK); A.p(x,y,"#ffffff"); A.p(x+1,y,"#ffffff"); A.p(x+2,y+2,"#9fc9ff"); },
+        A.r(x,y,3,4,INK); A.r(x+1,y-1,1,1,INK); A.r(x+1,y+4,1,1,INK); A.p(x,y,"#ffffff"); A.p(x+1,y,"#ffffff"); A.p(x,y+1,"#ffffff");
+        A.p(x+1,y+3,"#5a4fb8"); A.p(x+2,y+3,"#7f74e0"); A.p(x+2,y+2,"#c9e4ff"); },
       blush(x,y){ A.p(x,y,"#ff8fb1"); A.p(x+1,y,"#ff8fb1"); },
       smile(x,y){ A.p(x,y,INK); A.p(x+1,y+1,INK); A.p(x+2,y,INK); }
     };
     fn(A);
+    if(ol==="crit"){ const C=B.slice(), at=(x,y)=>(x>=0&&y>=0&&x<w&&y<h)?C[y*w+x]:null;
+      for(let y=0;y<h;y++) for(let x=0;x<w;x++){ const c=C[y*w+x]; if(!c||c===INK||c==="#ffffff") continue;
+        const u=at(x,y-1), l=at(x-1,y), d=at(x,y+1), r=at(x+1,y), n=!!u+!!l+!!d+!!r; if(n<3) continue;
+        if(!u||!l) B[y*w+x]=mix(c,"#fffbe6",.28); else if(!d||!r) B[y*w+x]=mix(c,"#3a2370",.16); }
+      for(let y=0;y<h;y++) for(let x=0;x<w;x++){ if(C[y*w+x]) continue;
+        const lit=at(x+1,y)||at(x,y+1), far=at(x-1,y)||at(x,y-1), n=lit||far; if(!n) continue;
+        B[y*w+x]=mix(dk(n,lit&&!far?.5:.72),"#2a1a5e",.18); }
+      ol=null; }
     if(ol){ const C=B.slice();
       for(let y=0;y<h;y++) for(let x=0;x<w;x++){ if(C[y*w+x]) continue;
         const n=[[1,0],[-1,0],[0,1],[0,-1]].map(([i,j])=>(x+i>=0&&y+j>=0&&x+i<w&&y+j<h)?C[(y+j)*w+x+i]:null).find(Boolean);
@@ -3171,7 +3182,7 @@ var TIDEART=(function(){
     u:"00hhhjd0",v:"00hhha40",w:"00hhlla0",x:"00ha4ah0",y:"00hhhf1e",z:"00v248v0",
     "0":"ehjlphe0","1":"4c4444e0","2":"eh1248v0","3":"v2421he0","4":"26aiv220","5":"vgu11he0","6":"68guhhe0","7":"v1248880","8":"ehhehhe0","9":"ehhf12c0",
     "!":"44444040","?":"eh124040",".":"00000040",",":"00000448","'":"44000000",'"':"aa000000","-":"000e0000",":":"00400400",";":"00400448",
-    "/":"11248gg0","(":"24888420",")":"84222480","+":"044v4400","♥":"0avve400",">":"gosusog0","▼":"00ve4000","×":"00ha4ah0","~":"000mi000","…":"000000l0","%":"pj248jp0","_":"0000000v","=":"00v0v000","&":"8kk8lie0","*":"04lel400","#":"00avava0","$":"4fke1u40","@":"ehngmge0"};
+    "/":"11248gg0","(":"24888420",")":"84222480","+":"044v4400","♥":"0avve400",">":"gosusog0","<":"137f7310","▼":"00ve4000","×":"00ha4ah0","~":"000mi000","…":"000000l0","%":"pj248jp0","_":"0000000v","=":"00v0v000","&":"8kk8lie0","*":"04lel400","#":"00avava0","$":"4fke1u40","@":"ehngmge0"};
   const FONT={};
   for(const ch in GL){ const rows=[...GL[ch]].map(c=>parseInt(c,32)); let mn=5, mx=-1;
     rows.forEach(r=>{ for(let x=0;x<5;x++) if(r&(16>>x)){ mn=Math.min(mn,x); mx=Math.max(mx,x); } });
@@ -3242,6 +3253,12 @@ var TIDEART=(function(){
       A.l(8,10,4,3,"#ff7fae"); A.l(8,10,12,4,"#ff7fae"); A.l(8,10,8,2,"#ff7fae"); A.p(4,3,"#ffb3cf"); A.p(12,4,"#ffb3cf"); A.p(8,2,"#ffb3cf"); });
     else if(ch==="C") cv=make(16,16,A=>{ A.r(0,0,16,16,"#e8f7fa"); A.r(0,3,16,12,"#ffffff"); A.r(0,3,16,2,"#ff9ec4"); A.r(0,13,16,2,"#e5d8ea"); A.p(7,8,"#ff9ec4"); A.p(8,8,"#ff9ec4"); });
     else if(ch==="~") cv=make(16,16,A=>{ A.r(0,0,16,16,"#3f9fe8"); A.p((v*5+f*3)%16,4,"#7cc8ff"); A.p((v*3+8+f*2)%16,11,"#7cc8ff"); });
+    else if(ch==="K") cv=make(16,16,A=>{ A.r(0,0,16,16,"#1b6a7a"); for(let i=0;i<9;i++) A.p(hash(v,i,3)*16,hash(v,i,4)*16,"#23808f");   // giant kelp stalks
+      [[2,"#e0ae3c"],[8,"#cf9a2c"],[13,"#e8be4e"]].forEach(([x,c],i)=>{ const sx=y=>x+Math.round(Math.sin((y+v*3+i*5)*.42+f*.5));
+        for(let y=0;y<16;y++){ A.p(sx(y),y,c); A.p(sx(y)+1,y,dk(c,.25)); }
+        for(let y=(v+i*3)%6;y<16;y+=6){ const xx=sx(y), dir=(i+y)%2?1:-1;
+          for(let t=0;t<5;t++) A.p(xx+(dir>0?2+t:-1-t),y+Math.round(t*.6),t<2?"#9cd64a":"#6fbf3a");
+          A.e(xx+(dir>0?1.5:-.5),y-1,1.4,1.4,"#ffd76a"); A.p(xx+(dir>0?1:-1),y-2,"#fff4b0"); } }); });
     else if(ch==="V") cv=make(16,16,A=>{ sandBase(A,v,1); const C=["#ff6fb5","#ffcf3d","#7be0ff","#b98cff"];   // the Tidegate swirl (Lantern Deep)
       for(let r=7;r>=1;r--) for(let a=0;a<6.3;a+=.18){ const aa=a+r*.55+f*.8; A.p(8+Math.cos(aa)*r,8+Math.sin(aa)*r*.8,C[(r+f)%4]); } A.e(8,8,1.5,1.2,"#ffffff"); });
     else cv=make(16,16,A=>A.r(0,0,16,16,"#ff00ff"));
@@ -3357,6 +3374,15 @@ var TIDEART=(function(){
       A.b(8,9,5,5,"#ff7f6b"); A.r(4,8,8,1,"#e65a4a"); A.r(5,11,6,1,"#e65a4a");
       A.r(4,5,3,1,"#ffffff"); A.r(9,5,3,1,"#ffffff"); A.eye(5,6,1); A.eye(10,6,1); A.e(8,12,3,1.6,"#ffffff");
       A.r(5,14,1,2,"#d04a3c"); A.r(10,14,1,2,"#d04a3c"); },true),
+    beret:()=>make(16,16,A=>{ // painter goby in a beret
+      A.e(1.5,9,2,3,"#ffb14d"); A.b(8,9.5,6,5,"#ffc46b"); A.e(8,11.5,4,2,"#fff3dc");
+      A.e(8,4,5.5,2,"#ff4f6d"); A.p(8,1,"#ff4f6d"); A.p(8,2,"#ff4f6d"); A.p(5,3,"#ff8fa0");
+      A.eye(6,7,2); A.eye(10,7,2); A.smile(7,11); A.p(13,10,"#3fa8ff"); A.p(12,12,"#38c46a"); A.r(6,14,1,2,"#e08a2a"); A.r(10,14,1,2,"#e08a2a"); },true),
+    poet:()=>make(16,16,A=>{ // gloomy squid kid in a cloak
+      A.b(8,12,6,3.4,"#5a2a7a"); for(let x=3;x<14;x+=3) A.p(x,15,"#7be0ff");
+      A.b(8,7,4.6,5.4,"#c9406a"); A.e(3.5,3.5,1.6,1.4,"#c9406a"); A.e(12.5,3.5,1.6,1.4,"#c9406a");
+      A.r(5,6,2,3,INK); A.r(9,6,2,3,INK); A.p(5,6,"#7be0ff"); A.p(9,6,"#7be0ff"); A.r(4,5,3,1,"#8a2a4f"); A.r(9,5,3,1,"#8a2a4f");
+      A.p(7,10,INK); A.p(8,10,INK); },true),
     sign:()=>make(16,16,A=>{ A.r(7,9,2,7,"#a87e56"); A.r(1,2,14,9,"#d9a774"); A.r(1,2,14,1,"#ecc08f"); A.r(3,5,10,1,"#a87e56"); A.r(3,7,7,1,"#a87e56"); },true),
     tank:()=>make(16,16,A=>{ // little aquarium with a pet shrimp
       A.r(1,13,14,3,"#a87e56"); A.r(1,3,14,10,"#9fe6ff"); A.r(2,4,12,8,"#bff2ff"); A.r(2,10,12,2,"#ffe9b8");
@@ -3466,9 +3492,126 @@ var TIDEART=(function(){
     kelpshade:molt("fronda",-30,A=>{ onBody(A,27,11,16,3,"#2a1a2e"); A.p(33,12,"#ffffff"); A.r(32,12,3,2,"#ffffff"); A.p(33,12,INK);
       A.l(26,12,19,9,"#2a1a2e"); A.l(26,13,20,14,"#2a1a2e"); [[12,15],[40,36],[6,40]].forEach(([x,y],i)=>A.b(x,y,3,2.4,i%2?"#4fcf6e":"#3fbf62",false)); })
   });
+  // ---------- more of the reef: real animals and plants, each with a twist ----------
+  const sparkle=(A,x,y,c)=>{ A.p(x,y,"#ffffff"); A.p(x-1,y,c); A.p(x+1,y,c); A.p(x,y-1,c); A.p(x,y+1,c); };
+  const lightHouse=(A,x,y,hgt)=>{ for(let j=0;j<hgt;j++){ const wd=2+Math.floor(j/4); A.r(x-wd/2|0,y+j,wd+1,1,Math.floor(j/2)%2?"#ffffff":"#ff4f5f"); }
+    A.r(x-2,y-2,5,2,"#4b3f66"); A.b(x,y-4,2.2,2,"#fff27a",false); A.p(x,y-6,"#ff4f5f"); };
+  Object.assign(CRIT,{
+    puffkin:A=>{ const NV="#2f2b63", WH="#fbf7ff", OR="#ff7a3d"; // puffin chick with a beak full of fish
+      A.b(18,45,4,1.8,OR,false); A.b(30,45,4,1.8,OR,false);
+      A.b(24,33,12.5,12,NV); A.b(24,36,8.5,8.5,WH);
+      A.b(11.5,33,3.6,7.5,"#463f8c"); A.b(36.5,33,3.6,7.5,"#463f8c");
+      A.b(24,17,11,10,NV); A.b(24,19,8.6,7,WH);
+      A.l(16,13,14,11,"#9aa3d8"); A.l(32,13,34,11,"#9aa3d8");
+      A.eye(18,15,3); A.eye(28,15,3);
+      for(let j=0;j<7;j++){ const wd=6-j*.85; A.r(24-wd,21+j,wd*2,1,j<2?"#ffd23d":j<4?OR:"#ff4f6d"); } A.r(19,21,11,1,"#8b95c9");
+      [[35,25,"#bfe3ff"],[13,26,"#ffd9a0"]].forEach(([x,y,c],i)=>{ A.b(x,y,4,1.7,c,false); const t=i?x-4:x+4, s=i?-1:1; A.p(t,y-1,c); A.p(t+s,y-2,c); A.p(t,y+1,c); A.p(t+s,y+2,c); A.p(x-s*2,y,INK); });
+      A.blush(15,21); A.blush(32,21); },
+    zaplet:A=>{ const Y="#ffcf3d"; // torpedo ray that delivers mail
+      A.l(34,34,43,43,"#e8a33a"); A.l(35,34,44,43,"#e8a33a"); A.r(40,40,7,7,"#ffffff"); A.r(41,41,5,5,"#ff6fb5"); A.p(42,42,"#fff0f6"); A.p(44,44,"#d93a72");
+      A.b(13,38,5,3,"#ffa83b",false); A.b(35,38,5,3,"#ffa83b",false);
+      A.b(24,27,17,13,Y); A.e(24,30,10,6,"#fff1b0");
+      [[11,24],[37,24],[14,34],[34,34],[24,16]].forEach(([x,y])=>{ A.e(x,y,1.8,1.8,"#ff8a3d"); A.p(x-1,y-1,"#ffd27a"); });
+      const Z=[[14,36],[18,33],[21,37],[25,33],[28,37],[32,33],[35,36]]; for(let i=0;i<Z.length-1;i++){ A.l(Z[i][0],Z[i][1],Z[i+1][0],Z[i+1][1],"#3fa8ff"); A.l(Z[i][0],Z[i][1]+1,Z[i+1][0],Z[i+1][1]+1,"#9fe0ff"); }
+      A.eye(18,20,3); A.eye(27,20,3); A.blush(15,27); A.blush(31,27); A.smile(22,27);
+      sparkle(A,5,14,"#7be0ff"); sparkle(A,43,13,"#7be0ff"); sparkle(A,41,29,"#ffe14d"); },
+    lampkin:A=>{ const C="#5b6cff"; // baby anglerfish whose lure is a tiny lighthouse
+      A.b(9,29,4.5,7,"#8a5bff"); A.e(6,29,2.4,5,"#b38cff");
+      [[26,15],[28,11],[31,8],[35,7],[38,9]].reduce((a,b)=>{ A.l(a[0],a[1],b[0],b[1],"#a8b4ff"); return b; });
+      lightHouse(A,39,12,8); for(let i=0;i<4;i++) A.p(33-i*2,4-i%2,"#fff7c2"), A.p(45+i,4-i%2,"#fff7c2");
+      A.b(24,29,14,12,C); A.b(24,33,10,7,"#a9b8ff");
+      A.b(12,37,3,4,"#8a5bff",false); A.b(36,37,3,4,"#8a5bff",false);
+      A.e(24,35,8,3,"#2a1640"); for(let x=17;x<32;x+=2){ A.p(x,33,"#ffffff"); A.p(x+1,37,"#ffffff"); } A.e(24,37,3,1,"#ff6f9c");
+      A.eye(18,24,3); A.eye(28,24,3); A.blush(15,30); A.blush(33,30);
+      [[14,22],[34,21],[31,41],[17,41]].forEach(([x,y])=>{ A.p(x,y,"#9ff7ff"); A.p(x+1,y,"#d9fdff"); }); },
+    smudgit:A=>{ const C="#a07bff"; // baby octopus painter
+      for(let i=0;i<6;i++){ const x0=11+i*5.2; for(let t=0;t<12;t++){ const x=x0+Math.sin(t*.55+i*1.3)*2.2, y=31+t; A.e(x,y,2-t*.07,1.4,t>9?lt(C,.15):C); }
+        A.p(x0+Math.sin(6.6+i*1.3)*2.2,44,"#ffd1ec"); }
+      A.l(38,32,45,19,"#c98a5f"); A.l(39,32,46,19,"#a8743f"); A.e(46,16,2,3,"#2e1f5c"); A.p(46,14,"#7a52d6"); A.e(44,24,1,1.6,"#2e1f5c");
+      A.b(24,21,14,13,C); [[14,15,2.4],[33,13,2],[30,29,1.6],[15,27,1.6]].forEach(([x,y,r])=>A.e(x,y,r,r*.8,"#7a52d6"));
+      A.e(34,25,3,2,"#2e1f5c"); A.p(33,24,"#4b3a8a");
+      A.eye(17,18,3); A.eye(27,18,3); A.blush(14,24); A.blush(31,24); A.e(23,27,1.6,1.4,"#5a2a6b"); A.p(23,27,"#ff6f9c"); },
+    duskle:A=>{ const R="#e2456f", CL="#5a2a7a"; // vampire squid, dramatic about everything
+      A.b(24,37,15,8,CL); for(let i=0;i<6;i++){ const x=10+i*5.6; A.e(x,44,2.6,2,CL); A.p(x,46,"#7be0ff"); A.p(x,47,"#d9fdff"); }
+      A.b(11,13,4.4,3,R); A.b(37,13,4.4,3,R);
+      A.b(24,23,11,14,R); A.e(24,30,7,4,"#ff7f9c");
+      [[19,24],[29,24]].forEach(([x,y])=>{ A.e(x,y,3.6,4,"#ffffff"); A.e(x,y+1,2.6,3,"#3fa8ff"); A.r(x-1,y,2,3,INK); A.p(x-2,y-1,"#ffffff"); A.r(x-4,y-4,8,2,"#a82a52"); });
+      A.r(22,31,4,1,INK); A.p(21,32,INK); A.p(26,32,INK); A.blush(15,29); A.blush(31,29);
+      sparkle(A,6,6,"#7be0ff"); },
+    mangrub:A=>{ const BK="#9b6a3f"; // mangrove seedling that walked off
+      [[20,35,12,46],[22,36,18,46],[26,36,30,46],[28,35,36,46]].forEach(([a,b,c,d])=>{ A.l(a,b,c,d,BK); A.l(a+1,b,c+1,d,dk(BK,.2)); A.p(c,d,"#6b4228"); });
+      A.e(14,45,1.6,1.4,"#f2ead8"); A.e(33,45,1.4,1.2,"#f2ead8");
+      A.b(24,26,8.5,13.5,"#8fd14f"); A.b(24,36,6,4,"#b0d45a",false);
+      [[20,30],[28,32],[22,35],[27,19]].forEach(([x,y])=>A.p(x,y,"#e4ff9a"));
+      A.r(24,7,1,6,"#3f9e3a"); A.b(16,9,7,3.2,"#38c46a"); A.b(32,8,7,3.2,"#4fd67a"); A.l(10,9,22,10,"#2f8f4a"); A.l(26,9,38,8,"#2f8f4a");
+      A.eye(19,21,3); A.eye(27,21,3); A.blush(17,27); A.blush(29,27); A.smile(22,27); },
+    pewpop:A=>{ const C="#ffb13b", R="#ff4f5f"; // pistol shrimp with one enormous claw
+      A.b(5,31,3,4.4,"#ff8a3d"); A.b(4,25,2.6,3,"#ffa04d");
+      for(let i=0;i<4;i++){ const x=10+i*4.6, y=30-i; A.b(x,y,4.6,5.6,i%2?C:"#ffc457"); A.r(x+2,y-5,1,10,"#fff4e0"); }
+      for(let i=0;i<4;i++) A.l(12+i*4,35,11+i*4,39,"#e08a2a");
+      A.b(31,25,7.5,6.5,C); A.r(24,19,15,2,"#e0882a"); A.r(25,18,13,1,"#ffd27a");
+      A.eye(27,22,3); A.eye(33,22,3); A.blush(26,28); A.smile(30,28);
+      A.l(35,19,45,10,"#ffffff"); A.l(36,20,47,15,"#ffffff");
+      A.b(37,33,2.4,2,R); A.l(28,33,33,38,R);
+      A.b(34,40,8,5.5,R); A.b(41,36,3.4,3,R); A.l(37,36,42,36,"#a82a3a"); A.p(30,38,"#ff9aa6"); A.p(31,37,"#ff9aa6");
+      A.e(45,43,2.6,2.6,"#bff2ff"); A.e(45,43,1.4,1.4,"#ffe14d"); A.p(44,42,"#ffffff"); },
+    oldhorn:A=>{ const C="#4f9fd6"; // horseshoe crab, older than coral and grumpy about it
+      A.l(30,36,45,46,"#3a6fa8"); A.l(31,36,46,46,"#3a6fa8"); A.l(31,37,46,47,"#2c5a8f");
+      A.b(30,34,8,5,"#3f88c4"); for(let i=0;i<4;i++) A.p(25+i*3.4,39,"#9fd6ff");
+      for(let i=0;i<5;i++) A.r(9+i*5,38,1,4,"#2c5a8f");
+      A.b(21,28,17,12.5,C); for(let a=3.4;a<6;a+=.04) A.p(21+Math.cos(a)*15.5,28+Math.sin(a)*11.2,"#a8e4ff");
+      A.l(21,17,21,38,"#3f88c4"); A.r(6,38,31,2,"#2c5a8f");
+      A.eye(13,25,3); A.eye(26,25,3); A.l(11,21,16,23,INK); A.l(25,23,30,21,INK);
+      A.r(16,26,10,1,"#e9c07a"); A.r(18,32,6,1,INK); A.blush(10,31); A.blush(28,31);
+      A.e(38,24,1.4,2,"#3fa8ff"); A.p(38,22,"#3fa8ff"); },
+    // ---- molted forms (each gets its own silhouette) ----
+    bazaarbill:A=>{ A.r(7,6,2,36,"#a8743f"); A.r(39,6,2,36,"#a8743f"); CRIT.puffkin(A);
+      for(let x=4;x<45;x++) A.r(x,1,1,6,Math.floor((x-4)/4)%2?"#ffffff":"#ff4f8f"); A.r(4,0,41,1,"#d93a72");
+      for(let i=0;i<10;i++) A.e(6+i*4,7,2,1.6,i%2?"#ffffff":"#ff4f8f");
+      A.l(8,9,8,15,"#d9c7a0"); A.b(8,17,1.6,3,"#7fd3ff",false); A.l(40,9,40,14,"#d9c7a0"); A.b(40,16,1.6,3,"#ffd23d",false);
+      A.r(14,27,20,2,"#3fd0c9"); A.r(14,27,20,1,"#7ff0e4");
+      A.r(20,35,8,6,"#fff4b0"); A.p(21,36,"#ff4f8f"); A.r(23,37,3,1,"#a8743f"); A.r(23,39,3,1,"#a8743f"); },
+    voltaray:A=>{ for(let i=0;i<9;i++){ A.b(5+i*.7,11+i*1.7,2.6,2,"#ffcf3d",false); A.b(43-i*.7,11+i*1.7,2.6,2,"#ffcf3d",false); }
+      CRIT.zaplet(A);
+      A.b(24,13,8,4.4,"#3f5fd6"); A.r(16,15,17,2,"#2c46a8"); A.r(26,16,10,1,"#2c46a8"); A.p(24,11,"#ffe14d"); A.p(23,12,"#ffe14d"); A.p(25,13,"#ffe14d");
+      A.l(11,17,32,37,"#8a5a37"); A.r(30,34,10,8,"#c9853f"); A.r(30,34,10,3,"#8a5a37"); A.p(35,37,"#ffe14d");
+      sparkle(A,2,8,"#ffe14d"); sparkle(A,46,8,"#ffe14d"); },
+    beaconfin:molt("lampkin",-12,A=>{ for(let y=0;y<17;y++) for(let x=25;x<48;x++) A.clr(x,y);
+      for(let x=28;x<48;x++) for(let y=0;y<12;y++){ const k=Math.abs(y-3)/((x-24)*.38); if(k<1&&(k<.45||(x+y)%2)) A.p(x,y,k<.45?"#fff7c2":"#ffe98a"); }   // the beam
+      lightHouse(A,24,6,13); A.r(17,19,15,2,"#3fd0c9"); A.r(17,19,15,1,"#8ff7ee"); }),
+    muralopus:molt("smudgit",-12,A=>{ A.e(23,8,11,3.6,"#ff4f6d"); A.e(21,7,7,1.6,"#ff8fa0"); A.r(23,3,2,2,"#ff4f6d");
+      A.e(6,33,6,4.6,"#e9c07a"); A.e(7,34,1.4,1.2,null); A.clr(7,34); A.clr(8,34);
+      [["#ff4f6d",3,31],["#ffd23d",6,30],["#3fa8ff",9,31],["#38c46a",4,35],["#ff8a3d",10,35]].forEach(([c,x,y])=>{ A.p(x,y,c); A.p(x+1,y,c); });
+      [["#ff4f6d",40,40],["#ffd23d",44,30],["#3fa8ff",36,44],["#38c46a",2,22]].forEach(([c,x,y])=>{ A.e(x,y,1.6,1.4,c); A.p(x+2,y-1,c); });
+      A.l(2,40,10,46,"#c98a5f"); A.e(1,39,1.6,2,"#ffd23d"); }),
+    nocturnelle:molt("duskle",-8,A=>{ [[4,1],[44,-1]].forEach(([x,s])=>{ for(let j=0;j<16;j++) A.r(s>0?x+Math.floor(j*.5):x-Math.floor(j*.5)-3,22+j,4,1,j%5===4?"#7be0ff":"#4a2068"); });
+      A.l(14,18,9,6,"#4a2068"); A.l(15,18,10,6,"#4a2068"); A.l(34,18,39,6,"#4a2068"); A.l(33,18,38,6,"#4a2068");
+      A.l(40,24,46,10,"#ffffff"); A.l(41,24,46,12,"#e8e8f0"); A.p(39,25,"#2e1f5c");
+      A.e(7,6,4,4,"#fff4b0"); A.e(9,5,3.4,3.4,null); for(let y=0;y<12;y++) for(let x=4;x<14;x++){ const dx=x+.5-9, dy=y+.5-5; if(dx*dx+dy*dy<11) A.clr(x,y); }
+      sparkle(A,15,3,"#fff4b0"); sparkle(A,40,4,"#7be0ff"); }),
+    mangrovern:A=>{ const BK="#9b6a3f"; // a walking mangrove knight
+      for(let i=0;i<6;i++){ const x0=5+i*7.4; for(let t=0;t<=1;t+=.04){ const x=24+(x0-24)*t, y=30+17*Math.sqrt(t); A.p(x,y,BK); A.p(x+1,y,dk(BK,.2)); } }
+      [[8,44],[19,45],[39,44]].forEach(([x,y])=>{ A.b(x,y,2.6,1.6,"#ece6f5",false); A.p(x,y,"#c9c0de"); });
+      A.b(24,27,10,12,BK); for(let x=17;x<32;x+=3) A.l(x,19,x+1,37,dk(BK,.2));
+      A.b(24,31,6,6,"#d4d4ea"); A.r(23,27,2,8,"#38c46a"); A.r(21,29,6,2,"#38c46a");
+      [[12,11,9,6,"#38c46a"],[36,11,9,6,"#2fae5a"],[24,7,11,6.5,"#5fd67a"],[17,16,7,4,"#2fae5a"],[31,16,7,4,"#38c46a"]].forEach(([x,y,rx,ry,c])=>A.b(x,y,rx,ry,c));
+      [[9,9],[20,4],[33,8],[40,13],[15,15]].forEach(([x,y])=>{ A.p(x,y,"#ff8fc0"); A.p(x+1,y,"#ffd1e8"); });
+      A.r(31,0,2,4,"#ffffff"); A.b(32,1,2.4,1.8,"#ffffff",false); A.l(34,1,38,2,"#ffcf3d"); A.p(32,0,INK);
+      A.r(17,20,15,4,"#3b2a1f"); A.r(19,21,3,2,"#d9ff8a"); A.r(27,21,3,2,"#d9ff8a"); },
+    shericlaw:molt("pewpop",-10,A=>{ A.e(31,17,12,2.2,"#8a5a37"); A.b(31,12,6.5,5,"#a8743f"); A.r(25,14,13,2,"#ff4f6d"); A.p(28,9,"#c99a6b");
+      [[17,27]].forEach(([x,y])=>{ A.r(x-2,y,5,1,"#ffd84d"); A.r(x,y-2,1,5,"#ffd84d"); A.p(x-1,y-1,"#ffd84d"); A.p(x+1,y-1,"#ffd84d"); A.p(x-1,y+1,"#ffd84d"); A.p(x+1,y+1,"#ffd84d"); A.p(x,y,"#fff4b0"); });
+      for(let i=0;i<5;i++) A.r(26+i,30+i,9-i*2,1,"#ff4f6d");
+      [[45,33,2.2],[43,29,1.6],[46,26,1.2]].forEach(([x,y,r])=>A.b(x,y,r,r,"#e8e8f0",false)); }),
+    fossilord:A=>{ CRIT.oldhorn(A);
+      A.r(7,13,29,3,"#f2ead8"); A.r(7,15,29,1,"#c9bfa8");
+      for(let x=9;x<35;x+=6){ A.r(x,5,3,8,"#fffaf0"); A.r(x+2,5,1,8,"#d9d0bd"); }
+      for(let j=0;j<5;j++) A.r(7+j*3,4-j,29-j*6,1,"#f2ead8"); A.r(7,4,29,1,"#c9bfa8"); A.p(21,1,"#ff4f6d");
+      [[11,32],[31,30]].forEach(([x,y])=>{ for(let a=0;a<9;a+=.3) A.p(x+Math.cos(a)*a*.35,y+Math.sin(a)*a*.35,"#e9c07a"); });
+      A.e(27.5,26.5,3,3,null); for(let a=0;a<6.3;a+=.25) A.p(27.5+Math.cos(a)*3,26.5+Math.sin(a)*3,"#ffd84d"); A.l(30,29,33,36,"#ffd84d"); }
+  });
   const SCACHE={};
   function critter(id,shiny){ const k=id+(shiny?"*":""); if(SCACHE[k]) return SCACHE[k];
-    const cv=make(48,48,CRIT[id],true); SCACHE[k]=cv; SCACHE[k+"<"]=flip(cv); return cv; }
+    const cv=make(48,48,CRIT[id],"crit"); SCACHE[k]=cv; SCACHE[k+"<"]=flip(cv); return cv; }
   const critterBack=id=>{ critter(id); return SCACHE[id+"<"]; };
   function icon(id){ const k="i"+id; if(SCACHE[k]) return SCACHE[k];
     const s=critter(id), o=document.createElement("canvas"); o.width=24; o.height=24; const g=o.getContext("2d"); g.imageSmoothingEnabled=false; g.drawImage(s,0,0,24,24); return SCACHE[k]=o; }
@@ -3482,11 +3625,14 @@ var TIDEART=(function(){
 // Script events are async functions that get the engine API E (say/ask/battle/give/flag...).
 // Text tokens: {P} user's chosen name, {R} rival name.
 var TIDEDATA=(function(){
-  // ---- types: Tide > Vent > Kelp > Tide; Shell critters are tough but weak to Kelp ----
+  // ---- types: Tide > Vent > Kelp > Tide; Shell critters are tough but weak to Kelp and Ink.
+  // Spark lights up Tide and Ink but grounds out on Kelp and Shell; Ink smothers Vent and seeps into Shell, but Tide washes it away.
   const TYPES={
-    tide:{n:"Tide",c:"#3fa8ff"}, kelp:{n:"Kelp",c:"#38c46a"}, vent:{n:"Vent",c:"#ff6b3d"}, shell:{n:"Shell",c:"#c9a66b"}
+    tide:{n:"Tide",c:"#3fa8ff"}, kelp:{n:"Kelp",c:"#38c46a"}, vent:{n:"Vent",c:"#ff6b3d"}, shell:{n:"Shell",c:"#c9a66b"},
+    spark:{n:"Spark",c:"#f2b705"}, ink:{n:"Ink",c:"#7a52d6"}
   };
-  const CHART={ tide:{vent:2,kelp:.5,tide:.5}, kelp:{tide:2,shell:2,vent:.5,kelp:.5}, vent:{kelp:2,tide:.5,vent:.5}, shell:{} };
+  const CHART={ tide:{vent:2,ink:2,kelp:.5,tide:.5}, kelp:{tide:2,shell:2,vent:.5,kelp:.5}, vent:{kelp:2,tide:.5,vent:.5}, shell:{},
+    spark:{tide:2,ink:2,kelp:.5,shell:.5,spark:.5}, ink:{vent:2,shell:2,tide:.5,ink:.5} };
   const eff=(mt,dt)=>(CHART[mt]&&CHART[mt][dt])||1;
 
   const MOVES={
@@ -3507,7 +3653,12 @@ var TIDEDATA=(function(){
     crash:{n:"Riptide Crash",t:"tide",p:75,a:95}, abyss:{n:"Abyss Wave",t:"tide",p:90,a:85},
     lash:{n:"Kelp Lash",t:"kelp",p:75,a:95}, bloom:{n:"Kelp Bloom",t:"kelp",p:90,a:85},
     gush:{n:"Magma Gush",t:"vent",p:75,a:95}, plume:{n:"Scald Plume",t:"vent",p:90,a:85},
-    crush:{n:"Carapace Crush",t:"shell",p:75,a:95}, quake:{n:"Seabed Quake",t:"shell",p:90,a:85}
+    crush:{n:"Carapace Crush",t:"shell",p:75,a:95}, quake:{n:"Seabed Quake",t:"shell",p:90,a:85},
+    toss:{n:"Fish Toss",t:"tide",p:50,a:95}, pew:{n:"Snap Shot",t:"vent",p:50,a:95},
+    zap:{n:"Static Zap",t:"spark",p:40,a:100}, shock:{n:"Shock Wave",t:"spark",p:55,a:95},
+    tdive:{n:"Thunder Dive",t:"spark",p:75,a:95}, mega:{n:"Megavolt Beam",t:"spark",p:90,a:85},
+    splat:{n:"Ink Splat",t:"ink",p:40,a:100}, smother:{n:"Ink Smother",t:"ink",p:55,a:95},
+    nbrush:{n:"Night Brush",t:"ink",p:75,a:95}, abink:{n:"Abyss Ink",t:"ink",p:90,a:85}
   };
 
   // b:[hp,atk,def,spd]  learn:[[level,move]]  rate: how easily it befriends (0..1)  xp: base exp
@@ -3551,10 +3702,45 @@ var TIDEDATA=(function(){
     jelloquent:{n:"Jelloquent",t:"tide",b:[58,70,52,74],learn:[[16,"crash"],[28,"abyss"]],rate:.1,xp:145,
       d:"A jellyfish with a voice like warm current. It sings wherever the tide takes it."},
     kelpshade:{n:"Kelpshade",t:"kelp",b:[62,62,64,64],learn:[[16,"lash"],[28,"bloom"]],rate:.12,xp:140,
-      d:"So good at looking like seaweed that other seaweed asks it for directions."}
+      d:"So good at looking like seaweed that other seaweed asks it for directions."},
+    // ---- more of the reef: base forms ----
+    puffkin:{n:"Puffkin",t:"tide",b:[44,48,40,58],learn:[[1,"nibble"],[1,"stare"],[5,"splash"],[9,"toss"],[14,"burst"]],rate:.55,xp:50,
+      d:"A puffin chick that dives for fish and lines them up in its beak, smallest to biggest, to sell later."},
+    zaplet:{n:"Zaplet",t:"spark",b:[42,50,42,62],learn:[[1,"zap"],[1,"stare"],[6,"curl"],[10,"shock"]],rate:.4,xp:58,
+      d:"A torpedo ray no bigger than a postcard. It seals envelopes with a tiny spark and stamps them with its tail."},
+    lampkin:{n:"Lampkin",t:"spark",b:[48,46,46,48],learn:[[1,"nibble"],[1,"stare"],[5,"zap"],[11,"shock"]],rate:.45,xp:56,
+      d:"A baby anglerfish. Its lure is a tiny lighthouse that blinks on whenever it's nervous, which is always."},
+    smudgit:{n:"Smudgit",t:"ink",b:[44,52,42,54],learn:[[1,"splat"],[1,"stare"],[7,"curl"],[11,"smother"]],rate:.4,xp:58,
+      d:"A baby octopus that doodles on every rock with its own ink. The doodles are mostly of itself."},
+    duskle:{n:"Duskle",t:"ink",b:[48,46,54,46],learn:[[1,"splat"],[1,"curl"],[6,"stare"],[12,"smother"]],rate:.35,xp:60,
+      d:"A vampire squid the size of a plum. It wraps itself in its cloak and sighs deeply at nothing in particular."},
+    mangrub:{n:"Mangrub",t:"kelp",b:[52,48,58,34],learn:[[1,"whip"],[1,"curl"],[9,"frond"],[14,"bash"]],rate:.5,xp:54,
+      d:"A mangrove seedling that pulled itself out of the mud and walked off. Its roots make terrible legs and great anchors."},
+    pewpop:{n:"Pewpop",t:"vent",b:[40,58,40,60],learn:[[1,"pinch"],[1,"stare"],[5,"ember"],[10,"pew"],[14,"steam"]],rate:.4,xp:58,
+      d:"A pistol shrimp. It snaps its big claw so fast the bubble it fires is, for one blink, hotter than the sun."},
+    oldhorn:{n:"Oldhorn",t:"shell",b:[52,44,66,30],learn:[[1,"nibble"],[1,"curl"],[8,"bash"],[13,"stare"]],rate:.45,xp:60,
+      d:"A horseshoe crab older than the coral itself. It has blue blood and an opinion about everything newer than it."},
+    // ---- their molted forms ----
+    bazaarbill:{n:"Bazaarbill",t:"tide",b:[64,68,56,78],learn:[[16,"crash"],[28,"abyss"]],rate:.12,xp:140,
+      d:"A puffin with a striped market awning on its back. Its haggling call carries across three reefs."},
+    voltaray:{n:"Voltaray",t:"spark",b:[60,74,58,86],learn:[[16,"tdive"],[28,"mega"]],rate:.1,xp:148,
+      d:"A ray in a courier cap with a satchel full of sparks. Never late. Occasionally on fire."},
+    beaconfin:{n:"Beaconfin",t:"spark",b:[72,62,68,56],learn:[[16,"tdive"],[28,"mega"]],rate:.1,xp:146,
+      d:"Keeps a real lighthouse on its head. Lost swimmers follow the beam home, and it pretends not to be proud."},
+    muralopus:{n:"Muralopus",t:"ink",b:[62,74,56,74],learn:[[16,"nbrush"],[28,"abink"]],rate:.1,xp:148,
+      d:"Every arm holds a different brush. It paints a mural of each critter it beats, flattering or not."},
+    nocturnelle:{n:"Nocturnelle",t:"ink",b:[68,64,74,62],learn:[[16,"nbrush"],[28,"abink"]],rate:.1,xp:148,
+      d:"Writes sad poems by the glow of its own arm tips. Reading one leaves you a little bit damp."},
+    mangrovern:{n:"Mangrovern",t:"kelp",b:[80,66,86,38],learn:[[16,"lash"],[28,"bloom"]],rate:.1,xp:150,
+      d:"A walking mangrove in bark armor. Oysters live on its knees and a very calm heron lives in its hair."},
+    shericlaw:{n:"Shericlaw",t:"vent",b:[56,84,54,78],learn:[[16,"gush"],[28,"plume"]],rate:.1,xp:148,
+      d:"Wears a shell hat and a star-shaped badge. Its snap echoes across the reef at exactly noon."},
+    fossilord:{n:"Fossilord",t:"shell",b:[74,62,92,36],learn:[[16,"crush"],[28,"quake"]],rate:.1,xp:150,
+      d:"Carries a whole museum on its back, labels included. Touching the exhibits is strictly forbidden."}
   };
   [["bubblet","effervessa"],["frillip","frillustra"],["cindrop","flarefin"],["snipsnap","snapmansion"],["pufflo","puffbrawl"],
-   ["plumo","plumoir"],["starlet","stellarm"],["jellum","jelloquent"],["fronda","kelpshade"]].forEach(([a,b])=>{ SPECIES[a].evo={to:b,lv:EVO_LV}; SPECIES[b].from=a; });
+   ["plumo","plumoir"],["starlet","stellarm"],["jellum","jelloquent"],["fronda","kelpshade"],["puffkin","bazaarbill"],["zaplet","voltaray"],
+   ["lampkin","beaconfin"],["smudgit","muralopus"],["duskle","nocturnelle"],["mangrub","mangrovern"],["pewpop","shericlaw"],["oldhorn","fossilord"]].forEach(([a,b])=>{ SPECIES[a].evo={to:b,lv:EVO_LV}; SPECIES[b].from=a; });
   const STARTERS=["bubblet","frillip","cindrop"];
   const COUNTER={bubblet:"frillip",frillip:"cindrop",cindrop:"bubblet"};   // rival picks the one strong against yours
 
@@ -3571,7 +3757,7 @@ var TIDEDATA=(function(){
 
   // ---------- maps ----------
   // outdoor: . sand  , path  g seagrass (wild critters)  T reef wall  # coral  o rock  u tube sponge  w sea fan
-  //          k brain coral  m sea mushroom  f anemone  s shell  b bubble vent
+  //          k brain coral  m sea mushroom  f anemone  s shell  b bubble vent  K giant kelp stalk (woods wall)
   // indoor:  _ floor  X wall  S shelf  E bed  L table  P potted coral  C counter  r rug  M exit mat
   const MAPS={
     town:{name:"Tidepool Town",out:1,rows:[
@@ -3619,10 +3805,10 @@ var TIDEDATA=(function(){
       "T.gggg...,,.....f..T",
       "Tw.......,,.......uT",
       "TTTTTTTTT,,TTTTTTTTT"],
-      warps:[[9,21,"town",9,1,0],[10,21,"town",10,1,0],[9,0,"coral",9,14,1],[10,0,"coral",10,14,1]],
-      enc:{rate:.12,list:[["pufflo",2,4,35],["snipsnap",2,4,25],["fronda",3,4,20],["plumo",3,4,15],["jellum",4,5,5]]},
+      warps:[[9,21,"town",9,1,0],[10,21,"town",10,1,0],[9,0,"woods",9,22,1],[10,0,"woods",10,22,1]],
+      enc:{rate:.12,list:[["puffkin",2,4,30],["pufflo",2,4,20],["snipsnap",2,4,15],["fronda",3,4,12],["mangrub",3,4,10],["plumo",3,4,8],["jellum",4,5,5]]},
       npcs:[
-        {id:"gus",kind:"goby",x:13,y:14,dir:2,tr:{name:"Kid Gus",team:[["pufflo",4]],range:4,
+        {id:"gus",kind:"goby",x:13,y:14,dir:2,tr:{name:"Kid Gus",team:[["puffkin",3],["pufflo",4]],range:4,
           hi:"Hey, you're new around here! Let's battle!",lose:"Aw, my Pufflo puffed out...",after:"I'm gonna train way harder!",pay:1}},
         {id:"wen",kind:"swim",x:13,y:9,dir:2,tr:{name:"Swimmer Wen",team:[["fronda",4],["plumo",5]],range:4,
           hi:"My goggles see everything! Battle me!",lose:"Whoa, you're quick!",after:"The seagrass up north is full of critters. Weak ones are easier to befriend!",pay:1}},
@@ -3631,6 +3817,47 @@ var TIDEDATA=(function(){
         {id:"whelk",kind:"whelk",x:10,y:6,dir:0,ev:"whelk"},
         {id:"rsign",kind:"sign",x:11,y:20,ev:"routeSign"},
         {id:"it1",kind:"item",x:3,y:11,item:["tonic",1]},{id:"it2",kind:"item",x:17,y:20,item:["snack",2]}]},
+    woods:{name:"Glimmerkelp Woods",out:1,dim:1,rows:[
+      "KKKKKKKKK,,KKKKKKKKK",
+      "KK.......,,......KKK",
+      "K..gggg..,,..ggg...K",
+      "K..gggg..KK..ggg.f.K",
+      "K..gggg..KK..ggg...K",
+      "K........KK........K",
+      "KKKKKK..KKKK..KKKKKK",
+      "K......gggggg......K",
+      "K.ggg..gggggg..ggg.K",
+      "K.ggg..........ggg.K",
+      "K.ggg..KKKKKK..ggg.K",
+      "K......K....K......K",
+      "KKKK...K.o..K...KKKK",
+      "K......K....K......K",
+      "K.gggg.KK..KK.gggg.K",
+      "K.gggg........gggg.K",
+      "K.gggg..,,,,..gggg.K",
+      "K.......,KK,.......K",
+      "KKKKK...,KK,...KKKKK",
+      "K.......,,,,.......K",
+      "K..ggggg.,,.ggggg..K",
+      "K..ggggg.,,.ggggg..K",
+      "Km.......,,.......wK",
+      "KKKKKKKKK,,KKKKKKKKK"],
+      warps:[[9,23,"route",9,1,0],[10,23,"route",10,1,0],[9,0,"coral",9,14,1],[10,0,"coral",10,14,1]],
+      enc:{rate:.14,list:[["lampkin",4,6,20],["zaplet",4,6,16],["smudgit",4,6,16],["pewpop",4,6,14],["duskle",5,7,10],["oldhorn",5,6,10],["starlet",5,6,8],["mangrub",4,5,6]]},
+      trig:[[9,1,"kipWoods"],[10,1,"kipWoods"]],
+      npcs:[
+        {id:"moss",kind:"swim",x:12,y:9,dir:2,tr:{name:"Diver Moss",team:[["zaplet",6],["lampkin",6]],range:4,
+          hi:"Shh! The kelp glows if you're really quiet. ...You weren't quiet. Battle!",lose:"Zzzt. Fair enough.",
+          after:"Spark critters light up Tide and Ink types, but they fizzle against Kelp and Shell.",pay:1}},
+        {id:"lou",kind:"beret",x:4,y:12,dir:3,tr:{name:"Painter Lou",team:[["smudgit",7],["puffkin",6]],range:2,
+          hi:"Hold still, I'm painting you! ...Ugh, you moved. Now we battle!",lose:"Hmm. I'll call this one 'Defeat, in Blue'.",
+          after:"Ink critters smother Vent fire and seep right into a Shell. Elder Brine hates that.",pay:1}},
+        {id:"vesper",kind:"poet",x:18,y:5,dir:2,tr:{name:"Poet Vesper",team:[["duskle",7],["pewpop",8]],range:6,
+          hi:"O traveler, who swims where kelp grows thick... prepare to be rhymed at.",lose:"Alas. Alack. A loss. ...I'll write about it.",
+          after:"A Tide move washes Ink right off. Isn't that the saddest thing?",pay:1}},
+        {id:"kip3",kind:"rival",x:11,y:1,dir:2,show:"kipWoodsOn",hide:"kipWoods"},
+        {id:"wsign",kind:"sign",x:12,y:22,ev:"woodsSign"},
+        {id:"it3",kind:"item",x:10,y:12,item:["tonic",2]},{id:"it4",kind:"item",x:18,y:7,item:["snack",3]},{id:"it5",kind:"item",x:2,y:1,item:["tonic",1]}]},
     coral:{name:"Coralbrook",out:1,rows:[
       "TTTTTTTTTTTTTTTTTTTT",
       "Tw#..............#wT",
@@ -3650,7 +3877,7 @@ var TIDEDATA=(function(){
       "TTTTTTTTT,,TTTTTTTTT"],
       bld:[{k:"hall",x:6,y:2,w:8,h:4,doors:[[9,5],[10,5]],to:["hall",5,10,1]},{k:"clinic",x:2,y:4,w:4,h:3,doors:[[3,6]],to:["clinic",3,6,1]},
         {k:"cottage",x:14,y:4,w:4,h:3,doors:[[15,6]],ev:"cottage"}],
-      warps:[[9,15,"route",9,1,0],[10,15,"route",10,1,0]], enter:"coralEnter",
+      warps:[[9,15,"woods",9,1,0],[10,15,"woods",10,1,0]], enter:"coralEnter",
       npcs:[{id:"worry",kind:"snail",x:14,y:11,dir:2,ev:"worry"},{id:"csign",kind:"sign",x:12,y:12,ev:"coralSign"},
         {id:"kip2",kind:"rival",x:11,y:7,dir:2,show:"kipOutside"}]},
     home:{name:"Home",rows:[
@@ -3703,9 +3930,12 @@ var TIDEDATA=(function(){
       "X__________X",
       "XXXXXMXXXXXX"],
       warps:[[5,11,"coral",9,6,0]],
-      npcs:[{id:"pip",kind:"appr",x:6,y:8,dir:2,tr:{name:"Apprentice Pip",team:[["snipsnap",6]],range:5,
+      npcs:[{id:"pip",kind:"appr",x:6,y:8,dir:2,tr:{name:"Apprentice Pip",team:[["oldhorn",8],["snipsnap",9]],range:5,
           hi:"You want to see the Elder? You'll have to get past me first!",lose:"Wow... you might actually have a chance.",
-          after:"Elder Brine's critters have super tough shells. Kelp moves crack them open!",pay:1}},
+          after:"Elder Brine's critters have super tough shells. Kelp and Ink moves crack them open!",pay:1}},
+        {id:"tam",kind:"appr",x:8,y:4,dir:2,tr:{name:"Apprentice Tam",team:[["starlet",9],["oldhorn",9]],range:5,
+          hi:"Pip let you through?! Well, I won't! Shell critters never back down!",lose:"My shells... cracked...",
+          after:"Spark moves just bounce off a Shell. Bring Kelp or Ink instead!",pay:1}},
         {id:"brine",kind:"elder",x:5,y:2,dir:0,ev:"elder"}]}
   };
 
@@ -3737,8 +3967,21 @@ var TIDEDATA=(function(){
     async shelly(E){ await E.say(E.f("starter")?"A partner! Lucky you. Stay out of the tall seagrass if you'd rather avoid wild critters.":"The tall seagrass up north is where wild critters hide.","SHELLY"); },
     async kidtip(E){ await E.say("Tip! Press C to open your menu. You can check your team and your bag there.","KID"); },
     async townSign(E){ await E.say("TIDEPOOL TOWN\nWhere every little wave begins."); },
-    async routeSign(E){ await E.say("SEAGRASS PATH\nNorth: Coralbrook"); },
-    async coralSign(E){ await E.say("CORALBROOK\nHome of Elder Brine, keeper of the Pearl Badge."); },
+    async routeSign(E){ await E.say("SEAGRASS PATH\nNorth: Glimmerkelp Woods, then Coralbrook"); },
+    async woodsSign(E){ await E.say("GLIMMERKELP WOODS\nThe kelp grows so tall here that it's always dusk. Mind the glowing things."); },
+    async kipWoods(E){
+      if(E.f("kipWoods")||E.f("badge1")||!E.f("starter")) return;
+      E.set("kipWoodsOn"); E.faceNpc("kip3");
+      await E.say("{P}! There you are! I've been waiting forever. Like, four whole minutes!",R.toUpperCase());
+      await E.say("I made a new friend on the Seagrass Path. Let's see if you've been training at all!",R.toUpperCase());
+      const rid=COUNTER[E.f("starterId")]||"frillip";
+      const res=await E.battle({name:R,rival:1,team:[["puffkin",8],[rid,9]],lose:"No way! I was SO close!"});
+      if(res!=="win") return;
+      await E.say("Fine, fine. You're getting good. But Elder Brine's shells are way tougher than me!",R.toUpperCase());
+      await E.say("I'm gonna go train in the tall kelp. Don't you dare get that badge first!",R.toUpperCase());
+      await E.npcWalk("kip3",[[16,1]]); E.set("kipWoods");
+    },
+    async coralSign(E){ await E.say("CORALBROOK\nHome of Elder Brine, keeper of the Pearl Badge. South: Glimmerkelp Woods"); },
     async cottage(E){ await E.say("The door's shut tight. Someone inside is snoring..."); },
     async worry(E){ await E.say(E.f("badge1")?"You beat Elder Brine? Maybe you could stop Team Trawl someday...":
         "Have you seen those crabs wearing nets? Team Trawl! They want to scoop up every critter in the reef.","GRANNY SNAIL"); },
@@ -3796,7 +4039,7 @@ var TIDEDATA=(function(){
       await E.say("Hrmph. Another young swimmer after the Pearl Badge?","ELDER BRINE");
       await E.say("I've guarded this hall for sixty tides. My critters' shells are tougher than barnacles!","ELDER BRINE");
       await E.say("Show me what you've got!","ELDER BRINE");
-      const res=await E.battle({name:"Elder Brine",boss:1,team:[["snipsnap",7],["starlet",8]],lose:"Well, I'll be..."});
+      const res=await E.battle({name:"Elder Brine",boss:1,team:[["oldhorn",10],["snipsnap",11],["starlet",12]],lose:"Well, I'll be..."});
       if(res!=="win") return;
       await E.say("Your bond with your critters is the real thing.","ELDER BRINE");
       await E.say("Take the Pearl Badge. You've earned it!","ELDER BRINE");
@@ -3855,12 +4098,39 @@ var DEEPDATA=(function(){
       sk:[[1,"ballad"],[5,"solo"],[9,"flow"],[16,"power"]],perk:"Hums between rounds: the whole team slowly regains MP."},
     impostor:{n:["Seaweed Impostor","Grandmaster of Kelp"],d:"Hides among the seaweed by looking like seaweed. Has fooled three crabs and one mirror.",
       hp:[18,5],mp:[5,1.2],str:[6,1.4],agi:[10,1.9],int:[4,.8],hits:5,wpn:["blade","whip"],arm:["light","medium"],
-      sk:[[1,"blend"],[5,"pilfer"],[9,"shuriken"],[16,"ambush"]],perk:"Slips away from fights and swipes things after wins."}
+      sk:[[1,"blend"],[5,"pilfer"],[9,"shuriken"],[16,"ambush"]],perk:"Slips away from fights and swipes things after wins."},
+    grocer:{n:["Beak Grocer","Seafood Magnate"],d:"Carries ten fish in its beak at once, and sells every one of them back to you.",
+      hp:[18,5],mp:[6,1.6],str:[6,1.3],agi:[8,1.5],int:[5,1.1],hits:6,wpn:["blade","whip"],arm:["light","medium"],
+      sk:[[1,"fishtoss"],[5,"sample"],[9,"haggle"],[16,"catch"]],perk:"Sells the leftovers: more gold after every win."},
+    courier:{n:["Static Courier","Thunderbolt Postmaster"],d:"Delivers every letter by fin, and every fin by zap. Signature required.",
+      hp:[16,4.4],mp:[7,1.8],str:[5,1.1],agi:[11,2.1],int:[7,1.5],hits:6,wpn:["glow","blade"],arm:["light"],
+      sk:[[1,"parcel"],[6,"express"],[10,"signed"],[16,"chain"]],perk:"Its spark skills hit 20% harder."},
+    keeper:{n:["Lamp Keeper","Lighthouse Warden"],d:"Keeps its little light on all night so nobody gets lost. Gets a bit lost itself.",
+      hp:[18,5],mp:[8,2.2],str:[4,.9],agi:[5,.9],int:[9,2],hits:99,wpn:["staff","glow"],arm:["light","robe"],
+      sk:[[1,"flash"],[5,"guide"],[9,"beacon"],[16,"beam"]],perk:"Its lamp never goes out: regains 2 MP every round."},
+    painter:{n:["Ink Painter","Grand Muralist"],d:"Paints whatever it sees. Mostly it sees foes, so mostly it paints them, badly, in ink.",
+      hp:[16,4.5],mp:[7,2],str:[5,1.1],agi:[8,1.5],int:[9,1.9],hits:8,wpn:["whip","staff"],arm:["light","robe"],
+      sk:[[1,"splatter"],[5,"touchup"],[9,"blot"],[16,"masterpiece"]],perk:"Its ink skills may splash foes in the eyes."},
+    poet:{n:["Gloom Poet","Abyssal Laureate"],d:"Recites sad poems in the dark. Foes lose the will to fight. Friends lose the will to listen.",
+      hp:[17,4.8],mp:[8,2.2],str:[3,.7],agi:[6,1],int:[11,2.3],hits:99,wpn:["staff"],arm:["light","robe"],
+      sk:[[1,"verse"],[6,"elegy"],[10,"brood"],[16,"tragedy"]],perk:"Its ink skills hit 20% harder."},
+    squire:{n:["Root Squire","Mangrove Paladin"],d:"Plants its roots in front of its friends and refuses to budge. Mostly because it can't.",
+      hp:[24,7],mp:[5,1.2],str:[7,1.6],agi:[3,.6],int:[4,.9],hits:6,wpn:["blade","claw"],arm:["light","medium","heavy"],
+      sk:[[1,"rootguard"],[5,"sap"],[9,"sunbathe"],[16,"canopy"]],perk:"Thick bark: every hit on it lands softer."},
+    slinger:{n:["Bubble Gunslinger","High-Noon Sheriff"],d:"Fastest claw in the reef. Snaps first, asks questions never.",
+      hp:[18,5],mp:[5,1.2],str:[7,1.6],agi:[10,1.9],int:[3,.6],hits:5,wpn:["claw","blade"],arm:["light","medium"],
+      sk:[[1,"quickdraw"],[5,"ricochet"],[9,"aim"],[16,"fan"]],perk:"Dead-eye: lands lucky hits a lot."},
+    curator:{n:["Antique Appraiser","Grand Curator"],d:"Has seen it all, twice. Appraises every foe and finds them overpriced.",
+      hp:[22,6.5],mp:[6,1.6],str:[6,1.3],agi:[3,.6],int:[7,1.5],hits:7,wpn:["staff","claw"],arm:["light","medium","heavy"],
+      sk:[[1,"heirbash"],[5,"blueblood"],[9,"tuttut"],[16,"record"]],perk:"Appraises the loot: sometimes finds a rare item after a win."}
   };
   // critter species -> [class, tier]
   const SPCLS={bubblet:["somm",0],effervessa:["somm",1],frillip:["frill",0],frillustra:["frill",1],cindrop:["raver",0],flarefin:["raver",1],
     snipsnap:["landlord",0],snapmansion:["landlord",1],pufflo:["puff",0],puffbrawl:["puff",1],plumo:["sauce",0],plumoir:["sauce",1],
-    starlet:["lender",0],stellarm:["lender",1],jellum:["crooner",0],jelloquent:["crooner",1],fronda:["impostor",0],kelpshade:["impostor",1]};
+    starlet:["lender",0],stellarm:["lender",1],jellum:["crooner",0],jelloquent:["crooner",1],fronda:["impostor",0],kelpshade:["impostor",1],
+    puffkin:["grocer",0],bazaarbill:["grocer",1],zaplet:["courier",0],voltaray:["courier",1],lampkin:["keeper",0],beaconfin:["keeper",1],
+    smudgit:["painter",0],muralopus:["painter",1],duskle:["poet",0],nocturnelle:["poet",1],mangrub:["squire",0],mangrovern:["squire",1],
+    pewpop:["slinger",0],shericlaw:["slinger",1],oldhorn:["curator",0],fossilord:["curator",1]};
 
   // skills. tg: foe foes foes2 (two random foes) ally allies self.  el: PRAWN types (tide kelp vent shell), via TIDEDATA.eff
   // pw: [lo,hi] + int/2 (spell-like), or mul: x attack (blow-like).  t2: needs the molted form.  buy: sold by the Tutor in town.
@@ -3909,7 +4179,47 @@ var DEEPDATA=(function(){
     pilfer:{n:"Pilfer",cls:"impostor",mp:2,tg:"foe",fx:"steal",d:"Swipes gold or an item from a foe."},
     shuriken:{n:"Frond Shuriken",cls:"impostor",mp:5,tg:"foes2",el:"kelp",mul:.9,d:"Two kelp stars at two foes."},
     ambush:{n:"Ambush",cls:"impostor",t2:1,mp:9,tg:"foes",el:"kelp",mul:1.1,d:"Springs out of nowhere at every foe."},
-    becomekelp:{n:"Become Kelp",cls:"impostor",mp:8,tg:"allies",fx:"evaUp",buy:200,d:"The whole party is suddenly seaweed. Foes miss more."}
+    becomekelp:{n:"Become Kelp",cls:"impostor",mp:8,tg:"allies",fx:"evaUp",buy:200,d:"The whole party is suddenly seaweed. Foes miss more."},
+    fishtoss:{n:"Fish Toss",cls:"grocer",mp:3,tg:"foe",el:"tide",mul:1.3,d:"Lobs yesterday's catch at a foe. Still wet."},
+    sample:{n:"Free Sample",cls:"grocer",mp:4,tg:"ally",fx:"heal",pw:[14,22],d:"A bite of fresh fish for a friend. Heals."},
+    haggle:{n:"Haggle",cls:"grocer",mp:3,tg:"foe",fx:"steal",d:"Talks a foe out of some gold or an item."},
+    catch:{n:"Catch of the Day",cls:"grocer",t2:1,mp:10,tg:"foes",el:"tide",mul:1.1,d:"Unloads the whole stall onto every foe."},
+    clearance:{n:"Clearance Sale",cls:"grocer",mp:8,tg:"allies",fx:"heal",pw:[10,16],buy:200,d:"Everything must go! Heals the whole team."},
+    parcel:{n:"Parcel Zap",cls:"courier",mp:3,tg:"foe",el:"spark",pw:[12,20],d:"Special delivery: one shock, straight to a foe."},
+    express:{n:"Express Post",cls:"courier",mp:5,tg:"allies",fx:"agiUp",d:"Next-day speed for everyone. Quicker, and harder to hit."},
+    signed:{n:"Signature Required",cls:"courier",mp:4,tg:"foe",fx:"sleep",ch:.75,d:"A foe stops to sign for a parcel and loses its turn."},
+    chain:{n:"Chain Letter",cls:"courier",t2:1,mp:11,tg:"foes",el:"spark",pw:[20,30],d:"Forward this shock to every foe. Or else."},
+    returnto:{n:"Return to Sender",cls:"courier",mp:4,tg:"self",fx:"counter",buy:180,d:"Bounces the next hits right back at whoever sent them."},
+    flash:{n:"Flash Bulb",cls:"keeper",mp:3,tg:"foe",el:"spark",pw:[11,19],d:"Pops its lure right in a foe's eyes."},
+    guide:{n:"Guiding Light",cls:"keeper",mp:4,tg:"ally",fx:"heal",pw:[16,26],d:"A warm glow that leads a friend back to good health."},
+    beacon:{n:"Beacon Sweep",cls:"keeper",mp:5,tg:"foes",fx:"hitDn",d:"Sweeps its beam across the foes. They can barely see."},
+    beam:{n:"Lighthouse Beam",cls:"keeper",t2:1,mp:12,tg:"foes",el:"spark",pw:[22,34],d:"The whole lighthouse, at full power, at every foe."},
+    vigil:{n:"Night Vigil",cls:"keeper",mp:12,tg:"ally",fx:"revive",pct:.5,ko:1,buy:260,d:"Keeps watch all night: a knocked-out friend wakes with half its HP."},
+    splatter:{n:"Splatter",cls:"painter",mp:3,tg:"foe",el:"ink",pw:[12,20],d:"Flicks a brush full of ink at a foe."},
+    touchup:{n:"Touch-Up",cls:"painter",mp:4,tg:"ally",fx:"heal",pw:[14,22],cure:1,d:"Paints over a friend's scrapes. Heals and cures poison."},
+    blot:{n:"Blot Out",cls:"painter",mp:5,tg:"foe",fx:"sleep",ch:.75,d:"Paints a foe's eyes shut. It may lose a turn or two."},
+    masterpiece:{n:"Masterpiece",cls:"painter",t2:1,mp:11,tg:"foes",el:"ink",pw:[20,32],d:"A mural of every foe, painted directly onto every foe."},
+    camo:{n:"Camouflage Mural",cls:"painter",mp:8,tg:"allies",fx:"evaUp",buy:200,d:"Paints the team into the background. Foes miss more."},
+    verse:{n:"Bleak Verse",cls:"poet",mp:3,tg:"foe",el:"ink",pw:[12,20],fx:"poison",ch:.35,d:"A poem so bleak it stings. May poison."},
+    elegy:{n:"Elegy",cls:"poet",mp:4,tg:"foes",fx:"atkDn",d:"A lament for the foes' lost hopes. They hit softer."},
+    brood:{n:"Brood",cls:"poet",mp:3,tg:"self",fx:"hide",d:"Wraps itself in its cloak. Can't be hit; its next line lands double."},
+    tragedy:{n:"Epic Tragedy",cls:"poet",t2:1,mp:12,tg:"foes",el:"ink",pw:[22,34],d:"All five acts, all at once, at every foe."},
+    sonnet:{n:"Sonnet of Sighs",cls:"poet",mp:8,tg:"foes",fx:"sleep",ch:.5,buy:220,d:"Fourteen lines of sighing. Every foe may doze off."},
+    rootguard:{n:"Root Guard",cls:"squire",mp:2,tg:"self",fx:"guard",d:"Digs in its roots. Draws every attack this round."},
+    sap:{n:"Sap Strike",cls:"squire",mp:4,tg:"foe",el:"kelp",mul:1.4,d:"A sticky, heavy swing at one foe."},
+    sunbathe:{n:"Sunbathe",cls:"squire",mp:4,tg:"self",fx:"heal",pct:.35,d:"Soaks up the light from far above. Heals itself."},
+    canopy:{n:"Canopy",cls:"squire",t2:1,mp:9,tg:"allies",fx:"defUp",d:"Spreads its branches over the whole team. Everyone's tougher."},
+    overgrow:{n:"Overgrowth",cls:"squire",mp:10,tg:"foes",el:"kelp",mul:1.1,buy:220,d:"Roots burst up under every foe."},
+    quickdraw:{n:"Quick Draw",cls:"slinger",mp:3,tg:"foe",el:"vent",mul:1.3,d:"A scalding snap-shot before the foe can blink."},
+    ricochet:{n:"Ricochet",cls:"slinger",mp:4,tg:"foes2",el:"vent",mul:.9,d:"One bubble, two foes. Don't ask how."},
+    aim:{n:"Steady Aim",cls:"slinger",mp:5,tg:"allies",fx:"atkUp",d:"Calls the shots. Everyone hits harder this fight."},
+    fan:{n:"Fan the Claw",cls:"slinger",t2:1,mp:10,tg:"foes",el:"vent",mul:1.2,d:"Snap snap snap snap. Hits every foe."},
+    showdown:{n:"Showdown",cls:"slinger",mp:7,tg:"foe",el:"vent",mul:2.3,buy:200,d:"High noon. One foe, one snap."},
+    heirbash:{n:"Heirloom Bash",cls:"curator",mp:3,tg:"foe",el:"shell",mul:1.3,d:"Whacks a foe with a very old, very heavy heirloom."},
+    blueblood:{n:"Blue Blood",cls:"curator",mp:5,tg:"ally",fx:"heal",pw:[14,24],cure:1,d:"Its rare blue blood heals a friend and clears out poison."},
+    tuttut:{n:"Tut-Tut",cls:"curator",mp:4,tg:"foes",fx:"atkDn",d:"Points out every foe's flaws. They hit softer out of embarrassment."},
+    record:{n:"Fossil Record",cls:"curator",t2:1,mp:10,tg:"foes",el:"shell",mul:1.25,d:"Drops four hundred million years of history on every foe."},
+    restore:{n:"Restoration",cls:"curator",mp:14,tg:"ally",fx:"revive",pct:.6,ko:1,buy:260,d:"Restores a knocked-out friend to fine condition."}
   };
 
   const GEAR={
@@ -4349,15 +4659,16 @@ var DEEP=(function(){
           const m=team()[j], d=dp(m), slot=it.k; Q.gold-=it.p; if(d[slot]) Q.stash.push(d[slot]); d[slot]=id;
           await K.say(`${nm(m)} equips the ${it.n}!`); } } }
     if(kind==="tutor"){
-      const ids=Object.keys(D.SK).filter(k=>D.SK[k].buy);
+      const ids=Object.keys(D.SK).filter(k=>D.SK[k].buy&&team().some(m=>CI(m)[0]===D.SK[k].cls));   // only callings on the team (17 won't fit)
+      if(!ids.length) return K.say("I've nothing to teach your team's callings. Come back with new friends!","TUTOR");
       for(;;){ const i=await shopMenu({title:"SKILL TUTOR",items:ids.map(id=>{ const s=D.SK[id]; return {t:s.n,p:s.buy,d:`${s.d} For a ${D.CLS[s.cls].n[0]}.`}; })});
         if(i<0) return K.say("Practice makes perfect. Mostly.","TUTOR"); const id=ids[i], s=D.SK[id];
         if(Q.gold<s.buy){ await K.say("You don't have enough gold.","TUTOR"); continue; }
         const j=await pickAlly(`Who learns ${s.n}?`,m=>canBuy(m,id)); if(j<0) continue;
         const m=team()[j]; Q.gold-=s.buy; dp(m).sk.push(id); K.jingle(); await K.say(`${nm(m)} learned ${s.n}!`); } }
   }
-  const gearDesc=id=>{ const it=G(id), who=Object.values(D.CLS).filter(c=>(it.k==="w"?c.wpn:c.arm).includes(it.cat)).map(c=>c.n[0]);
-    return (it.k==="w"?`Attack +${it.atk}. `:`Defense +${it.def}. `)+"For: "+who.join(", ")+"."; };
+  const gearDesc=id=>{ const it=G(id), who=team().filter(m=>(it.k==="w"?C(m).wpn:C(m).arm).includes(it.cat)).map(nm);   // team members only: 17 callings won't fit
+    return (it.k==="w"?`Attack +${it.atk}. `:`Defense +${it.def}. `)+(who.length?"For: "+who.join(", ")+".":"No one on your team can use it."); };
   async function sellGear(){
     for(;;){ if(!Q.stash.length) return K.say("You have no spare gear to sell.","ARMORER");
       const i=await shopMenu({title:"SELL",items:Q.stash.map(id=>({t:G(id).n,p:Math.floor((G(id).p||60)/2),d:gearDesc(id)}))});
@@ -4426,7 +4737,7 @@ var DEEP=(function(){
   }
 
   // ---------- skills: one routine for the field and for rounds ----------
-  const EC={tide:"#9fe6ff",kelp:"#7be08a",vent:"#ff7a3d",shell:"#ffe0a0"};
+  const EC={tide:"#9fe6ff",kelp:"#7be08a",vent:"#ff7a3d",shell:"#ffe0a0",spark:"#ffe14d",ink:"#a98cff"};
   async function useSkill(m,id,tgt,inB){
     const s=D.SK[id], d=dp(m), mi=team().indexOf(m);
     if(d.mp<s.mp){ await say2(`${nm(m)} is out of MP!`,inB); return; }
@@ -4442,13 +4753,14 @@ var DEEP=(function(){
           for(let h=0;h<(s.hits||1);h++){ const a0=atk(m)*buffAtk(mi);
             dmg+=s.pw?rnd(s.pw[0],s.pw[1])+Math.floor(intl(m)/2):Math.max(1,Math.floor(rnd(a0,a0*2)*s.mul)-(s.pierce?0:M.def)); }
           if(QB.ms[mi].amb){ dmg*=2; QB.ms[mi].amb=0; }
-          if(CI(m)[0]==="somm"&&s.el==="tide") dmg*=1.2;
+          if(CI(m)[0]==="somm"&&s.el==="tide") dmg*=1.2; if(CI(m)[0]==="courier"&&s.el==="spark") dmg*=1.2; if(CI(m)[0]==="poet"&&s.el==="ink") dmg*=1.2;
           dmg=Math.max(1,Math.floor(dmg*e)); if(e>1) strong=1; if(e<1) weak=1;
           parts(f.x+fsz(f)/2,f.y+fsz(f)/2,EC[s.el]||"#ffffff",12); hurtFoe(f,dmg); }
         if(f.dead) continue;
         if(s.fx==="poison"&&Math.random()<(s.ch||1)){ f.poi=1; }
         if(s.fx==="sleep"){ if(M.boss) said.push(`${M.n} shrugs it off!`); else if(Math.random()<s.ch){ f.sleep=rnd(1,2); said.push(`${M.n} stops to stare. It won't act!`); } else said.push(`${M.n} isn't fooled.`); }
         if(s.fx==="atkDn") f.atkDn=1; if(s.fx==="hitDn") f.hitDn=1;
+        if(CI(m)[0]==="painter"&&s.el==="ink"&&!f.hitDn&&Math.random()<.35){ f.hitDn=1; said.push(`${M.n} gets ink in its eyes!`); }
         if(s.fx==="steal"){ if(f.stolen){ said.push("Nothing left to swipe!"); continue; } f.stolen=1;
           if(Math.random()<.5){ const n=M.g*2+rnd(0,10); Q.gold+=n; said.push(`Swiped ${n} G!`); }
           else { const it=Math.random()<.7?"tonic":"spritz"; give(it,1); said.push(`Swiped a ${D.ITEMS[it].n}!`); } }
@@ -4536,9 +4848,10 @@ var DEEP=(function(){
     }
     if(res==="win"){
       let xp=0, gold=0; for(const f of QB.foes){ xp+=D.MON[f.id].xp; gold+=D.MON[f.id].g; }
-      const rent=Math.max(0,...has("landlord").map(m=>tier(m)?.3:.15)); gold=Math.floor(gold*(1+rent));
+      const rent=Math.max(0,...has("landlord").map(m=>tier(m)?.3:.15))+Math.max(0,...has("grocer").map(m=>tier(m)?.2:.1)); gold=Math.floor(gold*(1+rent));
       const live=team().filter(up), each=Math.max(1,Math.floor(xp*(K.S.perks.pearl?1.2:1)/live.length)); Q.gold+=gold; QB.msg="";
       await K.say(`Victory! The team gets ${gold} G${rent?" (rent included)":""} and ${each} XP each.`);
+      if(has("curator").length&&Math.random()<.15){ const it=Math.random()<.6?"spritz":"spark"; give(it,1); await K.say(`${nm(has("curator")[0])} appraised the loot and found a ${D.ITEMS[it].n}!`); }
       if(has("impostor").length&&Math.random()<.2){ const it=Math.random()<.7?"tonic":"spritz"; give(it,1); await K.say(`${nm(has("impostor")[0])} swiped a ${D.ITEMS[it].n} on the way out!`); }
       for(const m of live) await K.grow(m,each);
     }
@@ -4554,6 +4867,7 @@ var DEEP=(function(){
       if(d.poi){ const x=Math.max(1,Math.floor(mhp(m)/16)); d.hp=Math.max(1,d.hp-x); pop(i,x,"#b6ff6a",1); await msg(`${nm(m)} is hurt by poison.`,.5); }
       if(CI(m)[0]==="lender"&&d.hp<mhp(m)){ const h=Math.max(1,Math.floor(mhp(m)*.05)); d.hp=Math.min(mhp(m),d.hp+h); pop(i,h,"#7dffa0",1); } }
     if(has("crooner").length) team().filter(up).forEach(m=>{ dp(m).mp=Math.min(mmp(m),dp(m).mp+1); });
+    has("keeper").filter(up).forEach(m=>{ dp(m).mp=Math.min(mmp(m),dp(m).mp+2); });
     for(const f of aliveFoes()) if(f.poi){ hurtFoe(f,Math.max(1,Math.floor(D.MON[f.id].hp/10))); }
     if(aliveFoes().some(f=>f.poi)) await K.wait(.4);
     QB.ms.forEach(s=>{ s.guard=0; s.counter=0; s.hide=0; });
@@ -4592,7 +4906,7 @@ var DEEP=(function(){
     if(a.k==="item"){ await msg(`${nm(m)} uses a ${D.ITEMS[a.id].n}.`,.5); await useItem(a.id,a.t,true); return null; }
     if(a.k==="skill"){ await useSkill(m,a.id,a.t,true); return null; }
     if(a.k==="fight"){
-      const f=a.t&&!a.t.dead?a.t:aliveFoes()[0]; if(!f) return null; const M=D.MON[f.id], w=G(dp(m).w), n=hits(m), crit=CI(m)[0]==="raver"?.15:.04;
+      const f=a.t&&!a.t.dead?a.t:aliveFoes()[0]; if(!f) return null; const M=D.MON[f.id], w=G(dp(m).w), n=hits(m), crit=CI(m)[0]==="slinger"?.2:CI(m)[0]==="raver"?.15:.04;
       let tot=0, land=0, cr=0;
       for(let h=0;h<n;h++){ if(rnd(1,100)>clamp(80+(w?w.hit:0)+agi(m)/2-M.ev,15,98)) continue;
         land++; const a0=Math.floor(atk(m)*buffAtk(mi)); let d=rnd(a0,a0*2)-M.def; if(Math.random()<crit){ d+=a0; cr=1; } tot+=Math.max(1,d); }
@@ -4624,8 +4938,8 @@ var DEEP=(function(){
     const ch=clamp(85-agi(t)/2-ms.eva-(f.hitDn?25:0)-(CI(t)[0]==="raver"?10:0),15,95);
     QB.msg=`${M.n} attacks ${nm(t)}`;
     if(rnd(1,100)>ch){ pop(ti,"Miss","#bfe6ff",1); await msg(QB.msg,.55); return; }
-    const guardDef=ms.guard?Math.floor(def(t)*.8):0, puff=ms.counter?6:0;
-    hurtMember(t,Math.max(1,Math.floor(rnd(M.atk,M.atk*2)*atkMul)-def(t)-ms.def-guardDef-puff));
+    const guardDef=ms.guard?Math.floor(def(t)*.8):0, puff=ms.counter?6:0, bark=CI(t)[0]==="squire"?(tier(t)?6:3):0;
+    hurtMember(t,Math.max(1,Math.floor(rnd(M.atk,M.atk*2)*atkMul)-def(t)-ms.def-guardDef-puff-bark));
     await msg(QB.msg,.55);
     if(!up(t)){ await msg(`${nm(t)} is knocked out!`); return; }
     if(M.poi&&!dp(t).poi&&Math.random()<M.poi){ dp(t).poi=1; await msg(`${nm(t)} is poisoned!`,.6); }
@@ -4761,7 +5075,7 @@ var DEEP=(function(){
 // by the shrimp's home (Bubble Snacks, Kelp Tonics) and unlocks perks at tag milestones. No XP from tags.
 var TIDE=(function(){
   const A=TIDEART, D=TIDEDATA, W=240, H=160, KEY="tagtool.tide", VER=1, SPEED=5;
-  const SOLID="T#ouwkmXSELPC~";
+  const SOLID="T#ouwkmXSELPC~K";
   let S=null, g=null, cv=null, host=null, raf=0, lastT=0, time=0, open=false;
   const dbg={on:false};
 
@@ -4791,7 +5105,8 @@ var TIDE=(function(){
   const xpAt=L=>Math.floor(.8*L*L*L);
   function stat(m,k){ const b=SP(m.sp).b; if(k==="hp") return Math.floor(2*b[0]*m.lv/100)+m.lv+11;
     return Math.floor(2*b[{atk:1,def:2,spd:3}[k]]*m.lv/100)+5; }
-  function mkMon(sp,lv){ const mv=SP(sp).learn.filter(l=>l[0]<=lv).map(l=>l[1]).slice(-4); const m={sp,lv,xp:xpAt(lv),hp:0,mv}; m.hp=stat(m,"hp"); return m; }
+  function mkMon(sp,lv){ const s=SP(sp), L=s.from?[...SP(s.from).learn,...s.learn]:s.learn;   // a molted form met early still knows its base form's moves
+    const mv=[...new Set(L.filter(l=>l[0]<=lv).map(l=>l[1]))].slice(-4); const m={sp,lv,xp:xpAt(lv),hp:0,mv}; m.hp=stat(m,"hp"); return m; }
   const nm=m=>SP(m.sp).n, alive=m=>m.hp>0;
   function healAll(){ S.team.forEach(m=>m.hp=stat(m,"hp")); }
 
@@ -4840,7 +5155,9 @@ var TIDE=(function(){
   function menu(kind,o){ return new Promise(res=>{ ui=Object.assign({kind,cur:0,res},o); }); }
   function uiUpdate(){ const u=ui, n=(u.items||[]).length;
     const done=v=>{ ui=null; u.res(v); };
-    if(u.kind==="info"){ if(take("A")||take("B")) done(); return; }
+    if(u.kind==="info"){ if(u.journal){ const pn=Math.ceil(Object.keys(D.SPECIES).length/18); u.pg=u.pg||0;
+        if(take("left")) u.pg=(u.pg+pn-1)%pn; if(take("right")) u.pg=(u.pg+1)%pn; }
+      if(take("A")||take("B")) done(); return; }
     if(u.kind==="cmd"||u.kind==="moves"){ const cols=2;
       if(take("left")&&u.cur%2) u.cur--; if(take("right")&&u.cur%2===0&&u.cur+1<n) u.cur++;
       if(take("up")&&u.cur>=2) u.cur-=2; if(take("down")&&u.cur+2<n) u.cur+=2;
@@ -5223,6 +5540,10 @@ var TIDE=(function(){
       const tx=P.mv&&P.t>.5?P.x:(P.mv?P.fx:P.x), ty=P.mv&&P.t>.5?P.y:(P.mv?P.fy:P.y);
       if(tileAt(tx,ty)==="g"){ const gt=A.tile("g",(tx*7+ty*13)%8,(f+tx+ty)%2); g.drawImage(gt,0,10,16,6,tx*16-ox,ty*16-oy+10,16,6); } }});
     ents.sort((a,b)=>a.y-b.y).forEach(e=>e.d());
+    if(MAP.dim){ g.globalCompositeOperation="multiply"; g.fillStyle="#a8e0d0"; g.fillRect(0,0,W,H); g.globalCompositeOperation="source-over";   // dusk under the tall kelp, with drifting glow plankton
+      for(let i=0;i<18;i++){ const k=(time*.05+i*.137)%1, x=((i*53)%W)+Math.sin(time*.8+i)*10, y=H-k*(H+20), on=(Math.sin(time*2+i*1.7)+1)/2;
+        g.globalAlpha=.35+on*.5; g.fillStyle=i%3?"#9ff7ff":"#e7ff8a"; g.fillRect(Math.round(x),Math.round(y),1,1); if(on>.6){ g.globalAlpha=.25; g.fillRect(Math.round(x)-1,Math.round(y),3,1); g.fillRect(Math.round(x),Math.round(y)-1,1,3); } }
+      g.globalAlpha=1; }
     if(MAP.out){ g.globalAlpha=.07; g.fillStyle="#ffffff"; for(let i=0;i<5;i++){ const x=((i*67+time*9)%(W+60))-30; for(let y=0;y<H;y+=2) g.fillRect(Math.round(x+Math.sin(y*.05+time+i)*6+y*.3),y,6,2); } g.globalAlpha=1; }
     if(MAP.out) for(let y=0;y<MAP.h;y++) for(let x=0;x<MAP.w;x++) if(MAP.rows[y][x]==="b"){ for(let i=0;i<3;i++){ const k=(time*.6+i/3+x*.13)%1;
       g.fillStyle="rgba(255,255,255,.85)"; const bx=x*16-ox+7+Math.round(Math.sin(k*9+i)*2), by=y*16-oy+10-Math.round(k*28); g.fillRect(bx,by,2,2); if(i===1) g.fillRect(bx+1,by-1,1,1); } }
@@ -5230,7 +5551,7 @@ var TIDE=(function(){
       else { const w=A.textW(banner.t)+16; box(4,Math.round(-20+24*s),w,16,"#fff7e0","#ffb13b"); T(banner.t,12,Math.round(-20+24*s)+4); } }
   }
 
-  const PC={tide:["#7fd3ff","#ffffff"],kelp:["#7be08a","#d9ff8a"],vent:["#ff7a3d","#ffe14d"],shell:["#ffe0a0","#ffffff"]};
+  const PC={tide:["#7fd3ff","#ffffff"],kelp:["#7be08a","#d9ff8a"],vent:["#ff7a3d","#ffe14d"],shell:["#ffe0a0","#ffffff"],spark:["#ffe14d","#ffffff"],ink:["#7a52d6","#c9b6ff"]};
   function drawBattle(dt){
     for(let y=0;y<H;y+=4){ g.fillStyle=A.mix("#8fe3ff","#2fb3c9",y/H); g.fillRect(0,y,W,4); }
     g.globalAlpha=.12; g.fillStyle="#ffffff"; for(let i=0;i<4;i++){ const x=(i*70+time*6)%300-30; g.beginPath(); g.moveTo(x,0); g.lineTo(x+18,0); g.lineTo(x-20,112); g.lineTo(x-34,112); g.fill(); } g.globalAlpha=1;
@@ -5245,7 +5566,7 @@ var TIDE=(function(){
     if(B.msink<1&&!(B.mfl&&Math.floor(time*20)%2)){ g.save(); g.beginPath(); g.rect(0,0,W,108); g.clip();
       g.drawImage(A.critterBack(m.sp),40+Math.round(B.mo)+Math.round(B.shake*Math.sin(time*60)*3),60-bob+Math.round(B.msink*48)); g.restore(); }
     if(B.snack){ const k=B.snack.t, x=60+(180-60)*k, y=90-Math.sin(k*Math.PI)*60-(40-90)*k*0; g.fillStyle="#ffd1e8"; ell(Math.round(x),Math.round(y-k*50+k*0),3,3,"#ffd1e8"); g.fillStyle="#ffffff"; g.fillRect(Math.round(x)-1,Math.round(y-k*50)-2,1,1); }
-    B.parts=B.parts.filter(p=>(p.life-=dt)>0); B.parts.forEach(p=>{ p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=40*dt; const c=PC[p.t]; g.fillStyle=Math.floor(p.life*10)%2?c[0]:c[1];
+    B.parts=B.parts.filter(p=>(p.life-=dt)>0); B.parts.forEach(p=>{ p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=40*dt; const c=PC[p.t]||PC.shell; g.fillStyle=Math.floor(p.life*10)%2?c[0]:c[1];
       if(p.t==="tide") { g.fillRect(p.x,p.y,3,3); g.fillStyle="#ffffff"; g.fillRect(p.x,p.y,1,1); } else if(p.t==="kelp"){ g.fillRect(p.x,p.y,4,2); } else if(p.t==="vent"){ g.fillRect(p.x,p.y,2,3); } else { g.fillRect(p.x+1,p.y,1,3); g.fillRect(p.x,p.y+1,3,1); } });
     // HP boxes
     const ty=D.TYPES;
@@ -5309,9 +5630,10 @@ var TIDE=(function(){
       if(hasDeep()&&S.deep) T(DEEP.className(m),110,26,"#6a5f86",null);
       T("Moves:",12,88,"#ff6fb5",null); m.mv.forEach((id,i)=>T(MV(id).n,12+(i%2)*110,100+Math.floor(i/2)*11));
       A.wrap(sp.d,220).forEach((l,i)=>T(l,12,126+i*11,"#6a5f86",null)); }
-    if(u.kind==="info"&&u.journal){ box(4,4,W-8,H-8,"#fffaf0","#ffb13b"); const ids=Object.keys(D.SPECIES), c=ids.filter(i=>S.caught[i]).length, s=ids.filter(i=>S.seen[i]).length;
-      T(`TIDE JOURNAL   Seen ${s}   Friends ${c}`,12,10,"#ff6fb5",null);
-      ids.forEach((id,i)=>{ const x=12+(i%6)*37, y=22+Math.floor(i/6)*44; box(x,y,34,40,S.caught[id]?"#e8fbff":"#f1ecf7","#c9c0de");   // 18 forms: 6 x 3, no room for names
+    if(u.kind==="info"&&u.journal){ box(4,4,W-8,H-8,"#fffaf0","#ffb13b"); const ids=Object.keys(D.SPECIES).filter(i=>!SP(i).from).flatMap(i=>SP(i).evo?[i,SP(i).evo.to]:[i]), c=ids.filter(i=>S.caught[i]).length, s=ids.filter(i=>S.seen[i]).length;
+      const pg=u.pg||0, pn=Math.ceil(ids.length/18);
+      T(`TIDE JOURNAL   Seen ${s}   Friends ${c}`,12,10,"#ff6fb5",null); if(pn>1) T(`< ${pg+1}/${pn} >`,196,10,"#6a5f86",null);
+      ids.slice(pg*18,pg*18+18).forEach((id,i)=>{ const x=12+(i%6)*37, y=22+Math.floor(i/6)*44; box(x,y,34,40,S.caught[id]?"#e8fbff":"#f1ecf7","#c9c0de");   // 18 forms a page (6 x 3), each base form beside its molt; left/right turns pages
         if(S.seen[id]){ const im=A.critter(id); if(!S.caught[id]) g.globalAlpha=.35; g.drawImage(im,x+1,y+4,32,32); g.globalAlpha=1; }
         else T("?",x+15,y+14,"#c9c0de",null); }); }
     if(u.kind==="info"&&u.card){ for(let y=0;y<H;y+=4){ g.fillStyle=A.mix("#ffb3d9","#7fd3ff",y/H); g.fillRect(0,y,W,4); }
