@@ -7,7 +7,7 @@
 <script>
 // ---- self-update: checks the public mirror when online, keeps the newest build on this computer ----
 // Newer build saved earlier -> run that instead of this file. Add ?local to the address to skip it.
-var TT_BUILD=1795140013067;
+var TT_BUILD=1795142516010;
 (function(){
   var REMOTE="https://raw.githubusercontent.com/blsxf/express-pawn-tools/main/tagtool/", KEY="tagtool.update";
   function db(){ return new Promise(function(res,rej){ var r=indexedDB.open("tagtool",1);
@@ -72,9 +72,12 @@ const CONFIG = {
 
   // ---- Words printed on the tags --------------------------------------
   words: {
-    layaway:  "LAYAWAY!",
+    layaway:  "12-MONTH LAYAWAY!",  // navy header on the back
+    frontLayaway: "LAYAWAY ON BACK!", // big navy band at the bottom of the front
+    frontDown: " Down",           // front payment row (only if layout.front.payments > 0)
+    backTotal: "",                // small word after the back's layaway total, e.g. "total" ("" = none)
     perMonth: "/mo",              // front: "$21/mo"
-    backPerMonth: "/month",       // back:  "$21/month"
+    backPerMonth: " monthly",     // back:  "$21 monthly"
     backDown: " Down",            // back:  "$62 Down"
     barcode:  "Barcode",          // back: "Barcode sticker" hint where the sticker goes
     withPrefix: "w/ ",   // printed before the extras on the back: "w/ Case, 2 Mags"
@@ -98,6 +101,9 @@ const CONFIG = {
     // exactly behind the front (this one moves ~1/16" from sheet to sheet). The back has no
     // outline or box, just this wide white edge, so a small drift doesn't show when you cut.
     backMargin:  .15,
+    // how far the back's navy/yellow bands and black rules run PAST the left/right cut, inches. They line up
+    // with the next tag's, so any cut lands inside them and two-sided drift never shows a white sliver.
+    backBleed:   .1,
     // The shop printer lands backs a little off the fronts, the same way every time.
     // Every back page is moved this much (inches) to make up for it, as you look at the
     // printed back sheet held tall: right = to the right, down = toward the bottom.
@@ -110,13 +116,14 @@ const CONFIG = {
     // size of the text on the BACK (1 = old size, 1.2 = 20% bigger). Text never grows past its box.
     backText:    1.2,
     // front of the gun tag, under the make/model/caliber rows. The yellow price gets everything else.
-    front: { layawayBand:14, payments:26 },
+    // payments: 0 = no payment row (front just says LAYAWAY ON BACK!). ~28 adds "$20 Down | $7/mo" under the band.
+    front: { layawayBand:32, payments:0, downScale:.8 },
   },
 
   // ---- Checked before every print ---------------------------------------
   // Smallest text allowed (font size in points; 72 = 1 inch). A tag that would print smaller
   // gets fixed automatically (extras on 2 lines, words below shortened) or listed before printing.
-  minText: { brand:16, model:10, caliber:12, price:30, monthly:14, total:18, down:11, extras:9 },
+  minText: { brand:16, model:10, caliber:12, price:30, monthly:14, hook:14, total:18, totalLabel:7, down:11, extras:9 },
   // Words the tool may shorten on the MODEL line, only when the full name won't fit big enough.
   shorten: [["Government","Gov't"],["Semi-Automatic","Semi-Auto"],["Automatic","Auto"],["Tactical","Tac"],
             ["Standard","Std"],["Limited","Ltd"],["Edition","Ed."],["Anniversary","Anniv."],["Commemorative","Comm."]],
@@ -1250,8 +1257,11 @@ function canvasG(ctx){
     strokeRect(x,y,w,h){ctx.strokeStyle="#000";ctx.strokeRect(x,y,w,h)},
     line(a,b,c,d,col){ctx.strokeStyle=col?rgb(col):"#000";ctx.beginPath();ctx.moveTo(a,b);ctx.lineTo(c,d);ctx.stroke()},
     fitSize(str,maxW,maxSize){ctx.font="bold 10px "+F;return Math.min(maxSize,maxW/(ctx.measureText(str).width/10))},
-    fitText(str,cx,cy,maxW,maxSize,col){ if(!str)return; const sz=this.fitSize(str,maxW,maxSize);
-      ctx.font="bold "+sz+"px "+F;ctx.fillStyle=col?rgb(col):"#000";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(str,cx,cy+sz*.04)},
+    // ol: optional outline {k: width as share of text size, col}. Drawn under the fill, so the letters keep their full size.
+    fitText(str,cx,cy,maxW,maxSize,col,ol){ if(!str)return; const sz=this.fitSize(str,maxW,maxSize);
+      ctx.font="bold "+sz+"px "+F;ctx.textAlign="center";ctx.textBaseline="middle";
+      if(ol){ ctx.save(); ctx.lineJoin="round"; ctx.lineWidth=2*sz*ol.k; ctx.strokeStyle=rgb(ol.col||[0,0,0]); ctx.strokeText(str,cx,cy+sz*.04); ctx.restore(); }
+      ctx.fillStyle=col?rgb(col):"#000";ctx.fillText(str,cx,cy+sz*.04)},
   };
 }
 function pdfG(doc){
@@ -1263,9 +1273,11 @@ function pdfG(doc){
     strokeRect(x,y,w,h){doc.setDrawColor(0);doc.rect(x,y,w,h,"S")},
     line(a,b,c,d,col){if(col)doc.setDrawColor(col[0],col[1],col[2]);else doc.setDrawColor(0);doc.line(a,b,c,d)},
     fitSize(str,maxW,maxSize){doc.setFont("AH","bold");doc.setFontSize(10);return Math.min(maxSize,maxW/(doc.getTextWidth(str)/10))},
-    fitText(str,cx,cy,maxW,maxSize,col){ if(!str)return; const sz=this.fitSize(str,maxW,maxSize); doc.setFontSize(sz);
+    fitText(str,cx,cy,maxW,maxSize,col,ol){ if(!str)return; const sz=this.fitSize(str,maxW,maxSize); doc.setFontSize(sz);
+      if(ol){ const c=ol.col||[0,0,0]; doc.setDrawColor(c[0],c[1],c[2]); doc.setLineWidth(2*sz*ol.k); doc.setLineJoin("round");
+        doc.text(str,cx,cy,{align:"center",baseline:"middle",renderingMode:"stroke"}); doc.setLineJoin("miter"); doc.setDrawColor(0); }
       if(col) doc.setTextColor(col[0],col[1],col[2]); else doc.setTextColor(0);
-      doc.text(str,cx,cy,{align:"center",baseline:"middle"})},
+      doc.text(str,cx,cy,{align:"center",baseline:"middle",renderingMode:"fill"})},
   };
 }
 
@@ -1474,10 +1486,11 @@ function tagProblems(type,t,s){
   for(const side of ["front","back"]){
     if(side==="back"&&!type.drawBack) continue;
     const g=measureG(); (side==="front"?type.draw:type.drawBack)(g,0,0,t,s);
-    const lo=side==="back"?m-.5:-.5, hiW=s.W-lo, hiH=s.H-lo;
+    // backs drift only left-right, so only the sides need the white edge
+    const lo=side==="back"?m-.5:-.5, hiW=s.W-lo, loY=-.5, hiH=s.H+.5;
     for(const it of g.items){
       if(it.k==="text"&&it.size<(MIN_TEXT[it.role]||0)-.01) out.push({side,role:it.role,why:"small",str:it.str,size:it.size});
-      if(it.role!=="bg"&&(it.x<lo-1||it.y<lo-1||it.x+it.w>hiW+1||it.y+it.h>hiH+1)) out.push({side,role:it.role,why:"outside",str:it.str||it.k});
+      if(it.role!=="bg"&&it.role!=="bleed"&&(it.x<lo-1||it.y<loY-1||it.x+it.w>hiW+1||it.y+it.h>hiH+1)) out.push({side,role:it.role,why:"outside",str:it.str||it.k});
     }
   }
   return out;
@@ -1592,64 +1605,80 @@ function drawGunFront(g,x,y,t,s){
   // big yellow price
   g.rect(x,yPrice,W,ph,C.yellow);
   g.role("price"); g.fitText(fmt$(t.price||0),x+W/2,yPrice+ph/2,W-3*pad,ph*.82);
-  // LAYAWAY! band + monthly payment (the hook), pinned to the bottom
+  // big navy "LAYAWAY ON BACK!" band pinned to the bottom (11-19-2026): makes customers ask to see
+  // the item, and the back closes it. layout.front.payments > 0 adds a "$20 Down | $7/mo" row under it.
   const l=layaway(t.price||0);
   g.rect(x,yLay,W,lb,C.navy);
-  g.role("band"); g.fitText(W_.layaway,x+W/2,yLay+lb/2+1,W-2*pad,lb*.72,C.white);
-  g.rect(x,yPay,W,pr,C.white);
-  g.role("monthly"); g.fitText(fmt$(l.monthly)+W_.perMonth,x+W/2,yPay+pr/2+1,W-3*pad,pr*.78);
+  g.role("hook"); g.fitText(W_.frontLayaway||W_.layaway,x+W/2,yLay+lb/2+1,W-2.8*pad,lb*.7,C.white);
+  if(pr>0){ g.rect(x,yPay,W,pr,C.white);
+    pairRow(g,fmt$(l.down)+(W_.frontDown??" Down"),fmt$(l.monthly)+W_.perMonth,x+W/2,yPay+pr/2+1,W-3*pad,pr*.72,F.downScale??.8,"down","monthly"); }
   // lines + text
   g.lw(thick);
   for(let i=1;i<ys.length;i++) g.line(x,ys[i][0],x+W,ys[i][0]);
-  [yPrice,yLay,yPay].forEach(v=>g.line(x,v,x+W,v));
+  [yPrice,yLay].concat(pr>0?[yPay]:[]).forEach(v=>g.line(x,v,x+W,v));
   groups.forEach((gr,i)=>{ g.role(type.rows[gr.owner??0][0]); fitRow(g,gr.text,x+W/2,ys[i][0],W-2*pad,ys[i][1],gr.scale,gr.wrap); });
   g.lw(thick); g.strokeRect(x,y,W,H);      // the front's outer line is the cut line
 }
 
-// ---------- GUN TAG: back = layaway, "Comes with" extras, spot for the barcode sticker ----------
-// Item # and cost code are on the barcode sticker, so the tag doesn't print them.
-// Made to look right even when the printer lands the back a little off the front (it moves
-// ~1/16" from sheet to sheet): no outline, nothing runs to the edge, everything is centered
-// and rounded inside a wide white edge (CONFIG.layout.backMargin), so an off-center back
-// still reads as a finished design.
+// Two amounts on one line with a divider: "$62 Down | $21 monthly". a is drawn at ka x the size of b, same baseline.
 const C_SOFT=[200,205,214], C_HINT=[175,180,190];
+function pairRow(g,a,b,cx,cy,maxW,maxSize,ka,ra,rb,dcol,dw){
+  const per1=str=>1000/g.fitSize(str,1000,1e9);            // width of the text at size 1
+  const wa=per1(a)*ka, wb=per1(b), sepK=.9;                 // gap around the divider = 0.9 x text size
+  const vs=Math.min(maxSize,maxW/(wa+wb+sepK)), sa=vs*ka;
+  const xs=cx-(wa+wb+sepK)*vs/2, xd=xs+wa*vs+sepK*vs/2;
+  g.role(ra); g.fitText(a,xs+wa*vs/2,cy+(vs-sa)*.3,999,sa);
+  g.role(rb); g.fitText(b,xd+sepK*vs/2+wb*vs/2,cy,999,vs);
+  const w=dw?dw(vs):1.2; g.role(""); g.rect(xd-w/2,cy-vs*.4,w,vs*.8,dcol||C_SOFT);
+}
+
+// ---------- GUN TAG: back = layaway panel, "Comes with" extras, spot for the barcode sticker ----------
+// Item # and cost code are on the barcode sticker, so the tag doesn't print them.
+// 11-19-2026: two-sided printing drifts the back left-right (~1/16") against the front's cut, so there are
+// NO side lines or outlines. The ink runs edge to edge and past the cut ("bleed", layout.backBleed): navy
+// "12-MONTH LAYAWAY!" header flush with the top edge (black rule on the top cut), full-width yellow total,
+// black rules under each band and around the extras. Every back in a row lines up, so the bands join across
+// the sheet and any cut lands inside them. Text stays inside the left/right white edge (layout.backMargin).
+const BACK_PANEL = { band:.27, total:.32, row:.19, extras:.22 };   // share of the panel's height (fixed, so rows line up)
 function drawGunBack(g,x0,y0,t,s0){
-  const m=(LAY.backMargin||0)*72;
+  const m=(LAY.backMargin||0)*72, BL=(LAY.backBleed??.1)*72;
   g.role("bg"); g.rect(x0,y0,s0.W,s0.H,C.white); g.role("");
   const x=x0+m, y=y0+m, s={...s0,W:s0.W-2*m,H:s0.H-2*m};
   const {W,H,k,pad}=tagBox(s), cx=x+W/2, B=LAY.backText||1;   // B: back text size (CONFIG.layout.backText)
   const l=layaway(t.price||0), extras=s0.extrasFront?"":String(t.extras||"").trim();   // General Merchandise: already on the front
-  const zone=Math.min(LAY.barcodeH*72,H*.5);            // sticker spot at the bottom
-  const hh=LAY.header*k*.92, gap=Math.max(3,4*k);
-  const tall=t.fit&&t.fit.extrasTall, ex=Math.min(LAY.extras*k*(tall?1.7:1),(H-hh-zone)*(tall?.42:.3));
-  const R=H-hh-gap-ex-zone, r1=R*.58, r2=R-r1;
-  const y1=y+hh+gap, y2=y1+r1, y3=y2+r2;
-  // LAYAWAY! pill, centered
-  const pw=W*.72;
-  g.rrect(cx-pw/2,y,pw,hh,hh/2,C.navy);
-  g.role("band"); g.fitText(W_.layaway,cx,y+hh/2+1,pw-hh*.8,Math.min(hh*.8,hh*.62*B),C.white);
-  // Total layaway price: rounded yellow box, biggest
-  g.rrect(x,y1,W,r1,Math.min(r1*.28,10*k),C.yellow);
-  g.role("total"); g.fitText(fmt$(l.total),cx,y1+r1/2+1,W-2*pad,Math.min(r1*.88,r1*.72*B));
-  // "$62 Down"  |  "$21/month", same size, centered as one line with a soft divider between.
-  // They share the full width (the shorter one gives room to the longer), so both print bigger.
-  const dv=fmt$(l.down)+(W_.backDown??" Down"), pv=fmt$(l.monthly)+(W_.backPerMonth||W_.perMonth);
-  const per1=str=>1000/g.fitSize(str,1000,1e9);            // width of the text at size 1
-  const wd=per1(dv), wp=per1(pv), sepK=.9;                  // gap around the divider = 0.9 x text size
-  const vs=Math.min(r2*.6*B,(W-pad)/(wd+wp+sepK));
-  const xs=cx-(wd+wp+sepK)*vs/2, xd=xs+wd*vs+sepK*vs/2;
-  g.role("down"); g.fitText(dv,xs+wd*vs/2,y2+r2/2+1,999,vs); g.fitText(pv,xd+sepK*vs/2+wp*vs/2,y2+r2/2+1,999,vs);
-  g.role(""); g.rect(xd-.6,y2+r2*.25,1.2,r2*.5,C_SOFT);
-  // Comes with: "w/ Case, 2 Mags" (from Bravo's description; edit it in the tag's Edit panel). Row is always there so every back matches.
+  // sticker spot: from the tag's own bottom edge (the sticker goes on by hand after cutting)
+  const zone=Math.min(LAY.barcodeH*72-m,H*.5);
+  const lw=Math.max(1.5,s0.W*.009), xa=x0-BL, xb=x0+s0.W+BL, K=[0,0,0];
+  const top=y0, BT=.04*72;
+  // shares are of the old panel (top white edge included); the height freed at the top goes to the yellow total
+  const pH=(y+H-zone-Math.max(3,4*k))-top-lw, F=BACK_PANEL, U=(pH-m)/(F.band+F.total+F.row+F.extras);
+  const hb=F.band*U, ht=F.total*U+m, hr=F.row*U, he=F.extras*U;
+  const yt=top+hb, yr=yt+ht, ye=yr+hr+lw/2, yEnd=ye+he;
+  // header: navy, edge to edge, white letters with a black outline
+  g.role("bleed"); g.rect(xa,top-BT,xb-xa,hb+BT,C.navy); g.rect(xa,top-lw/2,xb-xa,lw,K);
+  g.role("band"); g.fitText(W_.layaway,cx,top+hb/2+1,W-2*pad-hb*.12,Math.min(hb*.7,hb*.6*B),C.white,{k:.075,col:K});
+  // layaway total: full-width yellow band, black rules under the navy and yellow bands
+  const p=Math.max(3,5*k), by=yt, bh=ht-p*.7;
+  g.role("bleed"); g.rect(xa,by,xb-xa,bh,C.yellow); g.rect(xa,yt-lw/2,xb-xa,lw,K); g.rect(xa,by+bh-lw/2,xb-xa,lw,K);
+  const num=fmt$(l.total), lab=W_.backTotal||"", lk=.42, per1=str=>1000/g.fitSize(str,1000,1e9);
+  const wn=per1(num), wl=lab?per1(lab)*lk+.22:0, ts=Math.min(bh*.72*B,bh*.86,(W-2*pad)/(wn+wl));
+  const xn=cx-(wn+wl)*ts/2, cyT=by+bh/2+1;
+  g.role("total"); g.fitText(num,xn+wn*ts/2,cyT,999,ts);
+  if(lab){ g.role("totalLabel"); g.fitText(lab,xn+(wn+.22)*ts+per1(lab)*lk*ts/2,cyT+ts*(1-lk)*.3,999,ts*lk,C.navy); }
+  // "$62 Down | $21 monthly"
+  pairRow(g,fmt$(l.down)+(W_.backDown??" Down"),fmt$(l.monthly)+(W_.backPerMonth||W_.perMonth),cx,yr+hr/2+1,W-pad,hr*.62*B,1,"down","down",K,v=>Math.max(1.2,v*.08));
+  // black rules, edge to edge, around Comes with: "w/ Case, 2 Mags" (row always there so every back matches)
+  g.role("bleed"); g.rect(xa,ye-lw/2,xb-xa,lw,K); g.rect(xa,yEnd,xb-xa,lw,K);
   g.role("extras");
+  const ey=ye+he/2, ew=W-2*pad;
   if(extras){ const line=W_.withPrefix+extras, two=t.fit&&t.fit.extras2&&extras.includes(", ");
-    if(!two) g.fitText(line,cx,y3+ex/2+1,W-2*pad,ex*.56*B);
-    else { const p=extras.split(", "), h=Math.ceil(p.length/2), a=W_.withPrefix+p.slice(0,h).join(", ")+",", b=p.slice(h).join(", ");
-      const sz=Math.min(g.fitSize(a,W-2*pad,ex*.42*B),g.fitSize(b,W-2*pad,ex*.42*B));
-      g.fitText(a,cx,y3+ex*.29,W-2*pad,sz); g.fitText(b,cx,y3+ex*.72,W-2*pad,sz); } }
+    if(!two) g.fitText(line,cx,ey+1,ew,he*.5*B);
+    else { const q=extras.split(", "), h=Math.ceil(q.length/2), a=W_.withPrefix+q.slice(0,h).join(", ")+",", b=q.slice(h).join(", ");
+      const sz=Math.min(g.fitSize(a,ew,he*.36*B),g.fitSize(b,ew,he*.36*B));
+      g.fitText(a,cx,ye+he*.3,ew,sz); g.fitText(b,cx,ye+he*.7,ew,sz); } }
   // sticker spot: a quiet hint (the sticker covers it)
   const yz=y+H-zone;
-  g.role("label"); g.fitText(W_.barcode+" sticker",cx,yz+zone/2,W*.6,8,C_HINT);
+  g.role("label"); g.fitText(W_.barcode+" sticker",cx,yz+(zone+m)/2,W*.6,8,C_HINT);
 }
 
 // ---------- DESIGNS: a tag type's own look (CONFIG.tagTypes design:"tv") ----------
