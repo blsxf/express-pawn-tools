@@ -7,7 +7,7 @@
 <script>
 // ---- self-update: checks the public mirror when online, keeps the newest build on this computer ----
 // Newer build saved earlier -> run that instead of this file. Add ?local to the address to skip it.
-var TT_BUILD=1795198238771;
+var TT_BUILD=1795206314843;
 (function(){
   var REMOTE="https://raw.githubusercontent.com/blsxf/express-pawn-tools/main/tagtool/", KEY="tagtool.update";
   function db(){ return new Promise(function(res,rej){ var r=indexedDB.open("tagtool",1);
@@ -129,6 +129,9 @@ const CONFIG = {
   shorten: [["Government","Gov't"],["Semi-Automatic","Semi-Auto"],["Automatic","Auto"],["Tactical","Tac"],
             ["Standard","Std"],["Limited","Ltd"],["Edition","Ed."],["Anniversary","Anniv."],["Commemorative","Comm."]],
 
+  // Maker names the tool may shorten, only when the name won't fit big enough (e.g. next to a red NEW!)
+  shortMakers: [["Yankee Hill Machine","YHM"],["Rugged Suppressors","Rugged"],["Smith & Wesson","S&W"],["Heckler & Koch","H&K"]],
+
   // ---- Manager fixes console: Ctrl+Shift+F.  PIN ("" = no PIN) ---------
   managerPin: "1234",
   // Built-in name fixes for every computer, e.g.
@@ -144,7 +147,7 @@ const CONFIG = {
     guns: {
       name:  "Guns",
       twoSided: true,
-      fields: [["brand","Make"],["model","Model"],["what","What it is"],["notes","Notes"],["caliber","Caliber"],["extras","Comes with (back)"]],   // what / notes: General Merchandise only
+      fields: [["brand","Make"],["model","Model"],["what","What it is"],["notes","Notes"],["caliber","Caliber"],["extras","Comes with (back)"],["quality","Condition (NEW: red \"NEW!\" before the maker, guns + suppressors)"]],   // what / notes: General Merchandise only
       rows:   [["brand",36,.74,false],["model",28,.68,true],["caliber",24,.78,false]],
       sizes: [
         {label:'4 per sheet (big)', w:4.1, h:3.62, orient:"landscape"},
@@ -347,6 +350,9 @@ main{flex:1;padding:16px 16px 90px;display:flex;flex-direction:column}
 .card .tick{position:absolute;top:-8px;right:-8px;width:26px;height:26px;border-radius:50%;border:2px solid var(--bg);background:var(--yellow);color:var(--onyellow);display:flex;align-items:center;justify-content:center;font-size:14px;padding:0}
 .card .tick svg{stroke-width:3.2}
 .card.off{opacity:.25}
+.card.check::after{content:"?";position:absolute;top:-8px;left:-8px;width:26px;height:26px;border-radius:50%;border:2px solid var(--bg);background:#7fb2ff;color:#1a1a1a;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center}
+.kb{border:1px solid #7fb2ff;border-radius:10px;padding:10px 12px;margin:0 0 12px}.kb b{display:block;margin-bottom:6px}.kb a{color:#7fb2ff}
+.kbBtns{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 8px}
 .card.warn::after{content:"!";position:absolute;top:-8px;left:-8px;width:26px;height:26px;border-radius:50%;border:2px solid var(--bg);background:var(--warn);color:#1a1a1a;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center}
 .card.off .tick{background:var(--off)}.card.off .tick svg{visibility:hidden}
 #noMatch{color:var(--ink3);padding:30px 0}
@@ -963,7 +969,7 @@ const BRAND_MAP = {
 // brands that sometimes appear as the first word of the model (importer listed as maker)
 const MODEL_BRANDS = {"CANIK":"Canik"};
 const ACRONYMS = new Set(("MCX LT XD XDS XDM SKS BPS SXP MOS EZ TS FDE UFX BLK WSM LCP LCR RS RXM RXP II III IV VI M&P CC RF PA SA SC MC AR RR PG CF " +
-  "JBL KRK EVH ESP PRS MXR TCL AOC MSI DJI ASUS RCA BMAG NATO ACP LR SF TP SP DA SAO DAO HD SBR SBS OD ODG FS LE PC CO2 SS CA EC EC9S XL XR CS USA TRP").split(" "));
+  "JBL KRK EVH ESP PRS MXR TCL AOC MSI DJI ASUS RCA GPS EOS YHM BMAG NATO ACP LR SF TP SP DA SAO DAO HD SBR SBS OD ODG FS LE PC CO2 SS CA EC EC9S XL XR CS USA TRP").split(" "));
 const SMALL_TITLE = new Set(["HI","MAX","GUN","PRO","GEN","AIR","ONE","TAC","OPS","MAG","OF","IN","ON","TO","A","AN","OR","BY","FOR","AND","THE","WITH"]);
 
 function titleWord(w){
@@ -1088,7 +1094,7 @@ function parseExtras(desc){
 const ACCESSORIES = [
   ["HARD ?CASE|HSC|HARD ?SHELL ?CASE","Hard Case"],["SOFT ?CASE","Soft Case"],["CARRY(?:ING)? CASE","Case"],["CASES?","Case"],
   ["ORIG(?:INAL)? BOX","Box"],["BOX(?:ES)?","Box"],["BAGS?","Bag"],
-  ["BATT(?:ERY|ERIES|S)?","Battery","Batteries"],["CHARGERS?","Charger"],
+  ["BATT(?:ERY|ERIES|S)?|BATS?","Battery","Batteries"],["CHARGERS?|CHARGE|CHAR|CHG","Charger"],["ATTACH(?:MENTS?)?","Attachments"],
   ["POWER (?:CORDS?|SUPPLY|CABLES?)","Power Cord"],["HDMI(?: CABLES?| CORDS?)?","HDMI Cord"],["CORDS?","Cord"],["CABLES?","Cable","Cables"],["ADAPTERS?","Adapter","Adapters"],
   ["REMOTES?","Remote","Remotes"],["CONTROLLERS?","Controller","Controllers"],["HEADSETS?","Headset","Headsets"],
   ["JOY-?CONS?","Joy-Cons"],["GAMES?","Game","Games"],["DOCK","Dock"],
@@ -1133,19 +1139,22 @@ function missingByPrice(c,price,kit,said){
 }
 // Power tool kits: "DRILL/DRIVER" (or "IMPACT DRILL/DRIVER") is ONE tool; "HAMMER DRILL/IMPACT DRIVER",
 // "DRILL & IMPACT", "2-TOOL COMBO", "2PC KIT" are sets. A set prints "2-Tool Kit" first.
-const TOOLS=["HAMMER ?DRILL","DRILLDRIVER","IMPACT DRIVER","IMPACT WRENCH","DRILL","IMPACT(?! ?DRILL)",
-  "CIRCULAR SAW","RECIP(?:ROCATING)? SAW","SAWZALL","JIG ?SAW","MITER SAW","BAND ?SAW","GRINDER","OSCILLATING","MULTI-?TOOL",
+const TOOLS=["HAMMER ?DRILL","CIRC?(?:ULAR)? ?SAW","DRILLDRIVER","IMPACT DRIVER","IMPACT WRENCH","DRILL","IMPACT(?! ?DRILL)",
+  "RECIP(?:ROCATING)? SAW","SAWZALL","JIG ?SAW","MITER SAW","BAND ?SAW","GRINDER","OSCILLATING","MULTI-?TOOL",
   "SANDER","ROUTER","BLOWER","(?:STRING )?TRIMMER","HEDGE TRIMMER","NAILER","STAPLER","(?:WORK ?|FLASH ?)?LIGHT","RADIO","VACUUM|VAC"];
 function toolCount(s){
   s=s.replace(/\bDRILL\s*\/\s*DRIVER\b|\bDRILL[- ]DRIVER\b/g,"DRILLDRIVER");
-  const n=s.match(/\b(\d)\s*-?\s*(?:TOOL|PC|PIECE)S?\s*(?:COMBO|KIT|SET)\b|\b(\d)\s*-?\s*TOOLS?\b/); if(n) return +(n[1]||n[2]);
+  const n=s.match(/\b(\d)\s*-?\s*(?:TOOL|PC|PIECE)S?\s*(?:COMB[OP]|COMBINATION|KIT|SET)\b|\b(\d)\s*-?\s*TOOLS?\b/); if(n) return +(n[1]||n[2]);
   const seen=new Set(), re=new RegExp("\\b("+TOOLS.map(t=>"(?:"+t+")").join("|")+")\\b","g"); let x;
   while((x=re.exec(s))) seen.add(TOOLS.findIndex(t=>new RegExp("^(?:"+t+")$").test(x[1])));
   return seen.size;
 }
 // cordless tool: needs a battery + charger (CONFIG.toolRequired)
 const CORDLESS=/\b(M12|M18|MX FUEL|FUEL|\d{1,2}(?:\.\d)?\s?V(?:OLT)?|V\d{2}|\d{2}V MAX|FLEXVOLT|ONE\+|CORDLESS|BRUSHLESS)\b/;
+// Bravo "|" lists with no W/ ("CANON T5 18-55|75-300|CHARGER"): what follows the first "|" is what it comes with
+const pipeW=d=>{ d=String(d||""); return /\|/.test(d)&&!/\bW\s*\/|\bWITH\b|\bINCL/i.test(d)?d.replace("|"," W/ "):d; };
 function parseAccessories(desc,model,category,price){
+  desc=pipeW(desc);
   const vg=s=>String(s||"").toUpperCase().replace(/…|\.\.\.$/g,"").replace(/\b(?:VIDEO ?)?GAME ?(?:CONSOLE|SYSTEM)\b/g,"CONSOLE");
   const d=vg(desc), mo=vg(model);
   const m=d.match(/(?:^|[\s|(])(?:W\s*\/(?!\s*O\b)|WITH\b(?!OUT)|INCL(?:UDES?|\.)?\b|COMES WITH\b)\s*(.*)$/), seg=m?m[1]:d;
@@ -1173,13 +1182,22 @@ function parseAccessories(desc,model,category,price){
     list=kit.concat(list.filter(o=>!names.has(o.name)&&o.name!=="Cord"&&o.name!=="Cable"));
   } else if(!m&&!gone.size&&list.length<2) list=[];   // no W/ or WITH: one lone word is usually the item itself ("M18 BATTERY", "CASE KNIFE")
   const tools=Math.max(toolCount(d.slice(0,m?m.index:d.length)),toolCount(mo));
-  if(!con&&tools>=1&&CORDLESS.test(item))                                 // cordless tool: at least 1 battery + charger
-    for(const r of CONFIG.toolRequired||[]) if(!list.some(o=>o.name===r)) list.push(kitItem(r));
+  const bare=/\b(?:TOOL|UNIT) ONLY\b|\bBARE TOOL\b/.test(d);
+  if(!con&&!bare&&tools>=1&&CORDLESS.test(item))                          // cordless tool: at least 1 battery + charger, unless the description says not
+    for(const r of CONFIG.toolRequired||[]) if(!list.some(o=>o.name===r)&&!gone.has(r)) list.push(kitItem(r));
   let texts=[...new Set(list.slice().sort((a,b)=>accRank(a.name)-accRank(b.name)).map(o=>o.text))];
   const pc=texts.indexOf("Power Cord"), hc=texts.indexOf("HDMI Cord");                  // shorter, reads better
   if(pc>=0&&hc>=0){ texts[pc]="Power & HDMI Cords"; texts.splice(hc,1); }
   if(m){ const known=new RegExp("(?:\\b|(?<=\\d))"+accRe+"\\b");                            // W/ words not in the list yet: print them as typed
-    for(const e of (parseExtras(desc)||"").split(", ")) if(e&&!known.test(e.toUpperCase())&&!texts.includes(e)) texts.push(e); }
+    for(let e of (parseExtras(desc)||"").split(", ")){ if(!e||known.test(e.toUpperCase())||/^No\b/i.test(e)) continue;
+      const ln=e.match(/^(\d{2,3}-\d{2,3})(?:MM)?$/i); if(ln) e=ln[1]+"mm Lens";           // camera kit lens "18-55"
+      if(!texts.includes(e)) texts.push(e); } }
+  if(/CAMERA|\bEOS\b|\bREBEL\b|\bNIKON\b|\bDSLR\b|\bMIRRORLESS\b/i.test(d+" "+mo+" "+category)){
+    const ls=[...new Set([...d.matchAll(/\b(\d{2,3}-\d{2,3})(?:\s?MM)?\b/g)].map(x=>x[1]+"mm Lens"))];
+    texts=texts.filter(x=>!ls.includes(x)).concat(ls); }
+  // what's NOT included matters as much (cordless tools: battery / charger)
+  if(!con) for(const r of gone) if(!list.some(o=>o.name===r)&&!texts.includes("No "+r)) texts.push("No "+r);
+  if(bare&&tools>=1&&!texts.length) texts.push("Tool Only");
   return texts.join(", ");             // only what it comes with; what it is (itemWhat) and notes (itemNotes) are their own fields
 }
 
@@ -1193,7 +1211,7 @@ const ITEM_WORDS=[
   [/\b(?:FACTORY )?SEALED\b/,"Sealed"],[/\bOPEN[- ]BOX\b/,"Open Box"],[/\bREFURB(?:ISHED)?\b/,"Refurbished"],
   [/\bLEFT[- ]?HAND(?:ED)?\b|\bLEFTY\b|\bLH\b/,"Left-Handed"],[/\bLIMITED EDITION\b|\bLTD ED(?:ITION|\.)?\b/,"Limited Edition"],
   [/\bSIGNED\b|\bAUTOGRAPHED\b/,"Signed"],[/\bDIAMONDS?\b|\bDIA\b/,"Diamond"],[/\bCUSTOM SHOP\b/,"Custom Shop"],[/\bMADE IN (?:THE )?USA\b|\bUSA MADE\b/,"Made in USA"],
-  [/\bMADE IN JAPAN\b|\bMIJ\b/,"Made in Japan"],[/\bMADE IN MEXICO\b|\bMIM\b/,"Made in Mexico"],
+  [/\bMADE IN JAPAN\b|\bMIJ\b|\bJAPAN\s*$/,"Made in Japan"],[/\bMADE IN MEXICO\b|\bMIM\b/,"Made in Mexico"],
 ];
 const NWORD={TWO:2,THREE:3,FOUR:4,FIVE:5,SIX:6,SEVEN:7,EIGHT:8,TEN:10,TWELVE:12};
 function itemCount(s){
@@ -1219,7 +1237,7 @@ function itemNotes(item,model,noCount,category){
   const flat=v=>v.replace(/\s+/g,"").replace(/WATTS?\b/g,"W"), fm=flat(mo);
   const J=isJewel(s+" "+String(category||"").toUpperCase());
   for(const [re,f,need] of ITEM_SPECS){ if(need==="J"&&!J||typeof need==="object"&&!need.test(s)) continue; const x=s.match(re); if(!x) continue; const v=f(x,s);
-    if(v&&!fm.includes(flat(v.toUpperCase()))&&!(need==="num"&&fm.includes(x[1]))&&!out.includes(v)) out.push(v); }
+    if(v&&!fm.includes(flat(v.toUpperCase()))&&!(need==="num"&&new RegExp("(?:^|[^0-9])M?"+x[1]+"(?![0-9])").test(fm))&&!out.includes(v)) out.push(v); }
   return out.join(", ");
 }
 // Specs and grades experts look for (11-20-2026). The tag shows them when the description has them and the model doesn't.
@@ -1229,6 +1247,7 @@ const ITEM_SPECS=[
   [/\bSTD\b|\bSTANDARD\b/,()=>"Standard"],[/\bDLX\b|\bDELUXE\b/,()=>"Deluxe"],[/\bA\/E\b|\bACOUSTIC[- ]ELECTRIC\b/,()=>"Acoustic-Electric"],
   [/\b12[- ]?STRING\b/,()=>"12-String"],[/\b(?:ALL[- ])?TUBE\b/,()=>"Tube"],[/\bSOLID[- ]?STATE\b/,()=>"Solid State"],
   [/\bILLUM(?:INATED)?\b/,()=>"Illuminated"],[/\bFFP\b|\bFIRST FOCAL\b/,()=>"First Focal Plane"],[/\bZERO STOP\b/,()=>"Zero Stop"],
+  [/\b(38|40|41|42|44|45|46|49)\s?MM\b/,x=>x[1]+"mm",/\bWATCH\b/],[/\b(?:CELL(?:ULAR)?|LTE)\b/,()=>"GPS + Cellular",/\bWATCH\b/],
   [/\bBRUSHLESS\b/,()=>"Brushless"],[/\bWIRELESS\b/,()=>"Wireless"],[/\bBLUETOOTH\b/,()=>"Bluetooth"],
   // jewelry: only when the item is clearly jewelry (JEWEL), so "4K TV" isn't karat and "5G" isn't grams
   [/\b(10|14|18|22|24)\s?K(?:T|ARAT)?\b/,(x,s)=>x[1]+"K "+(/\bTT\b|TWO[- ]TONE|TRI[- ]COLOR/.test(s)?"Two-Tone Gold":/\bWG\b|WHITE GOLD/.test(s)?"White Gold":/\bRG\b|ROSE GOLD/.test(s)?"Rose Gold":/\bYG\b|YELLOW/.test(s)?"Yellow Gold":"Gold"),"J"],
@@ -1239,7 +1258,7 @@ const ITEM_SPECS=[
   // electronics / tools / music: screen, resolution, battery, engine, air, channels
   [/\b(\d{2,3})\s?(?:"|IN(?:CH)?)(?=\s|$)/,x=>x[1]+'"'],[/\b([48]K)\b(?!\s*(?:GOLD|YG|WG|RG))/,x=>x[1]],[/\b(1080|1440|2160)P\b/,x=>x[1]+"p"],[/\b(\d{2,3})\s?HZ\b/,x=>x[1]+"Hz"],
   [/\b(\d{1,2}(?:\.\d)?)\s?AH\b/,x=>x[1]+"Ah"],[/\b(12|18|20|24|36|40|56|60|80|82|120)\s?V(?:OLTS?)?(?:\s?MAX)?\b/,x=>x[1]+"V","num"],
-  [/\b(\d{2,3})\s?CC\b/,x=>x[1]+"cc"],[/\b(\d(?:\.\d{1,2})?)\s?HP\b/,x=>x[1]+" HP",/\b(?:MOWER|COMPRESSOR|ROUTER|ENGINE|MOTOR|GENERATOR|PUMP|SHOP ?VAC|WASHER|BLOWER|TILLER|SPLITTER|OUTBOARD)\b/],[/\b(\d{3,4})\s?PSI\b/,x=>x[1]+" PSI"],
+  [/\b(\d{2,3})\s?CC\b/,x=>x[1]+"cc"],[/(?:^|\s)(1\/4|3\/8|1\/2|3\/4)"?\s?(?:DRIVE|DR)?(?=\s|$)/,x=>x[1]+'" Drive',/\b(?:IMPACT|WRENCH|RATCHET|SOCKET)\b/],[/\b(\d(?:\.\d{1,2})?)\s?HP\b/,x=>x[1]+" HP",/\b(?:MOWER|COMPRESSOR|ROUTER|ENGINE|MOTOR|GENERATOR|PUMP|SHOP ?VAC|WASHER|BLOWER|TILLER|SPLITTER|OUTBOARD)\b/],[/\b(\d{3,4})\s?PSI\b/,x=>x[1]+" PSI"],
   [/\b(\d{1,2})\s?GAL(?:LON)?S?\b/,x=>x[1]+"-Gallon"],[/\b([579]\.[124](?:\.[24])?)\s?-?\s?CH(?:ANNEL)?S?\b/,x=>x[1]+"-Channel"],[/(?<![\d.])\b(\d{1,2})\s?-?\s?CH(?:ANNEL)?S?\b/,x=>x[1]+"-Channel"],
 ];
 // Jewelry only on real evidence: a karat / sterling / ctw / dwt mark, a "Jewel..." category, or a jewelry word together
@@ -1257,6 +1276,7 @@ const JEWEL={test:isJewel};
 // KNOWN_MODELS. No confident answer = nothing printed (never a guess). Ambiguous words need context (3rd entry):
 // MIXER (audio vs kitchen), ROUTER (wood vs Wi-Fi), RING / CHAIN (jewelry vs scope rings / chainsaw), MONITOR, GRINDER...
 // Skipped when the model already says it ("Regent 30 Watt Acoustic Amp") or it's a name everyone knows (Xbox, iPhone).
+// Returns the noun, "" (known, nothing to add) or null (unknown: the checker flags it, see fixes.js knowledge base).
 const TOOLCTX=/\b(?:CORDLESS|BRUSHLESS|M12|M18|FUEL|\d{2}V|\d+ ?AMP|DEWALT|MILWAUKEE|MAKITA|RYOBI|RIDGID|BOSCH|PORTER[- ]CABLE|CRAFTSMAN|SKIL|METABO|HITACHI|KOBALT|HART|BLACK ?(?:&|\+|AND) ?DECKER|EGO|STIHL|HUSQVARNA|ECHO|GREENWORKS|WORX|HERCULES|BAUER|FLEX)\b/;
 const AUDIOCTX=/\b(?:\d+ ?CH|CHANNEL|AUDIO|MIXING|PA|DJ|BEHRINGER|MACKIE|YAMAHA|SOUNDCRAFT|PEAVEY|ALLEN|PRESONUS|KUSTOM|FENDER|PIONEER|NUMARK|ROLAND|TASCAM|ZOOM)\b/;
 const GUITARCTX=/\b(?:GIBSON|EPIPHONE|FENDER|SQUIER|IBANEZ|ESP|LTD|JACKSON|SCHECTER|PRS|GRETSCH|CHARVEL|DEAN|GUITAR)\b/;
@@ -1264,7 +1284,7 @@ const ITEM_WHAT=[
   // tools
   [/\bHAMMER ?DRILL\b/,"Hammer Drill"],[/\bDRILL PRESS\b/,"Drill Press"],[/\bDRILL ?\/ ?DRIVER\b|\bDRILL[- ]DRIVER\b/,"Drill/Driver"],
   [/\bIMPACT DRIVER\b/,"Impact Driver"],[/\bIMPACT WRENCH\b/,"Impact Wrench"],[/\bDRILL BITS?\b/,"Drill Bit Set"],[/\bDRILL\b/,"Drill"],
-  [/\bIMPACT\b/,"Impact Driver",TOOLCTX],[/\bCIRC(?:ULAR)? ?SAW\b/,"Circular Saw"],[/\bRECIP(?:ROCATING)? ?SAW\b|\bSAWZALL\b/,"Reciprocating Saw"],
+  [/\bIMPACT\b(?=.*(?:3\/8|1\/2|3\/4)"?)/,"Impact Wrench",TOOLCTX],[/\bIMPACT\b/,"Impact Driver",TOOLCTX],[/\bCOMB(?:O|P|INATION)\s+(?:TOOL\s+)?(?:SET|KIT)\b/,"Combo Kit"],[/\bCIRC(?:ULAR)? ?SAW\b/,"Circular Saw"],[/\bRECIP(?:ROCATING)? ?SAW\b|\bSAWZALL\b/,"Reciprocating Saw"],
   [/\bJIG ?SAW\b/,"Jigsaw"],[/\bMITER ?SAW\b|\bCHOP ?SAW\b/,"Miter Saw"],[/\bTABLE ?SAW\b/,"Table Saw"],[/\bCHAIN ?SAW\b/,"Chainsaw"],
   [/\bBAND ?SAW\b/,"Band Saw"],[/\bTILE ?SAW\b/,"Tile Saw"],[/\bPOLE ?SAW\b/,"Pole Saw"],[/\bCOFFEE GRINDER\b/,"Coffee Grinder"],
   [/\bANGLE GRINDER\b/,"Angle Grinder"],[/\bGRINDER\b/,"Grinder",TOOLCTX],[/\bOSCILLATING\b/,"Oscillating Multi-Tool"],
@@ -1282,11 +1302,11 @@ const ITEM_WHAT=[
   [/\bSTAND MIXER\b/,"Stand Mixer"],[/\bHAND MIXER\b/,"Hand Mixer"],[/\bMIXER\b/,"Stand Mixer",/\b(?:KITCHENAID|KITCHEN AID|CUISINART|SUNBEAM|HAMILTON BEACH)\b/],
   [/\bMIXER\b/,"Mixing Board",AUDIOCTX],[/\bBASS (?:AMP|AMPLIFIER|COMBO)\b/,"Bass Amp"],[/\bACOUSTIC (?:GUITAR )?(?:AMP|AMPLIFIER)\b/,"Acoustic Amp"],
   [/\b(?:AMP|AMPLIFIER) HEAD\b/,"Amp Head"],[/\b(?:SPEAKER )?CAB(?:INET)?\b/,"Speaker Cabinet",/\b\dX(?:8|10|12|15)\b|\bSPEAKER|\bGUITAR|\bBASS|\bAMP/],
-  [/\bGUITAR (?:AMP|AMPLIFIER|COMBO)\b|\bCOMBO AMP\b/,"Guitar Amp"],[/(?<!\d\s?)\bAMP(?:LIFIER)?\b(?! ?HOURS?)/,"Amp"],
+  [/\bGUITAR (?:AMP|AMPLIFIER|COMBO)\b/,"Guitar Amp"],[/\bCOMBO AMP\b|\b\dX\d{1,2} COMBO\b/,"Combo Amp"],[/(?<!\d\s?)\bAMP(?:LIFIER)?\b(?! ?HOURS?)/,"Amp"],
   [/\bPA SPEAKER\b|\bPOWERED SPEAKER\b|\bPA SYSTEM\b/,"PA Speaker"],[/\bSUB ?WOOFER\b/,"Subwoofer"],[/\bSOUND ?BAR\b/,"Soundbar"],
   [/\b(?:BLUETOOTH|BT) SPEAKER\b/,"Bluetooth Speaker"],[/\bSPEAKERS\b/,"Speakers"],[/\bSPEAKER\b/,"Speaker"],
   [/\bACOUSTIC BASS\b/,"Acoustic Bass Guitar"],[/\bBASS GUITAR\b|\bELECTRIC BASS\b|\bP[- ]?BASS\b|\bPRECISION BASS\b|\bJAZZ BASS\b|\b[456][- ]STRING BASS\b/,"Bass Guitar"],
-  [/\bACOUSTIC[- ]ELECTRIC\b|\bA\/E\b/,"Acoustic-Electric Guitar"],[/\bCLASSICAL GUITAR\b/,"Classical Guitar"],[/\b12[- ]?STRING\b/,"12-String Guitar"],
+  [/\bACOUSTIC[- ]ELECTRIC\b|\bELECTRIC[- ]ACOUSTIC\b|\bA\/E\b/,"Acoustic-Electric Guitar"],[/\bCLASSICAL GUITAR\b/,"Classical Guitar"],[/\b12[- ]?STRING\b/,"12-String Guitar"],
   [/\bACOUSTIC GUITAR\b|\bACOUSTIC\b(?=.*\bGUITAR\b)/,"Acoustic Guitar"],
   [/\bELECTRIC GUITAR\b|\bSTRAT(?:OCASTER)?\b|\bTELE(?:CASTER)?\b|\bLES PAUL\b|\bJAZZMASTER\b|\bES-?335\b|\bFLYING V\b/,"Electric Guitar"],
   [/\bPEDAL\b/,"Effects Pedal",/\b(?:GUITAR|BASS|BOSS|MXR|ELECTRO-?HARMONIX|EHX|TC ELECTRONIC|DIGITECH|LINE ?6|ZOOM|DUNLOP|STRYMON|IBANEZ|FENDER)\b/],
@@ -1303,6 +1323,7 @@ const ITEM_WHAT=[
   [/\bBINOCULARS?\b|\bBINOS\b/,"Binoculars"],[/\bMONOCULAR\b/,"Monocular"],[/\bTELESCOPE\b/,"Telescope"],
   [/\b(?:RIFLE )?SCOPE\b(?! ?(?:RINGS?|MOUNTS?|BASES?|COVERS?|CAPS?))/,"Scope"],[/\bCROSSBOW\b|\bX-?BOW\b/,"Crossbow"],[/\bCOMPOUND BOW\b/,"Compound Bow"],
   [/\bRECURVE\b/,"Recurve Bow"],[/\bTRAIL ?CAM(?:ERA)?\b|\bGAME CAM(?:ERA)?\b/,"Trail Camera"],[/\b(?:GUN|FIRE) ?SAFE\b/,"Safe"],
+  [/\bSUPPRESSORS?\b|\bSILENCERS?\b/,"Suppressor"],[/\bPROOF SETS?\b/,"Proof Set"],[/\bMINT SETS?\b/,"Mint Set"],[/\bRANGE (?:KIT|BAG)\b/,"Range Kit"],
   [/\bAIR ?RIFLE\b|\bPELLET (?:RIFLE|GUN)\b|\bBB GUN\b/,"Air Rifle"],[/\bAIR ?SOFT\b/,"Airsoft Gun"],[/\bSTUN GUN\b|\bTASER\b/,"Stun Gun"],
   [/\bGOLF (?:CLUB )?SET\b|\bGOLF CLUBS\b/,"Golf Club Set"],[/\bPUTTER\b/,"Putter",/\bGOLF|PING|ODYSSEY|SCOTTY|TAYLORMADE|CALLAWAY/],
   [/\bROD ?(?:&|AND|\/) ?REEL\b/,"Rod & Reel"],[/\b(?:SPINNING|BAITCAST(?:ING|ER)?|FISHING|FLY) REEL\b/,"Fishing Reel"],[/\b(?:FISHING|FLY) ROD\b/,"Fishing Rod"],[/\bROD\b/,"Fishing Rod",/\b(?:UGLY STIK|SHAKESPEARE|PENN|ST\.? CROIX|SHIMANO|DAIWA|ABU GARCIA|LEW'?S|FENWICK|FISHING|SPINNING|BAITCAST\w*|CASTING)\b/],
@@ -1325,29 +1346,46 @@ const ITEM_WHAT=[
 // Models Bravo's description doesn't explain. Add only what's known for sure: [maker, model, what it is].
 const KNOWN_MODELS=[
   [/^KUSTOM/,/^KPM\d/,"Powered Mixer"],                       // shop, 11-20-2026
+  [/^KUSTOM/,/^2-10\b/,"Guitar Speaker Cabinet"],                   // 2x10 cab (shop, 11-20-2026)
+  [/^KUSTOM/,/^SIENNA\b/,"Amp"],                                // shop, 11-20-2026
   [/^(?:TENPOINT|TEN POINT|WICKED RIDGE)/,/\b(?:INVADER|RAMPAGE)\b/,"Crossbow"],
 ];
 // names everyone knows: no "Game Console" after "Xbox Series S"
 const HOUSEHOLD=/\b(?:XBOX|PLAYSTATION|PS[2-5]|NINTENDO|WII|IPAD|IPHONE|IPOD|MACBOOK|IMAC|AIRPODS|APPLE WATCH|APPLE TV|ROKU|FIRE ?STICK|CHROMECAST|KINDLE|GOPRO|STEAM DECK)\b/;
 // "FENDER GUITAR CASE", "LAPTOP BAG", "CAMERA TRIPOD", "TV STAND": the item is the accessory, not the guitar / laptop / camera / TV
 const FOR_ITEM=/^\s*(?:HARD |SOFT |GIG |CARRY(?:ING)? )?(?:CASES?|BAGS?|STANDS?|TRIPODS?|STRAPS?|COVERS?|MOUNTS?|BRACKETS?|CHARGERS?|CABLES?|CORDS?|HOLDERS?|RACKS?|SKINS?|STRINGS|PICKS|CAPO|SHELF|SHELVES|TABLE|CABINET|DESK|DOCK|BACKPACK|SLEEVE|BOX|FILTERS?|LENS CAPS?|PROTECTOR|POWER SUPPLY|ADAPTERS?|REMOTE)\b/;
-const WHAT_SAME={AMP:"AMPLIFIER|AMPS",CABINET:"CAB",MICROPHONE:"MIC",TV:"TELEVISION",VACUUM:"VAC",SPEAKER:"SPEAKERS",SPEAKERS:"SPEAKER",HEADPHONES:"HEADPHONE"};
-function itemWhat(item,mfr,model,category,tools){
+const WHAT_SAME={SMARTWATCH:"WATCH",AMP:"AMPLIFIER|AMPS",CABINET:"CAB",MICROPHONE:"MIC",TV:"TELEVISION",VACUUM:"VAC",SPEAKER:"SPEAKERS",SPEAKERS:"SPEAKER",HEADPHONES:"HEADPHONE"};
+function itemWhat(item,mfr,model,category,tools,out){
   const up=v=>" "+String(v||"").toUpperCase().replace(/…|\.\.\.$/g,"").replace(/\s+/g," ")+" ";
-  const T=up(item+" "+model), M=up(mfr+" "+model), C=up(category), cs=C.replace(/(\w{3,})S\b/g,"$1");
+  const T=up(item+" "+model), M=up(mfr+" "+model), C=up(category), cs=C.replace(/(\w{2,}[^\WS])S\b/g,"$1");
   let what="";
-  if(tools>=2) what=tools+"-Tool Combo Kit";
-  else if(HOUSEHOLD.test(T)) return "";
+  if(tools>=2) what=tools+(/\b\d\s*-?\s*(?:PC|PCS|PIECES?)\b/.test(T)&&!/\b\d\s*-?\s*TOOLS?\b/.test(T)?"-Piece":"-Tool")+" Combo Kit";   // pieces can be batteries too
+  else if(HOUSEHOLD.test(M)) return "";                   // only when the model itself says it ("MEP64LW/A" isn't "Apple Watch")
   const hit=(s,re)=>{ const x=re.exec(s); return x&&!FOR_ITEM.test(s.slice(x.index+x[0].length)); };
   const find=s=>{ for(const [re,noun,ctx] of ITEM_WHAT) if(hit(s,re)&&(!ctx||ctx.test(T+C))) return noun; return ""; };
   // Category: only when it names ONE kind of thing ("Guitars & Amps" doesn't say which)
-  const fromCat=c=>{ const n=new Set(); for(const [re,noun,ctx] of ITEM_WHAT) if(hit(c,re)&&(!ctx||ctx.test(T+C))) n.add(noun.replace(/s$/,"")); return n.size===1?find(c):""; };
-  if(!what) what=find(T)||fromCat(C)||fromCat(cs);
-  if(!what){ const k=KNOWN_MODELS.find(([b,m])=>b.test(up(mfr).trim())&&m.test(up(model).trim())); if(k) what=k[2]; }
-  if(!what) return "";
+  // overlapping matches: the longer one counts; a noun that ends another ("Guitar" in "Acoustic-Electric Guitar") is absorbed
+  const fromCat=c=>{ const h=[]; for(const [re,noun,ctx] of ITEM_WHAT){ const x=re.exec(c); if(x&&hit(c,re)&&(!ctx||ctx.test(T+C))) h.push([x.index,x.index+x[0].length,noun]); }
+    const top=h.filter(a=>!h.some(b=>b!==a&&b[0]<a[1]&&a[0]<b[1]&&(b[1]-b[0]>a[1]-a[0]||b[1]-b[0]===a[1]-a[0]&&b[0]<a[0]))), all=top.map(a=>a[2]);
+    const spec=all.filter(x=>!all.some(y=>y!==x&&y.endsWith(" "+x))), n=new Set(spec.map(x=>x.replace(/s$/,"")));   // "Acoustic-Electric Guitar" absorbs "Guitar"
+    return n.size===1?spec[0]:""; };
+  // Bravo's Category is staff-entered and usually exact ("NFA Suppressors" keeps "Oculus 22" from being a VR headset).
+  // "Impact Wrench/Driver", "Monitor/Speakers": two kinds of thing, so the category decides nothing.
+  const k=KNOWN_MODELS.find(([b,m])=>b.test(up(mfr).trim())&&m.test(up(model).trim())), kn=k?k[2]:"";
+  const cn=what||/\//.test(C)?"":fromCat(cs)||fromCat(C);
+  const hh=HOUSEHOLD.test(T);                             // "APPLE TV" / "PS4 ... HEADSET" in the description: only the category may name it
+  const wn=hh?"":find(T), last=x=>x.split(" ").pop();
+  if(!what&&kn) what=cn&&cn!==kn&&cn.endsWith(" "+kn)?cn:kn;                   // known model; category may be more specific
+  else if(!what&&cn&&wn&&wn!==cn){                                              // category vs description words
+    if(wn.endsWith(" "+cn)||last(wn)===last(cn)&&wn.length>cn.length) what=wn;    // "Hammer Drill" beats category "Drill"
+    else if(cn.endsWith(" "+wn)||last(wn)===last(cn)) what=cn;
+    else { what=cn; if(out) out.clash='Bravo\'s category says "'+cn+'", the description sounds like "'+wn+'"'; } }
+  else if(!what) what=cn||wn;
+  if(!what&&hh) return "";
+  if(!what) return null;                // unknown: the checker asks (knowledge base, Reverb, staff)
   // the model already says it ("Intensity Scope", "Regent 30 Watt Acoustic Amp"): nothing to add
   const said=what.toUpperCase().split(/[\s\/&-]+/).filter(w=>w.length>=2&&!/^(SET|KIT|THE|AND|COMBO|TOOL|\d+)$/.test(w))
-    .some(w=>new RegExp("\\b(?:"+w+(WHAT_SAME[w]?"|"+WHAT_SAME[w]:"")+")\\b").test(M));
+    .some(w=>new RegExp("\\b(?:"+w+(WHAT_SAME[w]?"|"+WHAT_SAME[w]:"")+")\\b").test(up(model)));
   return said?"":what;
 }
 
@@ -1359,7 +1397,8 @@ function itemWhat(item,mfr,model,category,tools){
 function parseRows(lines){
   let cols=null; const out=[];
   const NAMES={Manufacturer:"mfr",Model:"model",Number:"number",Category:"category",Description:"desc",Caliber:"caliber",Cost:"cost",Price:"price",
-    Location:"location",Barcode:"barcode","Serial Number":"serial","Date to Inventory":"date"};     // last four: the printed barcode label
+    Location:"location",Barcode:"barcode","Serial Number":"serial","Date to Inventory":"date",     // these four: the printed barcode label
+    Quality:"quality"};                                         // NEW / VERY GOOD / GOOD... (NEW guns: "NEW Glock")
   for(const line of lines){
     const txt = line.map(c=>c.str).join(" ");
     if(/Manufacturer/.test(txt) && /Caliber/.test(txt)){
@@ -1367,7 +1406,7 @@ function parseRows(lines){
       continue;
     }
     if(!cols) continue;
-    const parts={mfr:[],model:[],number:[],category:[],desc:[],caliber:[],cost:[],price:[],location:[],barcode:[],serial:[],date:[],gun:[],skip:[]};
+    const parts={quality:[],mfr:[],model:[],number:[],category:[],desc:[],caliber:[],cost:[],price:[],location:[],barcode:[],serial:[],date:[],gun:[],skip:[]};
     for(const c of line){
       const cx = c.x + (c.w ? Math.min(c.w/2,40) : 0.5);       // middle of the text decides its column
       let col=cols[0]; for(const k of cols) if(cx>=k.x-2) col=k;
@@ -1382,7 +1421,7 @@ function parseRows(lines){
     if(!isFinite(cost) && !isFinite(price)) continue;
     if(price===0.01) continue;                                  // penny price = not priced yet; no tag
     out.push({mfr:j(parts.mfr), model:j(parts.model), number, category:j(parts.category), desc:j(parts.desc),
-              caliberRaw:m?m[1].trim():j(parts.caliber), price:isFinite(price)?price:0, cost,
+              caliberRaw:m?m[1].trim():j(parts.caliber), quality:j(parts.quality), price:isFinite(price)?price:0, cost,
               label:{barcode:j(parts.barcode).replace(/\s/g,""), location:j(parts.location), serial:j(parts.serial), date:j(parts.date), gun:j(parts.gun), desc:j(parts.desc)}});
   }
   return out;
@@ -1417,8 +1456,12 @@ const MODEL_FIXES=[
   {brand:/^Browning$/, model:/^Buck Mark Micro Bull Barrel/i, to:"Buck Mark Micro Bull"},
 ];
 
+// knowledge-base key: Bravo's own maker + model, as typed (cleaned names change with code and edits).
+// None when either is blank or Bravo cut it short ("…"): one answer must never land on every bare "Fender".
+const kbKeyOf=(mfr,model)=>{ if(/…|\.\.\.$/.test(mfr)||/…|\.\.\.$/.test(model)) return "";
+  const n=v=>String(v||"").toUpperCase().replace(/[^A-Z0-9]+/g," ").trim(), a=n(mfr), b=n(model); return a&&b?a+"|"+b:""; };
 function toTag(r){
-  const mfrCut=/…|\.\.\.$/.test(r.mfr), modelCut=/…|\.\.\.$/.test(r.model);
+  const mfrCut=/…|\.\.\.$/.test(r.mfr), modelCut=/…|\.\.\.$/.test(r.model), kbKey=kbKeyOf(r.mfr,r.model);
   // long maker names can spill the model into the maker column (not when Bravo cut the maker short with "…")
   r={...r, mfr:r.mfr.replace(/\s*(…|\.\.\.)\s*/g," ").trim(), model:r.model.replace(/\s*(…|\.\.\.)\s*$/,"").trim()};
   // Bravo cut the model short: drop the half word at the end ("BLACK LABEL 1911 TH…")
@@ -1435,18 +1478,51 @@ function toTag(r){
   for(const [re,name] of FINISHES){ if(re.test(model)){ finish=finish||name; model=model.replace(re," ").replace(/\s+/g," ").trim(); } }
   // 2) drop a bare gauge number repeated in the model ("A300 Ultima 12" when caliber is 12 Gauge)
   const g=caliber.match(/^(\d+) Gauge$/); if(g) model=model.replace(new RegExp("(^|\\s)"+g[1]+"(?=\\s|$)"),"$1").replace(/\s+/g," ").trim();
-  // 2b) catalog-style model ("Xbox Series S - Console - 1TB - 1883"): drop the category word and the part number
-  if(/\s-\s(?:Video\s+)?(?:Game\s+)?(?:Console|System|Gaming Console)(?=\s-\s|$)/i.test(model))
-    model=model.replace(/\s-\s(?:Video\s+)?(?:Game\s+)?(?:Console|System|Gaming Console)(?=\s-\s|$)/i,"").replace(/\s-\s\d{4}$/,"").replace(/\s-\s/g," ").trim();
+  // 2b) catalog-style model, parts split by " - " ("Xbox Series S - Console - 1TB - 1883", "MEH54LW/A - Watch SE 3 GPS",
+  //     "Quest 3 512GB VR Headset - 899-00583-01 - S3A"): keep the readable parts, drop part numbers and filler words
+  if(/\s-\s/.test(model)){
+    const seg=model.split(/\s-\s/).map(x=>x.trim()).filter(Boolean);
+    const code=x=>/^[A-Z0-9\/.-]+$/i.test(x)&&/\d/.test(x)&&!/^\d+(?:GB|TB|MM|IN)$/i.test(x)&&(x.length>=4||/^[A-Z]\d[A-Z]$/i.test(x));
+    const filler=x=>/^(?:(?:Video\s+)?(?:Game\s+|Gaming\s+)?Console|System|Quantity|Qty|Unit|Each)$/i.test(x);
+    const keep=seg.filter(x=>!code(x)&&!filler(x));
+    // only real catalog entries: a filler word, 3+ parts, or a retail SKU ("MEH54LW/A"); never "AR-15 - Sport", "DCD771 - 20V Max Drill"
+    const catalog=seg.some(filler)||seg.length>=3||seg.some(x=>/^[A-Z0-9]{5,}\/[A-Z]$/i.test(x));
+    if(catalog&&keep.length&&keep.length<seg.length&&keep.some(x=>/[A-Z]{3,}/i.test(x))) model=keep.join(" ");
+  }
+  // 2d) Bravo's model is only a part number ("MEP64LW/A", "YHM-2150-MB-24") and the description names the actual
+  //     model ("APPLE WATCH SE 3 40MM"): the description wins, buyers know it by name. Not for guns (P365 is the name),
+  //     and not when the description only says what it is ("DEWALT DRILL" keeps DCD793).
+  let mRaw=r.model;
+  // a part number, not a model name: "MEP64LW/A", "YHM-2150-MB-24", "AB12345678" (but "YAS-23", "2-10", "DCD793" are names)
+  const isCode=w=>/\d/.test(w)&&/^[A-Z0-9\/.-]+$/i.test(w)&&(/\//.test(w)||(w.match(/-/g)||[]).length>=2||w.replace(/[^A-Z0-9]/gi,"").length>=8&&/[A-Z]/i.test(w));
+  const gunCat=(CONFIG.tagTypes||[]).filter(k=>k.categories&&!k.extrasOnFront).some(k=>new RegExp("^(?:"+k.categories+")$","i").test(String(r.category||"").trim()));
+  if(!gunCat&&model&&model.split(/\s+/).every(isCode)){
+    const brandW=new Set(String(r.mfr).toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean)), ini=[...brandW].map(w=>w[0]).join("");
+    const code=String(r.model).toUpperCase().replace(/[^A-Z0-9]/g,"");
+    let dn=pipeW(r.desc).toUpperCase().replace(/(?:^|[\s|(])(?:W\s*\/|WITH\b|INCL|COMES WITH\b).*$/,"")
+      .replace(/\b(?:NO|W\s*\/\s*O|WITHOUT|MISSING|LESS)\s+\S+/g," ").replace(/\b(?:TOOL|UNIT) ONLY\b/g," ");
+    const words=dn.split(/\s+/).filter(w=>w&&!brandW.has(w)&&w!==ini&&!(w.replace(/[^A-Z0-9]/g,"").length>=4&&code.includes(w.replace(/[^A-Z0-9]/g,""))));
+    const nounW=new Set(ITEM_WHAT.flatMap(x=>x[1].toUpperCase().split(/[\s\/&-]+/)).concat(["SET","KIT","TOOL","CORDLESS"]));
+    const named=words.some(w=>/^[A-Z]{2,}$/.test(w)&&!nounW.has(w)&&![...nounW].some(n=>w.length>=3&&n.startsWith(w)));   // "SE", "RESONATOR"; not "CIRC"
+    if(named){ model=titleCase(words.join(" ")).replace(/\b(\d+)MM\b/g,"$1mm"); mRaw=words.join(" "); }
+  }
   // 2c) brand-name casing Bravo's caps lose
-  model=model.replace(/\bi(phone|pad|pod|mac)\b/gi,(m,w)=>"i"+w[0].toUpperCase()+w.slice(1).toLowerCase()).replace(/\bMacbook\b/g,"MacBook").replace(/\bAirpods\b/g,"AirPods").replace(/\bPlaystation\b/g,"PlayStation").replace(/\bGopro\b/g,"GoPro");
+  model=model.replace(/\bCombp\b/g,"Combo").replace(/\bi(phone|pad|pod|mac)\b/gi,(m,w)=>"i"+w[0].toUpperCase()+w.slice(1).toLowerCase()).replace(/\bMacbook\b/g,"MacBook").replace(/\bAirpods\b/g,"AirPods").replace(/\bPlaystation\b/g,"PlayStation").replace(/\bGopro\b/g,"GoPro");
   // 3) known model-name corrections
   for(const f of MODEL_FIXES){ if((!f.brand||f.brand.test(brand)) && f.model.test(model)){ model=model.replace(f.model,f.to).trim(); if(f.brandTo) brand=f.brandTo; } }
   // General Merchandise: what it is + notes, read from the item part of the description (before W/)
-  const dU=String(r.desc||"").toUpperCase(), wi=dU.search(/(?:^|[\s|(])(?:W\s*\/(?!\s*O\b)|WITH\b(?!OUT)|INCL(?:UDES?|\.)?\b|COMES WITH\b)/), item=wi>=0?dU.slice(0,wi):dU;
+  const dU=pipeW(r.desc).toUpperCase(), wi=dU.search(/(?:^|[\s|(])(?:W\s*\/(?!\s*O\b)|WITH\b(?!OUT)|INCL(?:UDES?|\.)?\b|COMES WITH\b)/), item=wi>=0?dU.slice(0,wi):dU;
   const tools=Math.max(toolCount(item),toolCount(String(r.mfr+" "+r.model).toUpperCase()));
-  const what=itemWhat(item,r.mfr,r.model,r.category,tools), notes=itemNotes(item,r.model,tools>=2,r.category);
-  return {include:true, brand, model, caliber, extras:parseExtras(r.desc), accessories:parseAccessories(r.desc,r.mfr+" "+r.model,r.category,r.price), what, notes, finish, category:r.category||"", price:r.price, cost:r.cost, number:r.number, label:r.label, ...specsOf(r),
+  const wo={}, w=itemWhat(item,r.mfr,mRaw,r.category,tools,wo), what=w||"", notes=itemNotes(item,mRaw,tools>=2,r.category);
+  // condition: Bravo's Quality column, or the description says new ("NIB")
+  const quality=String(r.quality||"").trim()||(/\bNIB\b|\bNEW IN (?:THE )?BOX\b|\bBRAND NEW\b/.test(dU)?"NEW":"");
+  // double-check: Bravo's model and description disagree on how many pieces ("6 PIECE COMBP SET" vs "5PC")
+  const pcs=s=>{ const x=String(s).toUpperCase().match(/\b(\d{1,3})\s*-?\s*(?:PC|PCS|PIECES?)\b/); return x?+x[1]:0; }, pm=pcs(r.model), pd=pcs(item);
+  let conflict=pm&&pd&&pm!==pd?"Bravo's model says "+pm+" pieces, the description says "+pd:wo.clash||"";
+  // coins / proof sets: the year is what buyers look for
+  if(!conflict&&/\bPROOF\b|\bMINT SET|\bCOINS?\b|\bSILVER EAGLE|\bMORGAN\b/.test(item+" "+String(r.model+" "+r.category).toUpperCase())&&!/\b(?:1[789]|20)\d\d\b/.test(item+" "+r.model))
+    conflict="No year in Bravo's description";
+  return {include:true, brand, model, caliber, extras:parseExtras(r.desc), accessories:parseAccessories(r.desc,r.mfr+" "+r.model,r.category,r.price), what, notes, quality, kbKey, whatKnown:w!==null, conflict, checked:"", finish, category:r.category||"", price:r.price, cost:r.cost, number:r.number, label:r.label, ...specsOf(r),
           raw:[r.mfr, r.model, r.desc, r.caliberRaw].filter(Boolean).join(" | ")};
 }
 
@@ -1723,7 +1799,7 @@ function tagProblems(type,t,s){
   return out;
 }
 // words that may be shortened on a tag when the full name won't fit big enough (model line only)
-const SHORTEN = CONFIG.shorten||[];
+const SHORTEN = (CONFIG.shorten||[]).concat(CONFIG.shortMakers||[]);
 function shortenWords(str){ let s=str; for(const [a,b] of SHORTEN) s=s.replace(new RegExp("\\b"+a.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\b","gi"),b); return s; }
 // try fixes in order until the tag passes; returns what's still wrong
 function fitTag(type,t,s){
@@ -1821,6 +1897,9 @@ function drawGunFront(g,x,y,t,s){
   g.role("bg"); g.rect(x,y,W,H,C.white);
   // General Merchandise: the "Comes with" list takes the caliber row (and may wrap to two lines)
   let type=TYPES.guns;
+  // new guns and suppressors (Bravo Quality "NEW", or NIB in the description): red "NEW!" before the maker (11-20-2026).
+  // The shop's only new stock, so General Merchandise never gets it.
+  const isNew=isNewItem(t)&&(!s.extrasFront||/SUPPRESSOR/i.test((t.what||"")+" "+(t.category||"")));
   // 11-20-2026: model row = model + what it is ("KPM8420T Powered Mixer"); this row = notes (Vintage, 4-12x40...).
   // What it comes with goes on the back, like the gun tags (shop's call, 11-20-2026).
   if(s.extrasFront){ const wt=String(t.what||"").trim(), ww=v=>!wt||String(v||"").toLowerCase().includes(wt.toLowerCase())?v:[v,wt].filter(x=>String(x||"").trim()).join(" ");   // never twice
@@ -1849,10 +1928,19 @@ function drawGunFront(g,x,y,t,s){
   g.lw(thick);
   for(let i=1;i<ys.length;i++) g.line(x,ys[i][0],x+W,ys[i][0]);
   [yPrice,yLay].concat(pr>0?[yPay]:[]).forEach(v=>g.line(x,v,x+W,v));
-  groups.forEach((gr,i)=>{ g.role(type.rows[gr.owner??0][0]); fitRow(g,gr.text,x+W/2,ys[i][0],W-2*pad,ys[i][1],gr.scale,gr.wrap); });
+  groups.forEach((gr,i)=>{ const role=type.rows[gr.owner??0][0]; g.role(role);
+    if(isNew&&role==="brand") newRow(g,gr.text,x+W/2,ys[i][0],W-2*pad,ys[i][1],gr.scale);
+    else fitRow(g,gr.text,x+W/2,ys[i][0],W-2*pad,ys[i][1],gr.scale,gr.wrap); });
   g.lw(thick); g.strokeRect(x,y,W,H);      // the front's outer line is the cut line
 }
 
+// "NEW! Glock": red NEW! then the maker in black, one line, sized together
+function newRow(g,str,cx,top,maxW,h,scale){
+  const a=W_.newItem||"NEW!", per1=v=>1000/g.fitSize(v,1000,1e9), wa=per1(a)*.85, wb=str?per1(str):0, gap=str?.3:0;   // NEW! a touch smaller, same line
+  const sz=Math.min(h*scale,maxW/(wa+wb+gap)), x0=cx-(wa+wb+gap)*sz/2, cy=top+h/2;
+  g.role("new"); g.fitText(a,x0+wa*sz/2,cy,999,sz*.85,C.red); g.role("brand"); if(str) g.fitText(str,x0+(wa+gap)*sz+wb*sz/2,cy,999,sz);
+}
+const isNewItem=t=>/^(?:NEW|NIB|NEW IN BOX|BRAND NEW)\b/i.test(String(t.quality||"").trim());
 // Two amounts on one line with a divider: "$62 Down | $21 monthly". a is drawn at ka x the size of b, same baseline.
 const C_SOFT=[200,205,214], C_HINT=[175,180,190];
 function pairRow(g,a,b,cx,cy,maxW,maxSize,ka,ra,rb,dcol,dw){
@@ -1905,7 +1993,7 @@ function drawGunBack(g,x0,y0,t,s0){
   g.role("bleed"); g.rect(xa,ye-lw/2,xb-xa,lw,K); g.rect(xa,yEnd,xb-xa,lw,K);
   g.role("extras");
   const ey=ye+he/2, ew=W-2*pad;
-  if(extras){ const line=W_.withPrefix+extras, two=t.fit&&t.fit.extras2&&extras.includes(", ");
+  if(extras){ const line=(/^(?:No |Tool Only)/.test(extras)?"":W_.withPrefix)+extras, two=t.fit&&t.fit.extras2&&extras.includes(", ");
     if(!two) g.fitText(line,cx,ey+1,ew,he*.5*B);
     else { const q=extras.split(", "), h=Math.ceil(q.length/2), a=W_.withPrefix+q.slice(0,h).join(", ")+",", b=q.slice(h).join(", ");
       const sz=Math.min(g.fitSize(a,ew,he*.36*B),g.fitSize(b,ew,he*.36*B));
@@ -2074,7 +2162,8 @@ for(const id in CONFIG.types) if(TYPE_CODE[id]) TYPES[id]=Object.assign({id}, CO
 const DATA_FILE = "Tag Tool Data.json";
 const SH = { dir:null, ok:false, data:null };
 // samples: picture of the tag a fixed tag type (TVs, Computers...) should look like {id:tag type, name, data:data URL, t}
-const blankData = () => ({ v:1, rules:[], items:{}, tagTypes:[], samples:[] });
+// kb: knowledge base, "what it is" per Bravo maker + model {key:{what,t}} (fixes.js)
+const blankData = () => ({ v:1, rules:[], items:{}, tagTypes:[], samples:[], kb:{} });
 
 // small key-value store in the browser to remember the folder
 function idb(){ return new Promise((res,rej)=>{ const r=indexedDB.open("tagtool",1);
@@ -2090,6 +2179,7 @@ function mergeData(a,b){
   for(const src of [a.items||{},b.items||{}]) for(const n in src) for(const k in src[n]){
     const cur=(out.items[n]||{})[k], v=src[n][k];
     if(!cur||(v.t||0)>(cur.t||0)){ out.items[n]=out.items[n]||{}; out.items[n][k]=v; } }
+  for(const src of [a.kb||{},b.kb||{}]) for(const k in src){ const cur=out.kb[k], v=src[k]; if(!cur||(v.t||0)>(cur.t||0)) out.kb[k]=v; }
   return out;
 }
 const cache={ get(){ try{ return Object.assign(blankData(),JSON.parse(localStorage.getItem("tagtool.shared"))||{}); }catch(e){ return blankData(); } },
@@ -2319,10 +2409,11 @@ async function handleFile(file){
   finally{ $("drop").classList.remove("busy"); $("dropBig").textContent="Drop Bravo report"; $("dropSmall").textContent="or click to pick it"; }
 }
 function loadLines(lines,quiet){
-  lastLines=lines; const list=TYPE.parse(lines); list.forEach(t=>{ t.kind=autoKind(t); if(skipCat(t)&&t.kind===CONFIG.otherTagType) t.include=false; useAccessories(t); });
+  lastLines=lines; const list=TYPE.parse(lines); list.forEach(t=>{ t.kind=autoKind(t); if(skipCat(t)&&t.kind===CONFIG.otherTagType) t.include=false; useAccessories(t); applyKB(t); });
   tags=applyFixes(list); skips={}; $("q").value="";             // a tag type changed on the Edit panel is remembered by item #
   if(!tags.length){ $("emptyMsg").textContent="No items found in that file."; view(); return; }
   $("emptyMsg").textContent=""; view(); window.scrollTo({top:0}); if(!quiet) prawn("load",tags.map(t=>t.number||t.raw||""));
+  kbResearch(tags);                                              // unknown models: ask Reverb in the background (once a day each)
   if(!quiet) toast("✓ "+kinds().map(k=>[ofKind(tags,k.id).length,k.name]).filter(x=>x[0]).map(x=>x[0]+" "+x[1]).join(" · "));
 }
 function newTag(){
@@ -2368,8 +2459,8 @@ function buildGrid(){
     grid.appendChild(head); grid.appendChild(wrap);
     idx.forEach(i=>{ const t=tags[i];
       if(q&&!Object.values(t).join(" ").toLowerCase().includes(q)) return; shown++;
-      const c=document.createElement("div"); c.className="card"+(t.include?"":" off")+(t._warn?" warn":""); c._i=i;
-      if(t._warn) c.title="Some text on this tag prints small — click to fix it";
+      const c=document.createElement("div"); c.className="card"+(t.include?"":" off")+(t._warn?" warn":t._check?" check":""); c._i=i;
+      if(t._warn) c.title="Some text on this tag prints small — click to fix it"; else if(t._check) c.title=t._check+" — click to check it";
       c.style.width=s.W*k+"px"; c.style.height=s.H*k+"px";
       c.innerHTML='<button class="tick" title="Print this tag?"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></button>';
       c.querySelector(".tick").onclick=e=>{ e.stopPropagation(); t.include=!t.include; c.classList.toggle("off",!t.include); updateBar(); buildGridHeadsOnly(); };
@@ -2440,6 +2531,7 @@ function openEditor(i){
       <div class="sides">${two?"<span>Front</span>":""}<canvas id="edFront"></canvas>${two?'<span>Back</span><canvas id="edBack"></canvas>':""}</div>
       ${(D=>D.fields?D.fields.map(x=>f(x[0],x[1],t[x[0]]||D.def(t)[x[0]]||"")).join(""):   // electronics: their own boxes
         TYPE.fields.filter(x=>s.extrasFront?x[0]!=="caliber":x[0]!=="what"&&x[0]!=="notes").map(x=>f(x[0],x[1],t[x[0]]||"")).join(""))(design(s))}
+      ${kbBox(t,s)}
       <div class="row2">${f("price","Price",t.price||"",1)}${f("cost","Cost",isFinite(t.cost)?t.cost:"",1)}</div>
       ${f("number","Item #",t.number||"")}
       ${t.category?`<div class="raw">Bravo category: ${esc(t.category)}</div>`:""}
@@ -2460,8 +2552,12 @@ function openEditor(i){
     else if(k==="cost"){ const m=money(v); t.cost=isFinite(m)?m:NaN; }
     else { t[k]=v; rememberEdit(t,k); }
     checkOne(t); draw(); redrawCard(i);
-    const c=cards().find(c=>c._i===i); if(c) c.classList.toggle("warn",!!t._warn);
+    const c=cards().find(c=>c._i===i); if(c){ c.classList.toggle("warn",!!t._warn); c.classList.toggle("check",!t._warn&&!!t._check); }
   });
+  const kbDo=what=>{ t.what=what; kbSet(t,what); checkAll(); view(); openEditor(i); };   // every tag of this model
+  if($("kbUse")) $("kbUse").onclick=()=>kbDo(kbWeb[t.kbKey].what);
+  if($("kbNone")) $("kbNone").onclick=()=>kbDo("");
+  if($("kbOk")) $("kbOk").onclick=()=>{ t.checked="1"; rememberEdit(t,"checked"); checkAll(); view(); openEditor(i); };   // remembered by item #
   $("edInc").onclick=()=>{ t.include=!t.include; inc(); const c=cards().find(c=>c._i===i); if(c) c.classList.toggle("off",!t.include); updateBar(); buildGridHeadsOnly(); };
   if($("edDel")) $("edDel").onclick=()=>{ tags.splice(i,1); closeDrawer(); view(); };
   $("edX").onclick=closeDrawer; $("edDone").onclick=()=>{ prawn("edit"); closeDrawer(); };
@@ -2511,12 +2607,25 @@ $("dl").onclick=()=>savePdf("both");
 $("dlFront").onclick=()=>savePdf("front");
 $("dlBack").onclick=()=>savePdf("back");
 
+// "What it is" helper on the Edit panel: what the checker says, Reverb's suggestion + its listings, search links
+function kbBox(t,s){
+  if(!s.extrasFront||s.design) return "";
+  const msg=kbCheck(t,s), w=t.kbKey&&kbWeb[t.kbKey];
+  if(!msg) return t._kb?`<div class="raw">✓ "What it is" saved for every ${esc([t.brand,t.model].join(" "))}</div>`:"";
+  if(t.conflict&&!t.checked) return `<div class="kb"><b>${esc(msg)}</b><div class="raw">Bravo: ${esc(t.raw||"")}</div>
+    <div class="kbBtns"><button class="btn primary" id="kbOk">Looks right</button></div><div class="raw">Or fix the Model / Notes boxes above.</div></div>`;
+  const sug=w&&w.what&&!t.what;
+  return `<div class="kb"><b>${esc(msg)}</b>
+    ${w&&w.ev&&w.ev.length?`<div class="raw">Reverb: ${w.ev.map(esc).join(" · ")}</div>`:""}
+    <div class="kbBtns">${sug?`<button class="btn primary" id="kbUse">Use "${esc(w.what)}"</button>`:""}${t.kbKey?'<button class="btn" id="kbNone">Nothing to add</button>':""}</div>
+    <div class="raw">Look it up: ${kbLinks(t).map(([n,u])=>`<a href="${esc(u)}" target="_blank" rel="noopener">${n}</a>`).join(" · ")} — then type it in "What it is" (remembered for this model)</div></div>`;
+}
 // ---------- check before printing (runs on load, on every edit, and again at Print) ----------
 // Fixes what it can by itself (extras on 2 lines, long words shortened); a tag it can't fix
 // still prints, gets a "!" on screen, and is named when you print.
 // skipped when nothing that changes the fit (size, text, price) changed since the last check
 const CHECKED=new WeakMap();
-function checkOne(t){ const s=settings(t.kind), key=JSON.stringify([s.W,s.H,s.extrasFront,s.design,TYPE.fields.map(f=>t[f[0]]),t.price]);
+function checkOne(t){ const s=settings(t.kind); t._check=kbCheck(t,s); const key=JSON.stringify([s.W,s.H,s.extrasFront,s.design,TYPE.fields.map(f=>t[f[0]]),t.price]);
   if(CHECKED.get(t)===key) return; CHECKED.set(t,key);
   const r=fitTag(TYPE,t,s); t._warn=r.left.length?r.left:null; }
 function checkAll(){ tags.forEach(checkOne); }
@@ -2524,10 +2633,12 @@ function checkPrint(){
   const rep=preflight(TYPE,printGroups());
   if(rep.sheet.length){ toast("Can't print: "+rep.sheet[0]+". Pick another size under Sizes ▾.",true); return null; }
   rep.left.forEach(x=>x.t._warn=x.why);
+  const ask=tags.filter(t=>t.include&&kbCheck(t,settings(t.kind)));   // double-check: unknown / unconfirmed "what it is"
   const name=t=>{ const n=[t.brand,t.model].filter(Boolean).join(" "); return n.length>28?n.slice(0,27)+"…":n; };
   rep.msg=rep.left.length
     ? "Small text on "+plural(rep.left.length,"tag")+": "+rep.left.slice(0,2).map(x=>name(x.t)).join(", ")+(rep.left.length>2?"…":"")+" · "+printTip()
     : "✓ Checked "+plural(rep.tags,"tag")+(rep.fixed.length?" · "+rep.fixed.length+" fixed to fit":"")+" · "+printTip();
+  if(ask.length) rep.msg="Check "+plural(ask.length,"tag")+" (what it is): "+ask.slice(0,2).map(name).join(", ")+(ask.length>2?"…":"")+" · "+rep.msg;
   if(/Firefox\//.test(navigator.userAgent)) rep.msg="Use Edge or Chrome to print — Firefox won't turn on two-sided by itself.";
   return rep;
 }
@@ -2621,17 +2732,103 @@ function applyFixes(list){
   }
   return list;
 }
+// ---------- KNOWLEDGE BASE: "what it is" per maker + model, built up as tags get made (11-20-2026) ----------
+// Order for every tag: built-in rules (core.js itemWhat) -> knowledge base -> item fix. One small entry per model,
+// confirmed by staff, kept in the shared "Tag Tool Data.json" so every computer knows it from then on.
+// Unknown models: Reverb's free public search is asked in the background (maker + model only, at most once a day per
+// model), and its answer is only a SUGGESTION on this computer (localStorage) until staff accept it. Nothing from the
+// web prints by itself. The checker flags what's unknown or unconfirmed before printing.
+const KB_DAY=864e5, KB_KEEP=30*KB_DAY, KBW="tagtool.kbweb";
+const kbWeb=(()=>{ try{ const w=JSON.parse(localStorage.getItem(KBW))||{}, now=Date.now();
+  for(const k in w) if(now-(w[k].at||0)>KB_KEEP) delete w[k];        // tidy: old unconfirmed lookups go (asked again if needed)
+  return w; }catch(e){ return {}; } })();
+const saveKbWeb=()=>{ try{ localStorage.setItem(KBW,JSON.stringify(kbWeb)); }catch(e){} };
+function applyKB(t){
+  t._rule=t.what||""; t._kb=false;
+  const e=t.kbKey&&(SH.data.kb||{})[t.kbKey];
+  // a saved blank ("Nothing to add") never erases a noun the built-in rules found, unless staff overruled that same noun
+  if(e&&!(e.what===""&&t._rule&&t._rule!==(e.over||""))){ t.what=e.what; t._kb=true; t._kbOver=e.over||""; }
+}
+// staff typed / accepted "what it is": every tag of that model, now and later, on every computer
+const pendingKB={};
+function kbSet(t,what){
+  if(!t.kbKey) return; what=String(what).trim(); pendingKB[t.kbKey]={what,over:t._rule||""};   // over: staff overruled the built-in answer delete kbWeb[t.kbKey]; saveKbWeb();
+  (typeof tags!=="undefined"?tags:[]).forEach(x=>{ if(x.kbKey===t.kbKey){ x.what=what; x._kb=true; x._kbOver=t._rule||""; } });
+  clearTimeout(editTimer); editTimer=setTimeout(flushEdits,700);
+}
+// what the checker says about a General Merchandise tag ("" = fine)
+function kbCheck(t,s){
+  if(!s.extrasFront||s.design||t.hand) return "";            // hand-made tags: staff typed it
+  const fixed=t._base&&["brand","model","what","notes"].some(k=>String(t[k]||"")!==String(t._base[k]||""));   // staff edited the tag
+  if(t.conflict&&!t.checked&&!fixed&&!(/year/.test(t.conflict)&&/\b(?:1[789]|20)\d\d\b/.test([t.model,t.notes,t.what].join(" ")))) return t.conflict;
+  if(!t.kbKey) return t.what||t.whatKnown?"":"What is it? (Bravo's model is blank or cut short)";
+  if(t._kb) return t._rule&&t.what&&t._rule!==t._kbOver&&!t.what.toLowerCase().includes(t._rule.toLowerCase())
+    ?'Saved as "'+t.what+'" but the description says "'+t._rule+'"':"";
+  if(t.what||t.whatKnown) return "";
+  const w=t.kbKey&&kbWeb[t.kbKey];
+  return w&&w.what?'Not checked yet: Reverb says "'+w.what+'"':"What is it? Not known yet";
+}
+// Reverb's public listing search (free, no key). A listing counts only if its title has the model in it;
+// the words after the model ("...KPM8420T Powered Mixer") or its category name the item. Needs 2+ listings agreeing.
+// Reverb category -> what it is ("Amps / Guitar Amps / Guitar Cabinets" -> "Guitar Speaker Cabinet")
+const RV_CAT=[[/Loop Pedals/,"Looper Pedal"],[/Multi-?Effect/,"Multi-Effects Pedal"],[/Guitar Heads/,"Guitar Amp Head"],[/Guitar Combos/,"Guitar Combo Amp"],
+  [/Guitar Cabinets/,"Guitar Speaker Cabinet"],[/Bass Heads/,"Bass Amp Head"],[/Bass Combos/,"Bass Combo Amp"],[/Bass Cabinets/,"Bass Speaker Cabinet"],
+  [/Acoustic Amps/,"Acoustic Amp"],[/Powered Mixers/,"Powered Mixer"],[/PA Speakers/,"PA Speaker"],[/Studio Monitors/,"Studio Monitor"],[/Power Amps/,"Power Amp"],
+  [/Interfaces$/,"Audio Interface"],[/^Electric Guitars/,"Electric Guitar"],[/^Acoustic Guitars/,"Acoustic Guitar"],[/^Bass Guitars/,"Bass Guitar"],
+  [/^Effects and Pedals \/ (.+)$/,m=>m[1].split(/ and |, | \/ /)[0].replace(/s$/,"")+" Pedal"]];
+function rvNoun(cat){
+  for(const [re,n] of RV_CAT){ const m=cat.match(re); if(m) return typeof n==="function"?n(m):n; }
+  const leaf=cat.split(" / ").pop().split(/ and |, /)[0];
+  return /^(Other|Parts|Merchandise)/.test(leaf)?"":leaf.replace(/(?<![su])s$/,"");
+}
+let kbBusy=false;
+async function kbResearch(list){
+  if(kbBusy||!navigator.onLine) return; kbBusy=true;
+  const now=Date.now(), seen=new Set(), todo=[];
+  for(const t of list){ const k=t.kbKey; if(!k||seen.has(k)||t._kb||t.what||t.whatKnown||t.include===false||kbCheck(t,settings(t.kind))==="") continue;
+    const mo=k.split("|")[1]; if(!/[A-Z]/.test(mo)&&mo.replace(/ /g,"").length<4||mo.replace(/ /g,"").length<3) continue;   // "65", "X", "2 10": too generic to search
+    seen.add(k);
+    const w=kbWeb[k]; if(w&&(w.what||now-(w.at||0)<KB_DAY)) continue; todo.push(t); }
+  try{ for(const t of todo.slice(0,25)){
+    const [mfr,model]=t.kbKey.split("|"), q=(mfr.split(" ")[0]+" "+model).toLowerCase();
+    let r; try{ r=await fetch("https://api.reverb.com/api/listings?per_page=24&query="+encodeURIComponent(q),{headers:{"Accept-Version":"3.0","Accept":"application/hal+json"}});
+    }catch(e){ break; }                                          // offline / blocked: try again next load, record nothing
+    if(!r.ok) break;
+    try{ const j=await r.json(), votes={}, ev=[], mk=mfr.split(" ")[0];
+      const mre=new RegExp(" "+model.split(" ").join(" ?")+"(?![0-9])");   // "XENYX 1202" matches 1202SFX, "RC 30" not RC-300
+      for(const l of j.listings||[]){ const T=" "+String(l.title||"").toUpperCase().replace(/[^A-Z0-9]+/g," ")+" ", x=mre.exec(T); if(!x) continue;
+        const make=String(l.make||"").toUpperCase();                // same maker, not just the same number ("Synergy Peavey 6505 module")
+        if(make?!make.includes(mk):!T.includes(" "+mk+" ")) continue;
+        const cat=((l.categories||[])[0]||{}).full_name||"", acc=/^(Accessories|Parts)/.test(cat)||!cat;
+        // accessories only count as "Cover for <maker> <model> Powered Mixer": the words after the model name the item
+        const n=acc?(/\bFOR\b/.test(T.slice(0,x.index))?itemWhat(T.slice(x.index+x[0].length),"","","",0):""):rvNoun(cat); if(!n) continue;
+        votes[n]=(votes[n]||0)+1; if(ev.length<3) ev.push(String(l.title).slice(0,90)); }
+      for(const a in votes) for(const b in votes) if(a!==b&&votes[b]&&a.endsWith(" "+b)){ votes[a]+=votes[b]; delete votes[b]; }   // "Bass Combo Amp" beats "Combo Amp"
+      const best=Object.entries(votes).sort((a,b)=>b[1]-a[1]), [n1,c1]=best[0]||[], c2=(best[1]||[])[1]||0;
+      kbWeb[t.kbKey]={at:now, what:c1>=2&&c1>=2*c2?n1:"", ev};
+    }catch(e){ kbWeb[t.kbKey]={at:now,what:"",ev:[]}; }
+    await new Promise(r=>setTimeout(r,400)); }
+  } finally{ kbBusy=false; saveKbWeb(); }
+  if(todo.length&&typeof view==="function") view();
+}
+// search links for staff (maker + model only: never serial, item # or price)
+const kbLinks=t=>{ const q=encodeURIComponent([t.brand,(t.src&&t.src.model)||t.model].filter(Boolean).join(" "));
+  return [["Google","https://www.google.com/search?q="+q],["Reverb","https://reverb.com/marketplace?query="+q],
+    ["eBay","https://www.ebay.com/sch/i.html?_nkw="+q],["Guitar Center","https://www.guitarcenter.com/search?Ntt="+q]]; };
+
 // called when someone edits a name in the Edit panel (saved after a short pause)
 const pendingEdits={}; let editTimer;
 function rememberEdit(t,k){
-  if(!t.number||MONEYKEYS.has(k)) return;
+  if(k==="what") kbSet(t,t.what);
+  if(!t.number||MONEYKEYS.has(k)||k==="what"&&t.kbKey) return;
   const from=(t._base||{})[k]??"", to=String(t[k]);
   pendingEdits[t.number+"\u0000"+k]={n:t.number,k,from,to};
   clearTimeout(editTimer); editTimer=setTimeout(flushEdits,700);
 }
 function flushEdits(){
-  const list=Object.values(pendingEdits); if(!list.length) return; for(const key in pendingEdits) delete pendingEdits[key];
-  updateShared(d=>{ for(const e of list){ d.items[e.n]=d.items[e.n]||{};
+  const list=Object.values(pendingEdits), kb=Object.entries(pendingKB); if(!list.length&&!kb.length) return;
+  for(const key in pendingEdits) delete pendingEdits[key]; for(const [k] of kb) delete pendingKB[k];
+  updateShared(d=>{ d.kb=d.kb||{}; for(const [k,v] of kb) d.kb[k]={...v,t:Date.now()}; for(const e of list){ d.items[e.n]=d.items[e.n]||{};
     d.items[e.n][e.k]=e.to===e.from?{deleted:true,t:Date.now()}:{from:e.from,to:e.to,t:Date.now()}; } });
 }
 
