@@ -7,7 +7,7 @@
 <script>
 // ---- self-update: checks the public mirror when online, keeps the newest build on this computer ----
 // Newer build saved earlier -> run that instead of this file. Add ?local to the address to skip it.
-var TT_BUILD=1795139522078;
+var TT_BUILD=1795140013067;
 (function(){
   var REMOTE="https://raw.githubusercontent.com/blsxf/express-pawn-tools/main/tagtool/", KEY="tagtool.update";
   function db(){ return new Promise(function(res,rej){ var r=indexedDB.open("tagtool",1);
@@ -151,11 +151,13 @@ const CONFIG = {
   // and prints them all in one go (each type on its own sheets).
   // size: which sheet size above (0 = first).  categories: Bravo categories for this type.
   // group: its own heading in the Sizes menu (default: the template's name, "Guns").
+  // designDate: when this type's design last matched its sample (Sizes menu ✎ > Add sample). A sample added after
+  //   this date is the spec: rebuild the design to match it, then move designDate up. No date = no design yet.
   // Change sizes here or with "Sizes ▾" in the top bar.
   tagTypes: [
-    {id:"handgun", cat:"guns", name:"Handguns",  size:3, categories:"Pistol|Revolver|Handgun|Derringer"},
-    {id:"rifle",   cat:"guns", name:"Long Guns", size:0, categories:"Rifle|Shotgun"},
-    {id:"general", cat:"guns", group:"General Merchandise", name:"General Merchandise", size:3,   // same small format as Handguns
+    {id:"handgun", cat:"guns", name:"Handguns",  size:3, designDate:"2026-11-19", categories:"Pistol|Revolver|Handgun|Derringer"},
+    {id:"rifle",   cat:"guns", name:"Long Guns", size:0, designDate:"2026-11-19", categories:"Rifle|Shotgun"},
+    {id:"general", cat:"guns", group:"General Merchandise", name:"General Merchandise", size:3, designDate:"2026-11-19",   // same small format as Handguns
      extrasOnFront:true},   // "Comes with" (bag, batteries, charger...) prints in the caliber row; back leaves it off
     // Electronics: each has its own tag design (design: drawing code in src/types.js DESIGNS; placeholders for now)
     {id:"tv",       cat:"guns", group:"Electronics", name:"TVs",       design:"tv",       size:3, extrasOnFront:true, categories:"TV|TVs|Television|Televisions"},
@@ -297,6 +299,10 @@ header .chip.on:hover{color:var(--onyellow)}
 .ttedit b{font-size:15px;padding:2px 2px 0}
 .tesample{min-height:70px;display:flex;align-items:center;justify-content:center;border:1px dashed var(--line);border-radius:8px;padding:6px;color:var(--ink3);font-size:13px;text-align:center}
 .tesample img{display:block;max-width:100%;max-height:170px;border-radius:4px}
+.tedef{display:flex;gap:8px;justify-content:center;margin-bottom:6px}
+.tedef canvas{display:block;border-radius:3px}
+.tenote{font-size:12px;color:var(--ink2);padding:0 2px}
+.newsample{display:inline-block;margin-left:7px;padding:1px 6px;border-radius:5px;background:#ffd400;color:#14213d;font-size:10.5px;font-weight:700;vertical-align:2px}
 .edsample{display:block;max-width:100%;max-height:150px;margin:4px auto 12px;border-radius:4px}
 
 /* main */
@@ -1805,6 +1811,34 @@ const grp=x=>x.group||TYPES[x.cat].name;
 // own tag (design set: TVs, Computers, Monitors): fixed size, no editing; the Sizes menu only takes a sample picture of it
 const fixed=x=>!!(x&&x.design);
 const sampleOf=id=>(SH.data.samples||[]).find(s=>s.id===id&&!s.deleted&&s.data);
+// The sample is the spec: when a type's sample is newer than its design (CONFIG.tagTypes designDate),
+// the design gets rebuilt to match it. Until then the menu and Edit panel flag it.
+const designDate=id=>Date.parse((CONFIG.tagTypes.find(x=>x.id===id)||{}).designDate||"")||0;
+const needsDesign=x=>{ const sm=x&&sampleOf(x.id); return !!sm&&(sm.t||0)>designDate(x.id); };
+const sampleBox=e=>{ const sm=sampleOf(e.id);
+  return `<div class="tesample">${!sm?`<div><div class="tedef"><canvas id="teDefF"></canvas><canvas id="teDefB"></canvas></div>Current design: add a sample to change it</div>`:/^data:image/.test(sm.data)?`<img src="${sm.data}" alt="">`:"📄 "+esc(sm.name)}</div>
+    ${needsDesign(e)?'<div class="tenote">Newer than the current design: the tag gets rebuilt to match this sample.</div>':""}
+    <input type="file" id="teFile" accept="image/*,application/pdf" hidden>
+    <div class="tebtns">${sm?'<button class="link" id="teRm">Remove sample</button>':""}<button class="chip" id="tePick">${sm?"Replace sample":"Add sample"}</button></div>`; };
+// no sample: the box shows the current design, drawn with a made-up item
+const DEMO={handgun:["Glock","19 Gen 5","9mm","Case, 2 Mags",450], rifle:["Ruger","10/22 Carbine",".22 LR","Scope",329],
+  general:["DeWalt","20V Drill","","Charger, 2 Batteries",89], tv:["Samsung",'55" 4K Smart TV',"","Remote",379],
+  computer:["Dell","Inspiron 15 Laptop","","Charger",299], monitor:["LG",'27" 1440p Monitor',"","Stand, HDMI Cable",159]};
+function paintDefault(e){
+  if(!$("teDefF")||!TYPE||e.cat!==TYPE.id||!kinds().some(x=>x.id===e.id)) return;
+  const d=DEMO[e.id]||(e.extrasOnFront?DEMO.general:DEMO.handgun);
+  const t={kind:e.id,brand:d[0],model:d[1],caliber:d[2],extras:d[3],price:d[4]}, s=settings(e.id), k=Math.min(125/s.W,150/s.H);
+  paint($("teDefF"),t,k,false); if(twoSided()) paint($("teDefB"),t,k,true); else $("teDefB").remove();
+}
+function wireSample(id,keep){
+  paintDefault(editing_);
+  $("tePick").onclick=()=>$("teFile").click();
+  $("teFile").onchange=async()=>{ const f=$("teFile").files[0]; if(!f) return; keep&&keep();
+    try{ const data=await sampleData(f); await saveSample({id,name:f.name,data}); toast("✓ Sample saved"); }
+    catch(e){ toast(e&&e.message||"Couldn't read that file",true); }
+    renderMenu(); };
+  if($("teRm")) $("teRm").onclick=async()=>{ keep&&keep(); await saveSample({id,deleted:true}); renderMenu(); };
+}
 const saveSample=s=>updateShared(d=>{ d.samples=(d.samples||[]).filter(y=>y.id!==s.id); d.samples.push({...s,t:Date.now()}); });
 // picture -> JPEG at most 1200px (keeps the shared file small); PDF kept as is, up to 2 MB
 async function sampleData(f){
@@ -1852,18 +1886,17 @@ function renderMenu(){
   const cats=groups.map(c=>`<button class="cat${c===menuCat?" on":""}" data-cat="${esc(c)}">${esc(c)}<span>›</span></button>`).join("");
   let right;
   if(editing_&&fixed(editing_)){            // own tag (TVs, Computers...): no name / size / delete, just the sample picture
-    const e=editing_, sm=sampleOf(e.id);
-    right=`<div class="ttedit"><b>${esc(e.name)}</b>
-      <div class="tesample">${!sm?"No sample yet.<br>Add a picture or PDF of the tag you want.":/^data:image/.test(sm.data)?`<img src="${sm.data}" alt="">`:"📄 "+esc(sm.name)}</div>
-      <input type="file" id="teFile" accept="image/*,application/pdf" hidden>
-      <div class="tebtns">${sm?'<button class="link" id="teRm">Remove</button>':""}<button class="chip" id="teCancel">Close</button><button class="btn primary" id="tePick">${sm?"Replace":"Add sample"}</button></div></div>`;
+    const e=editing_;
+    right=`<div class="ttedit"><b>${esc(e.name)}</b>${sampleBox(e)}
+      <div class="tebtns"><button class="btn" id="teCancel">Close</button></div></div>`;
   } else if(editing_){
     const e=editing_, T=TYPES[e.cat];
     right=`<div class="ttedit"><input id="teName" value="${esc(e.name)}" placeholder="Name">
       <select id="teSize">${T.sizes.map((z,i)=>`<option value="${i}"${i==e.size?" selected":""}>${esc(z.label)}</option>`).join("")}</select>
+      ${e.isNew?"":sampleBox(e)}
       <div class="tebtns">${e.isNew?"":'<button class="link" id="teDel">Delete</button>'}<button class="chip" id="teCancel">Cancel</button><button class="btn primary" id="teSave">Save</button></div></div>`;
   } else {
-    right=list.filter(x=>grp(x)===menuCat).map(x=>`<div class="sub"><button class="pickSub" data-ed="${x.id}">${esc(x.name)}${fixed(x)?"":`<small>${esc((TYPES[x.cat].sizes[x.size]||TYPES[x.cat].sizes[0]).label)}${x.categories?" · "+esc(x.categories.split("|").slice(0,3).join(", ")):""}</small>`}</button><button class="ed" data-ed="${x.id}" title="${fixed(x)?"Sample tag":"Edit"}">✎</button></div>`).join("")
+    right=list.filter(x=>grp(x)===menuCat).map(x=>`<div class="sub"><button class="pickSub" data-ed="${x.id}">${esc(x.name)}${needsDesign(x)?'<span class="newsample">new sample</span>':""}${fixed(x)?"":`<small>${esc((TYPES[x.cat].sizes[x.size]||TYPES[x.cat].sizes[0]).label)}${x.categories?" · "+esc(x.categories.split("|").slice(0,3).join(", ")):""}</small>`}</button><button class="ed" data-ed="${x.id}" title="${fixed(x)?"Sample tag":"Edit"}">✎</button></div>`).join("")
       +(list.some(x=>grp(x)===menuCat&&fixed(x))?"":`<button class="addsub" id="subAdd">+ New</button>`);
   }
   M.innerHTML=`<div class="cats">${cats}</div><div class="subs">${right}</div>`;
@@ -1872,16 +1905,12 @@ function renderMenu(){
   if($("subAdd")) $("subAdd").onclick=()=>{ const g0=list.find(x=>grp(x)===menuCat)||{};   // a new one joins this heading, same template + front layout
     editing_={id:"t"+Date.now(),cat:g0.cat||Object.keys(TYPES)[0],group:g0.group,extrasOnFront:g0.extrasOnFront,name:"",size:0,isNew:true}; renderMenu(); $("teName").focus(); };
   if(editing_&&fixed(editing_)){
-    const id=editing_.id;
     $("teCancel").onclick=()=>{ editing_=null; renderMenu(); };
-    $("tePick").onclick=()=>$("teFile").click();
-    $("teFile").onchange=async()=>{ const f=$("teFile").files[0]; if(!f) return;
-      try{ const data=await sampleData(f); await saveSample({id,name:f.name,data}); toast("✓ Sample saved"); }
-      catch(e){ toast(e&&e.message||"Couldn't read that file",true); }
-      renderMenu(); };
-    if($("teRm")) $("teRm").onclick=async()=>{ await saveSample({id,deleted:true}); renderMenu(); };
+    wireSample(editing_.id);
   } else if(editing_){
     $("teCancel").onclick=()=>{ editing_=null; renderMenu(); };
+    // keep a typed (unsaved) name / size when the sample box redraws the panel
+    if($("tePick")) wireSample(editing_.id,()=>{ editing_={...editing_,name:$("teName").value,size:+$("teSize").value}; });
     $("teSave").onclick=()=>{ const n=$("teName").value.trim(); if(!n) return $("teName").focus();
       const e={...editing_,name:n,size:+$("teSize").value,isNew:undefined}, l=subs().slice(), k=l.findIndex(x=>x.id===e.id);
       if(k<0) l.push(e); else l[k]=e; saveSubs(l); editing_=null; renderMenu(); view(); };
@@ -2021,7 +2050,7 @@ function openEditor(i){
   openDrawer(`<div class="top"><h3>${t.hand&&!t.price?"New tag":"Edit tag"}</h3><button class="x" id="edX">✕</button></div>
     <div class="body">
       <div class="kindrow">${kinds().map(x=>`<button class="chip${x.id===kd.id?" on":""}" data-kind="${esc(x.id)}">${esc(x.name)}</button>`).join("")}</div>
-      ${(sm=>sm&&/^data:image/.test(sm.data)?`<div class="raw">Sample of the ${esc(kd.name)} tag (its own design is coming)</div><img class="edsample" src="${sm.data}" alt="">`:"")(fixed(kd)&&sampleOf(kd.id))}
+      ${(sm=>sm&&/^data:image/.test(sm.data)?`<div class="raw">New sample for ${esc(kd.name)}: the tag below gets rebuilt to match it</div><img class="edsample" src="${sm.data}" alt="">`:"")(needsDesign(kd)&&sampleOf(kd.id))}
       <div class="sides">${two?"<span>Front</span>":""}<canvas id="edFront"></canvas>${two?'<span>Back</span><canvas id="edBack"></canvas>':""}</div>
       ${TYPE.fields.filter(x=>!(s.extrasFront&&x[0]==="caliber")).map(x=>f(x[0],s.extrasFront&&x[0]==="extras"?"Comes with":x[1],t[x[0]]||"")).join("")}
       <div class="row2">${f("price","Price",t.price||"",1)}${f("cost","Cost",isFinite(t.cost)?t.cost:"",1)}</div>
