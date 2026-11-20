@@ -7,7 +7,7 @@
 <script>
 // ---- self-update: checks the public mirror when online, keeps the newest build on this computer ----
 // Newer build saved earlier -> run that instead of this file. Add ?local to the address to skip it.
-var TT_BUILD=1795183736614;
+var TT_BUILD=1795191530964;
 (function(){
   var REMOTE="https://raw.githubusercontent.com/blsxf/express-pawn-tools/main/tagtool/", KEY="tagtool.update";
   function db(){ return new Promise(function(res,rej){ var r=indexedDB.open("tagtool",1);
@@ -1148,18 +1148,19 @@ function parseAccessories(desc,model,category,price){
 
 // rows: [{cells:[{x,w,str}], page}] sorted; returns raw records.
 // Works with the old "Custom" report and the newer one with Category / Description columns,
-// read from Bravo's own saved report (.prnx).
+// read from Bravo's own saved report (.prnx). Columns can be in any order; any other column
+// (Status, Type, Action, Barcode, Serial Number, Date to Inventory…) is kept apart and ignored.
 function parseRows(lines){
   let cols=null; const out=[];
-  const NAMES={Manufacturer:"mfr",Model:"model",Number:"number",Category:"category",Description:"desc",Caliber:"rest",Barcode:"rest",Cost:"rest",Price:"rest"};
+  const NAMES={Manufacturer:"mfr",Model:"model",Number:"number",Category:"category",Description:"desc",Caliber:"caliber",Cost:"cost",Price:"price"};
   for(const line of lines){
     const txt = line.map(c=>c.str).join(" ");
     if(/Manufacturer/.test(txt) && /Caliber/.test(txt)){
-      cols = line.map(c=>{ const n=c.str.trim().split(/\s+/)[0]; return NAMES[n]?{key:NAMES[n],x:c.x}:null; }).filter(Boolean).sort((a,b)=>a.x-b.x);
+      cols = line.filter(c=>c.str.trim()).map(c=>{ const h=c.str.trim(); return {key:NAMES[h]||(/^(Retail|Selling) Price$/i.test(h)?"price":"skip"),x:c.x}; }).sort((a,b)=>a.x-b.x);
       continue;
     }
     if(!cols) continue;
-    const parts={mfr:[],model:[],number:[],category:[],desc:[],rest:[]};
+    const parts={mfr:[],model:[],number:[],category:[],desc:[],caliber:[],cost:[],price:[],skip:[]};
     for(const c of line){
       const cx = c.x + (c.w ? Math.min(c.w/2,40) : 0.5);       // middle of the text decides its column
       let col=cols[0]; for(const k of cols) if(cx>=k.x-2) col=k;
@@ -1167,11 +1168,14 @@ function parseRows(lines){
     }
     const number = parts.number.join("").trim();
     if(!/^[A-Z]{0,3}\d{5,}$/.test(number)) continue;
-    const m = parts.rest.join(" ").replace(/\s+/g," ").match(/^(.*?)\s*\$([\d,]+\.\d\d)\s*\$([\d,]+\.\d\d)\s*$/);
-    if(!m) continue;
     const j = a => a.join(" ").replace(/\s+/g," ").replace(/\s*…/g,"…").trim();
+    // caliber, cost and price run together when Bravo squeezes them ("9MM $100.00 $150.00")
+    const m = j([...parts.caliber,...parts.cost,...parts.price]).match(/^(.*?)\s*\$([\d,]+\.\d\d)\s*\$([\d,]+\.\d\d)\s*$/);
+    const cost = m ? money(m[2]) : money(j(parts.cost)), price = m ? money(m[3]) : money(j(parts.price));
+    if(!isFinite(cost) && !isFinite(price)) continue;
+    if(price===0.01) continue;                                  // penny price = not priced yet; no tag
     out.push({mfr:j(parts.mfr), model:j(parts.model), number, category:j(parts.category), desc:j(parts.desc),
-              caliberRaw:m[1].trim(), price:money(m[3]), cost:money(m[2])});
+              caliberRaw:m?m[1].trim():j(parts.caliber), price:isFinite(price)?price:0, cost});
   }
   return out;
 }
@@ -1334,13 +1338,18 @@ function prnxXmlLines(xml){
   const doc=new DOMParser().parseFromString(xml,"application/xml");
   if(doc.getElementsByTagName("parsererror").length) throw new Error("bad prnx");
   const root=doc.documentElement, K=72/300, lines=[];
+  // Text that repeats on every page (column headers, title) is stored once under Options/SharedBricks;
+  // pages point at it by Index (Brick="6" or InnerBricks="6").
+  const shared=new Map(), sb=root.getElementsByTagName("SharedBricks")[0];
+  if(sb) for(const el of sb.children) if(el.getAttribute("Index")) shared.set(el.getAttribute("Index"),el);
   let pages=[...root.childNodes].filter(n=>n.nodeType===1&&/^Page\d+$/.test(n.nodeName)).sort((a,b)=>+a.nodeName.slice(4)-+b.nodeName.slice(4));
   if(!pages.length) pages=[root];
   for(const pg of pages){
     const items=[];
-    for(const el of [...pg.getElementsByTagName("*")]){
+    for(const ref of [...pg.getElementsByTagName("*")]){
+      const id=ref.getAttribute("Brick")??ref.getAttribute("InnerBricks"), el=id&&shared.get(id)||ref;
       if(el.getAttribute("BrickType")!=="Text") continue;
-      const r=(el.getAttribute("Rect")||"").split(",").map(Number); if(r.length<4||r.some(isNaN)) continue;
+      const r=(ref.getAttribute("Rect")||el.getAttribute("Rect")||"").split(",").map(Number); if(r.length<4||r.some(isNaN)) continue;
       const str=el.getAttribute("Text")??el.getAttribute("TextValue")??"";
       items.push({x:r[0]*K,y:Math.round(r[1]*K),w:r[2]*K,str});
     }
