@@ -7,7 +7,7 @@
 <script>
 // ---- self-update: checks the public mirror when online, keeps the newest build on this computer ----
 // Newer build saved earlier -> run that instead of this file. Add ?local to the address to skip it.
-var TT_BUILD=1795206314843;
+var TT_BUILD=1795209068972;
 (function(){
   var REMOTE="https://raw.githubusercontent.com/blsxf/express-pawn-tools/main/tagtool/", KEY="tagtool.update";
   function db(){ return new Promise(function(res,rej){ var r=indexedDB.open("tagtool",1);
@@ -1910,8 +1910,14 @@ function drawGunFront(g,x,y,t,s){
     // same for a long model + what it is ("Squier Stratocaster Electric Guitar"): two lines instead of tiny text
     const mlong=!!t.what&&g.fitSize((t.fit&&t.fit.model)||t.model,W-2*pad,1000)<(MIN_TEXT.model||10)+5;
     type={...type,rows:type.rows.map(r=>r[0]==="caliber"?[r[0],long?r[1]*1.7:r[1],r[2],true]:r[0]==="model"&&mlong?[r[0],r[1]*1.6,r[2],true]:r)}; }
-  const groups=topGroups(type,t), top=groups.reduce((a,r)=>a+r.h,0)*k;
+  // Bigger make / model / caliber (Sizes menu, per tag type; 11-20-2026, wall guns read from 10-15 ft):
+  // model + caliber grow most, the maker a bit less; the rows take the room from the big price box
+  const big=TOP_BIG[s.bigTop|0];
+  if(big){ type={...type,rows:type.rows.map(r=>[r[0],r[1]*(r[0]==="brand"?big[0]:big[1]),r[2],r[3]])}; }
   const lb=F.layawayBand*k, pr=F.payments*k;
+  let groups=topGroups(type,t), top=groups.reduce((a,r)=>a+r.h,0)*k;
+  const maxTop=(H-lb-pr)*.68;              // the price box always keeps at least 32% of the room
+  if(big&&top>maxTop){ const f=maxTop/top; groups=groups.map(gr=>({...gr,h:gr.h*f})); top=maxTop; }
   const yPrice=y+top, yLay=y+H-pr-lb, ph=yLay-yPrice, yPay=yLay+lb;
   let cy=y; const ys=groups.map(gr=>{ const r=[cy,gr.h*k]; cy+=gr.h*k; return r; });
   // big yellow price
@@ -1933,6 +1939,9 @@ function drawGunFront(g,x,y,t,s){
     else fitRow(g,gr.text,x+W/2,ys[i][0],W-2*pad,ys[i][1],gr.scale,gr.wrap); });
   g.lw(thick); g.strokeRect(x,y,W,H);      // the front's outer line is the cut line
 }
+
+// bigTop 1 / 2: row height x [maker, model + caliber]
+const TOP_BIG=[null,[1.2,1.3],[1.3,1.45]];
 
 // "NEW! Glock": red NEW! then the maker in black, one line, sized together
 function newRow(g,str,cx,top,maxW,h,scale){
@@ -2367,6 +2376,7 @@ function renderMenu(){
     const e=editing_, T=TYPES[e.cat];
     right=`<div class="ttedit"><input id="teName" value="${esc(e.name)}" placeholder="Name">
       <select id="teSize">${T.sizes.map((z,i)=>`<option value="${i}"${i==e.size?" selected":""}>${esc(z.label)}</option>`).join("")}</select>
+      <select id="teBig" title="Make / model / caliber size">${["Make/model/caliber: normal","Make/model/caliber: bigger (+25%)","Make/model/caliber: biggest (+40%)"].map((v,i)=>`<option value="${i}"${i==(e.bigTop|0)?" selected":""}>${v}</option>`).join("")}</select>
       ${e.isNew?"":sampleBox(e)}
       <div class="tebtns">${e.isNew?"":'<button class="link" id="teDel">Delete</button>'}<button class="chip" id="teCancel">Cancel</button><button class="btn primary" id="teSave">Save</button></div></div>`;
   } else {
@@ -2384,9 +2394,9 @@ function renderMenu(){
   } else if(editing_){
     $("teCancel").onclick=()=>{ editing_=null; renderMenu(); };
     // keep a typed (unsaved) name / size when the sample box redraws the panel
-    if($("tePick")) wireSample(editing_.id,()=>{ editing_={...editing_,name:$("teName").value,size:+$("teSize").value}; });
+    if($("tePick")) wireSample(editing_.id,()=>{ editing_={...editing_,name:$("teName").value,size:+$("teSize").value,bigTop:+$("teBig").value}; });
     $("teSave").onclick=()=>{ const n=$("teName").value.trim(); if(!n) return $("teName").focus();
-      const e={...editing_,name:n,size:+$("teSize").value,isNew:undefined}, l=subs().slice(), k=l.findIndex(x=>x.id===e.id);
+      const e={...editing_,name:n,size:+$("teSize").value,bigTop:+$("teBig").value||undefined,isNew:undefined}, l=subs().slice(), k=l.findIndex(x=>x.id===e.id);
       if(k<0) l.push(e); else l[k]=e; saveSubs(l); editing_=null; renderMenu(); view(); };
     if($("teDel")) $("teDel").onclick=()=>{ const l=subs().filter(x=>x.id!==editing_.id);
       if(!l.some(x=>grp(x)===grp(editing_))) return toast("Keep at least one",true);
@@ -2434,7 +2444,7 @@ function view(){
 let skips={};                                   // start spot per tag type (used sheets)
 function settings(kindId){
   const k=kindOf(kindId), z=TYPE.sizes[k.size]||TYPE.sizes[0];
-  return {W:z.w*72,H:z.h*72,portrait:z.orient==="portrait",skip:skips[k.id]||0,extrasFront:!!k.extrasOnFront,design:k.design||""};
+  return {W:z.w*72,H:z.h*72,portrait:z.orient==="portrait",skip:skips[k.id]||0,extrasFront:!!k.extrasOnFront,design:k.design||"",bigTop:k.bigTop|0};
 }
 const obs=new IntersectionObserver(es=>es.forEach(e=>{ const c=e.target;
   if(e.isIntersecting) drawCard(c); else if(c._cv){ c._cv.remove(); c._cv=null; } }),{rootMargin:"600px"});
@@ -2625,7 +2635,7 @@ function kbBox(t,s){
 // still prints, gets a "!" on screen, and is named when you print.
 // skipped when nothing that changes the fit (size, text, price) changed since the last check
 const CHECKED=new WeakMap();
-function checkOne(t){ const s=settings(t.kind); t._check=kbCheck(t,s); const key=JSON.stringify([s.W,s.H,s.extrasFront,s.design,TYPE.fields.map(f=>t[f[0]]),t.price]);
+function checkOne(t){ const s=settings(t.kind); t._check=kbCheck(t,s); const key=JSON.stringify([s.W,s.H,s.extrasFront,s.design,s.bigTop,TYPE.fields.map(f=>t[f[0]]),t.price]);
   if(CHECKED.get(t)===key) return; CHECKED.set(t,key);
   const r=fitTag(TYPE,t,s); t._warn=r.left.length?r.left:null; }
 function checkAll(){ tags.forEach(checkOne); }
