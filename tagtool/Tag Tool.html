@@ -7,7 +7,7 @@
 <script>
 // ---- self-update: checks the public mirror when online, keeps the newest build on this computer ----
 // Newer build saved earlier -> run that instead of this file. Add ?local to the address to skip it.
-var TT_BUILD=1795137565659;
+var TT_BUILD=1795139522078;
 (function(){
   var REMOTE="https://raw.githubusercontent.com/blsxf/express-pawn-tools/main/tagtool/", KEY="tagtool.update";
   function db(){ return new Promise(function(res,rej){ var r=indexedDB.open("tagtool",1);
@@ -150,12 +150,17 @@ const CONFIG = {
   // Tag types.  The tool picks one for each gun from Bravo's "Category" column,
   // and prints them all in one go (each type on its own sheets).
   // size: which sheet size above (0 = first).  categories: Bravo categories for this type.
+  // group: its own heading in the Sizes menu (default: the template's name, "Guns").
   // Change sizes here or with "Sizes ▾" in the top bar.
   tagTypes: [
     {id:"handgun", cat:"guns", name:"Handguns",  size:3, categories:"Pistol|Revolver|Handgun|Derringer"},
     {id:"rifle",   cat:"guns", name:"Long Guns", size:0, categories:"Rifle|Shotgun"},
-    {id:"general", cat:"guns", name:"General Merchandise", size:3,   // same small format as Handguns
+    {id:"general", cat:"guns", group:"General Merchandise", name:"General Merchandise", size:3,   // same small format as Handguns
      extrasOnFront:true},   // "Comes with" (bag, batteries, charger...) prints in the caliber row; back leaves it off
+    // Electronics: each has its own tag design (design: drawing code in src/types.js DESIGNS; placeholders for now)
+    {id:"tv",       cat:"guns", group:"Electronics", name:"TVs",       design:"tv",       size:3, extrasOnFront:true, categories:"TV|TVs|Television|Televisions"},
+    {id:"computer", cat:"guns", group:"Electronics", name:"Computers", design:"computer", size:3, extrasOnFront:true, categories:"Computer|Computers|Laptop|Laptops"},
+    {id:"monitor",  cat:"guns", group:"Electronics", name:"Monitors",  design:"monitor",  size:3, extrasOnFront:true, categories:"Monitor|Monitors"},
   ],
   // No Category column (old gun-only report): this tag type (change it on the tag's Edit panel)
   defaultTagType: "rifle",
@@ -289,6 +294,10 @@ header .chip.on:hover{color:var(--onyellow)}
 .ttedit input,.ttedit select{height:38px;border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:0 10px}
 .tebtns{display:flex;gap:8px;align-items:center;justify-content:flex-end}
 .tebtns .link{margin-right:auto;color:var(--bad)}
+.ttedit b{font-size:15px;padding:2px 2px 0}
+.tesample{min-height:70px;display:flex;align-items:center;justify-content:center;border:1px dashed var(--line);border-radius:8px;padding:6px;color:var(--ink3);font-size:13px;text-align:center}
+.tesample img{display:block;max-width:100%;max-height:170px;border-radius:4px}
+.edsample{display:block;max-width:100%;max-height:150px;margin:4px auto 12px;border-radius:4px}
 
 /* main */
 main{flex:1;padding:16px 16px 90px;display:flex;flex-direction:column}
@@ -310,8 +319,8 @@ main{flex:1;padding:16px 16px 90px;display:flex;flex-direction:column}
 .grp:not(:first-child){margin-top:26px;padding-top:16px;border-top:1px solid var(--line)}
 .grp small{font-size:13px;font-weight:500;color:var(--ink3)}
 .cards{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start}
-.kindrow{display:flex;gap:8px;margin-bottom:14px}
-.kindrow .chip{flex:1;justify-content:center;height:40px;font-size:15px;font-weight:700}
+.kindrow{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.kindrow .chip{display:block;text-align:center;line-height:38px;padding:0 6px;height:40px;font-size:14px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .card{position:relative;cursor:pointer;border-radius:3px;transition:transform .1s;box-shadow:var(--shadow)}
 .card:hover{transform:translateY(-2px);outline:2px solid var(--acc);outline-offset:2px}
 .card canvas{display:block;background:#fff;border-radius:2px}
@@ -1637,11 +1646,28 @@ function drawGunBack(g,x0,y0,t,s0){
   g.role("label"); g.fitText(W_.barcode+" sticker",cx,yz+zone/2,W*.6,8,C_HINT);
 }
 
+// ---------- DESIGNS: a tag type's own look (CONFIG.tagTypes design:"tv") ----------
+// Same report reading, sheet sizes and printing; only the drawing changes. No design = the gun / General Merchandise tag.
+// Electronics: placeholders for now (General Merchandise look) until each gets its own layout.
+//   front(g,x,y,t,s) / back(g,x,y,t,s): same arguments as drawGunFront / drawGunBack.
+function drawTvFront(g,x,y,t,s){ drawGunFront(g,x,y,t,s); }             // TODO: TV tag
+function drawTvBack(g,x,y,t,s){ drawGunBack(g,x,y,t,s); }
+function drawComputerFront(g,x,y,t,s){ drawGunFront(g,x,y,t,s); }       // TODO: Computer tag
+function drawComputerBack(g,x,y,t,s){ drawGunBack(g,x,y,t,s); }
+function drawMonitorFront(g,x,y,t,s){ drawGunFront(g,x,y,t,s); }        // TODO: Monitor tag
+function drawMonitorBack(g,x,y,t,s){ drawGunBack(g,x,y,t,s); }
+const DESIGNS = {
+  tv:       {front:drawTvFront,       back:drawTvBack},
+  computer: {front:drawComputerFront, back:drawComputerBack},
+  monitor:  {front:drawMonitorFront,  back:drawMonitorBack},
+};
+const design=s=>DESIGNS[s&&s.design]||{};
+
 const TYPE_CODE = {
   guns: {
     parse:    lines => parseRows(lines).map(toTag),          // proven gun cleanup in core.js
-    draw:     drawGunFront,
-    drawBack: drawGunBack,
+    draw:     (g,x,y,t,s)=>(design(s).front||drawGunFront)(g,x,y,t,s),
+    drawBack: (g,x,y,t,s)=>(design(s).back||drawGunBack)(g,x,y,t,s),
   },
 };
 
@@ -1657,7 +1683,8 @@ for(const id in CONFIG.types) if(TYPE_CODE[id]) TYPES[id]=Object.assign({id}, CO
 // Every change is merged (newest wins), so two computers can't wipe each other out.
 const DATA_FILE = "Tag Tool Data.json";
 const SH = { dir:null, ok:false, data:null };
-const blankData = () => ({ v:1, rules:[], items:{}, tagTypes:[] });
+// samples: picture of the tag a fixed tag type (TVs, Computers...) should look like {id:tag type, name, data:data URL, t}
+const blankData = () => ({ v:1, rules:[], items:{}, tagTypes:[], samples:[] });
 
 // small key-value store in the browser to remember the folder
 function idb(){ return new Promise((res,rej)=>{ const r=indexedDB.open("tagtool",1);
@@ -1669,7 +1696,7 @@ async function idbSet(k,v){ try{ const db=await idb(); await new Promise(res=>{ 
 function mergeData(a,b){
   const out=blankData();
   const byId=(x,y)=>{ const m=new Map(); [...(x||[]),...(y||[])].forEach(r=>{ const o=m.get(r.id); if(!o||(r.t||0)>(o.t||0)) m.set(r.id,r); }); return [...m.values()]; };
-  out.rules=byId(a.rules,b.rules); out.tagTypes=byId(a.tagTypes,b.tagTypes);
+  out.rules=byId(a.rules,b.rules); out.tagTypes=byId(a.tagTypes,b.tagTypes); out.samples=byId(a.samples,b.samples);
   for(const src of [a.items||{},b.items||{}]) for(const n in src) for(const k in src[n]){
     const cur=(out.items[n]||{})[k], v=src[n][k];
     if(!cur||(v.t||0)>(cur.t||0)){ out.items[n]=out.items[n]||{}; out.items[n][k]=v; } }
@@ -1770,8 +1797,24 @@ const twoSided=()=>!!(TYPE&&TYPE.drawBack);
 // ---------- tag types (Handguns, Long Guns...): picked for each gun from Bravo's Category ----------
 let SUB=null, menuCat=null, editing_=null;
 // tag types: built-in (CONFIG.tagTypes) + shared ones (added/edited/deleted in the Sizes menu)
-const subs=()=>{ const m=new Map(CONFIG.tagTypes.map(x=>[x.id,x])); (SH.data.tagTypes||[]).forEach(x=>m.set(x.id,x));
+// (a shared copy keeps built-in fields it doesn't have, e.g. group / extrasOnFront on an older saved copy)
+const subs=()=>{ const m=new Map(CONFIG.tagTypes.map(x=>[x.id,x])); (SH.data.tagTypes||[]).forEach(x=>m.set(x.id,{...m.get(x.id),...x}));
   return [...m.values()].filter(x=>!x.deleted&&TYPES[x.cat]&&!(CONFIG.retiredTypes||[]).includes(x.id)); };
+// Sizes menu heading: General Merchandise sits apart from Guns, though it prints with the same template
+const grp=x=>x.group||TYPES[x.cat].name;
+// own tag (design set: TVs, Computers, Monitors): fixed size, no editing; the Sizes menu only takes a sample picture of it
+const fixed=x=>!!(x&&x.design);
+const sampleOf=id=>(SH.data.samples||[]).find(s=>s.id===id&&!s.deleted&&s.data);
+const saveSample=s=>updateShared(d=>{ d.samples=(d.samples||[]).filter(y=>y.id!==s.id); d.samples.push({...s,t:Date.now()}); });
+// picture -> JPEG at most 1200px (keeps the shared file small); PDF kept as is, up to 2 MB
+async function sampleData(f){
+  const url=()=>new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(f); });
+  if(/pdf$/i.test(f.type)||/\.pdf$/i.test(f.name)){ if(f.size>2e6) throw new Error("That PDF is too big (2 MB max) — try a picture instead"); return url(); }
+  if(!/^image\//.test(f.type)) throw new Error("Needs a picture or a PDF");
+  const b=await createImageBitmap(f), k=Math.min(1,1200/Math.max(b.width,b.height)), c=document.createElement("canvas");
+  c.width=Math.round(b.width*k); c.height=Math.round(b.height*k); const x=c.getContext("2d");
+  x.fillStyle="#fff"; x.fillRect(0,0,c.width,c.height); x.drawImage(b,0,0,c.width,c.height); return c.toDataURL("image/jpeg",.85);
+}
 const kinds=()=>TYPE?subs().filter(x=>x.cat===TYPE.id):[];
 const kindOf=id=>{ const l=kinds(); return l.find(x=>x.id===id)||l.find(x=>x.id===CONFIG.defaultTagType)||l[0]; };
 // Pistol -> Handguns, Rifle / Shotgun -> Long Guns; any other category -> CONFIG.otherTagType
@@ -1805,34 +1848,50 @@ function useSub(){
   if(changed&&lastLines) loadLines(lastLines,true); else view();
 }
 function renderMenu(){
-  const M=$("ttMenu"), list=subs(); if(!Object.keys(TYPES).length){ M.innerHTML='<div class="subs" style="padding:16px;color:var(--ink2)">No tag templates loaded yet.</div>'; return; } menuCat=menuCat||(SUB?SUB.cat:Object.keys(TYPES)[0]);
-  const cats=Object.keys(TYPES).map(c=>`<button class="cat${c===menuCat?" on":""}" data-cat="${c}">${esc(TYPES[c].name)}<span>›</span></button>`).join("");
+  const M=$("ttMenu"), list=subs(); if(!Object.keys(TYPES).length){ M.innerHTML='<div class="subs" style="padding:16px;color:var(--ink2)">No tag templates loaded yet.</div>'; return; }   const groups=[...new Set(list.map(grp))]; if(!groups.includes(menuCat)) menuCat=SUB&&groups.includes(grp(SUB))?grp(SUB):groups[0];
+  const cats=groups.map(c=>`<button class="cat${c===menuCat?" on":""}" data-cat="${esc(c)}">${esc(c)}<span>›</span></button>`).join("");
   let right;
-  if(editing_){
+  if(editing_&&fixed(editing_)){            // own tag (TVs, Computers...): no name / size / delete, just the sample picture
+    const e=editing_, sm=sampleOf(e.id);
+    right=`<div class="ttedit"><b>${esc(e.name)}</b>
+      <div class="tesample">${!sm?"No sample yet.<br>Add a picture or PDF of the tag you want.":/^data:image/.test(sm.data)?`<img src="${sm.data}" alt="">`:"📄 "+esc(sm.name)}</div>
+      <input type="file" id="teFile" accept="image/*,application/pdf" hidden>
+      <div class="tebtns">${sm?'<button class="link" id="teRm">Remove</button>':""}<button class="chip" id="teCancel">Close</button><button class="btn primary" id="tePick">${sm?"Replace":"Add sample"}</button></div></div>`;
+  } else if(editing_){
     const e=editing_, T=TYPES[e.cat];
     right=`<div class="ttedit"><input id="teName" value="${esc(e.name)}" placeholder="Name">
       <select id="teSize">${T.sizes.map((z,i)=>`<option value="${i}"${i==e.size?" selected":""}>${esc(z.label)}</option>`).join("")}</select>
       <div class="tebtns">${e.isNew?"":'<button class="link" id="teDel">Delete</button>'}<button class="chip" id="teCancel">Cancel</button><button class="btn primary" id="teSave">Save</button></div></div>`;
   } else {
-    right=list.filter(x=>x.cat===menuCat).map(x=>`<div class="sub"><button class="pickSub" data-ed="${x.id}">${esc(x.name)}<small>${esc((TYPES[x.cat].sizes[x.size]||TYPES[x.cat].sizes[0]).label)}${x.categories?" · "+esc(x.categories.split("|").slice(0,3).join(", ")):""}</small></button><button class="ed" data-ed="${x.id}" title="Edit">✎</button></div>`).join("")
-      +`<button class="addsub" id="subAdd">+ New</button>`;
+    right=list.filter(x=>grp(x)===menuCat).map(x=>`<div class="sub"><button class="pickSub" data-ed="${x.id}">${esc(x.name)}${fixed(x)?"":`<small>${esc((TYPES[x.cat].sizes[x.size]||TYPES[x.cat].sizes[0]).label)}${x.categories?" · "+esc(x.categories.split("|").slice(0,3).join(", ")):""}</small>`}</button><button class="ed" data-ed="${x.id}" title="${fixed(x)?"Sample tag":"Edit"}">✎</button></div>`).join("")
+      +(list.some(x=>grp(x)===menuCat&&fixed(x))?"":`<button class="addsub" id="subAdd">+ New</button>`);
   }
   M.innerHTML=`<div class="cats">${cats}</div><div class="subs">${right}</div>`;
   M.querySelectorAll("[data-cat]").forEach(b=>b.onclick=()=>{ menuCat=b.dataset.cat; editing_=null; renderMenu(); });
   M.querySelectorAll("[data-ed]").forEach(b=>b.onclick=()=>{ editing_={...list.find(x=>x.id===b.dataset.ed)}; renderMenu(); });
-  if($("subAdd")) $("subAdd").onclick=()=>{ editing_={id:"t"+Date.now(),cat:menuCat,name:"",size:0,isNew:true}; renderMenu(); $("teName").focus(); };
-  if(editing_){
+  if($("subAdd")) $("subAdd").onclick=()=>{ const g0=list.find(x=>grp(x)===menuCat)||{};   // a new one joins this heading, same template + front layout
+    editing_={id:"t"+Date.now(),cat:g0.cat||Object.keys(TYPES)[0],group:g0.group,extrasOnFront:g0.extrasOnFront,name:"",size:0,isNew:true}; renderMenu(); $("teName").focus(); };
+  if(editing_&&fixed(editing_)){
+    const id=editing_.id;
+    $("teCancel").onclick=()=>{ editing_=null; renderMenu(); };
+    $("tePick").onclick=()=>$("teFile").click();
+    $("teFile").onchange=async()=>{ const f=$("teFile").files[0]; if(!f) return;
+      try{ const data=await sampleData(f); await saveSample({id,name:f.name,data}); toast("✓ Sample saved"); }
+      catch(e){ toast(e&&e.message||"Couldn't read that file",true); }
+      renderMenu(); };
+    if($("teRm")) $("teRm").onclick=async()=>{ await saveSample({id,deleted:true}); renderMenu(); };
+  } else if(editing_){
     $("teCancel").onclick=()=>{ editing_=null; renderMenu(); };
     $("teSave").onclick=()=>{ const n=$("teName").value.trim(); if(!n) return $("teName").focus();
       const e={...editing_,name:n,size:+$("teSize").value,isNew:undefined}, l=subs().slice(), k=l.findIndex(x=>x.id===e.id);
       if(k<0) l.push(e); else l[k]=e; saveSubs(l); editing_=null; renderMenu(); view(); };
     if($("teDel")) $("teDel").onclick=()=>{ const l=subs().filter(x=>x.id!==editing_.id);
-      if(!l.some(x=>x.cat===editing_.cat)) return toast("Keep at least one",true);
+      if(!l.some(x=>grp(x)===grp(editing_))) return toast("Keep at least one",true);
       saveSubs(l); editing_=null; renderMenu(); view(); };
     $("teName").onkeydown=e=>{ if(e.key==="Enter") $("teSave").click(); };
   }
 }
-$("ttBtn").onclick=e=>{ e.stopPropagation(); const M=$("ttMenu"); if(M.hidden){ menuCat=SUB?SUB.cat:null; editing_=null; renderMenu(); } M.hidden=!M.hidden; };
+$("ttBtn").onclick=e=>{ e.stopPropagation(); const M=$("ttMenu"); if(M.hidden){ menuCat=null; editing_=null; renderMenu(); } M.hidden=!M.hidden; };
 $("ttMenu").addEventListener("click",e=>e.stopPropagation());
 document.addEventListener("click",()=>{ $("ttMenu").hidden=true; });
 
@@ -1871,7 +1930,7 @@ function view(){
 let skips={};                                   // start spot per tag type (used sheets)
 function settings(kindId){
   const k=kindOf(kindId), z=TYPE.sizes[k.size]||TYPE.sizes[0];
-  return {W:z.w*72,H:z.h*72,portrait:z.orient==="portrait",skip:skips[k.id]||0,extrasFront:!!k.extrasOnFront};
+  return {W:z.w*72,H:z.h*72,portrait:z.orient==="portrait",skip:skips[k.id]||0,extrasFront:!!k.extrasOnFront,design:k.design||""};
 }
 const obs=new IntersectionObserver(es=>es.forEach(e=>{ const c=e.target;
   if(e.isIntersecting) drawCard(c); else if(c._cv){ c._cv.remove(); c._cv=null; } }),{rootMargin:"600px"});
@@ -1962,6 +2021,7 @@ function openEditor(i){
   openDrawer(`<div class="top"><h3>${t.hand&&!t.price?"New tag":"Edit tag"}</h3><button class="x" id="edX">✕</button></div>
     <div class="body">
       <div class="kindrow">${kinds().map(x=>`<button class="chip${x.id===kd.id?" on":""}" data-kind="${esc(x.id)}">${esc(x.name)}</button>`).join("")}</div>
+      ${(sm=>sm&&/^data:image/.test(sm.data)?`<div class="raw">Sample of the ${esc(kd.name)} tag (its own design is coming)</div><img class="edsample" src="${sm.data}" alt="">`:"")(fixed(kd)&&sampleOf(kd.id))}
       <div class="sides">${two?"<span>Front</span>":""}<canvas id="edFront"></canvas>${two?'<span>Back</span><canvas id="edBack"></canvas>':""}</div>
       ${TYPE.fields.filter(x=>!(s.extrasFront&&x[0]==="caliber")).map(x=>f(x[0],s.extrasFront&&x[0]==="extras"?"Comes with":x[1],t[x[0]]||"")).join("")}
       <div class="row2">${f("price","Price",t.price||"",1)}${f("cost","Cost",isFinite(t.cost)?t.cost:"",1)}</div>
@@ -2040,7 +2100,7 @@ $("dlBack").onclick=()=>savePdf("back");
 // still prints, gets a "!" on screen, and is named when you print.
 // skipped when nothing that changes the fit (size, text, price) changed since the last check
 const CHECKED=new WeakMap();
-function checkOne(t){ const s=settings(t.kind), key=JSON.stringify([s.W,s.H,s.extrasFront,TYPE.fields.map(f=>t[f[0]]),t.price]);
+function checkOne(t){ const s=settings(t.kind), key=JSON.stringify([s.W,s.H,s.extrasFront,s.design,TYPE.fields.map(f=>t[f[0]]),t.price]);
   if(CHECKED.get(t)===key) return; CHECKED.set(t,key);
   const r=fitTag(TYPE,t,s); t._warn=r.left.length?r.left:null; }
 function checkAll(){ tags.forEach(checkOne); }
