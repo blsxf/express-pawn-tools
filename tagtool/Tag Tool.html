@@ -7,7 +7,7 @@
 <script>
 // ---- self-update: checks the public mirror when online, keeps the newest build on this computer ----
 // Newer build saved earlier -> run that instead of this file. Add ?local to the address to skip it.
-var TT_BUILD=1795121714895;
+var TT_BUILD=1795137565659;
 (function(){
   var REMOTE="https://raw.githubusercontent.com/blsxf/express-pawn-tools/main/tagtool/", KEY="tagtool.update";
   function db(){ return new Promise(function(res,rej){ var r=indexedDB.open("tagtool",1);
@@ -154,9 +154,40 @@ const CONFIG = {
   tagTypes: [
     {id:"handgun", cat:"guns", name:"Handguns",  size:3, categories:"Pistol|Revolver|Handgun|Derringer"},
     {id:"rifle",   cat:"guns", name:"Long Guns", size:0, categories:"Rifle|Shotgun"},
+    {id:"general", cat:"guns", name:"General Merchandise", size:3,   // same small format as Handguns
+     extrasOnFront:true},   // "Comes with" (bag, batteries, charger...) prints in the caliber row; back leaves it off
   ],
-  // Category missing or not in any list above: this tag type (change it on the tag's Edit panel)
+  // No Category column (old gun-only report): this tag type (change it on the tag's Edit panel)
   defaultTagType: "rifle",
+  // Any other Bravo category (tools, electronics, music...): this tag type
+  otherTagType: "general",
+  // Categories with no tag format yet: they land on General Merchandise but start unchecked (Skip).
+  // Matched at the start of the category, so "Jewel" covers Jewelry / Jewelry - Gold.
+  skipCategories: "Computer|Jewel",
+
+  // Game consoles we take in.  First match wins, so keep the specific ones (Lite, Pro, Digital) above the general.
+  //  match: words in Bravo's make/model/description.  kit: what a complete one comes with ("2 Controllers" = two).
+  //  price: what a complete one sells for.  When the tag's price is lower by the deductions below
+  //  (e.g. PS5 Slim Disc $410 = no controller, $400 = no controller + no HDMI), the tag leaves those off
+  //  even if the description doesn't say.  Leave price out (or null) to skip that check.
+  // Power cords / chargers are required to take a console in, so they always print.
+  consoles: [
+    {name:"Switch Lite",      match:"SWITCH LITE",                                kit:["Charger"]},
+    {name:"Switch",           match:"NINTENDO.*\\bSWITCH|SWITCH (?:OLED|2)",     kit:["Joy-Cons","Dock","Power Cord","HDMI Cord"]},
+    {name:"PS5 Pro",          match:"(PS ?5|PLAYSTATION ?5).*\\bPRO\\b",          kit:["Controller","Power Cord","HDMI Cord"]},
+    {name:"PS5 Slim Digital", match:"(PS ?5|PLAYSTATION ?5).*\\bDIGITAL|\\bDIGITAL\\b.*(PS ?5|PLAYSTATION ?5)", kit:["Controller","Power Cord","HDMI Cord"]},
+    {name:"PS5 Slim Disc",    match:"(PS ?5|PLAYSTATION ?5)",                     kit:["Controller","Power Cord","HDMI Cord"], price:440},
+    {name:"Xbox Series X",    match:"SERIES ?X",                                  kit:["Controller","Power Cord","HDMI Cord"]},
+    {name:"Xbox Series S",    match:"SERIES ?S",                                  kit:["Controller","Power Cord","HDMI Cord"]},
+    {name:"Meta Quest 3",     match:"QUEST ?3S?",                                 kit:["2 Controllers","Charger"]},
+    {name:"Handheld PC",      match:"STEAM ?DECK|ROG ?ALLY|LEGION ?GO|MSI ?CLAW",  kit:["Charger"]},
+  ],
+  // Taken off the price for each missing piece (used with the console prices above)
+  consoleDeduct: {"Controller":30, "Joy-Cons":30, "HDMI Cord":10},
+  // Always on a console tag: we don't take one in without it
+  consoleRequired: ["Power Cord","Charger"],
+  // Cordless tools (M18, 20V, FUEL...): we require at least 1 battery and a charger, so these always print
+  toolRequired: ["Battery","Charger"],
   // Old tag types, no longer shown
   retiredTypes: ["wall","smallwall"],
 };
@@ -1000,6 +1031,99 @@ function parseExtras(desc){
   return [...new Set(out)].join(", ");
 }
 
+// ---- General Merchandise accessories from Bravo's Description ----
+// "M18 FUEL DRILL W/ BAG 2 BATTERIES CHARGER" -> "Bag, 2 Batteries, Charger".
+// Reads after W/ / WITH / INCLUDES / COMES WITH when there is one, else the whole description.
+// [match (after an optional count), one, many]. Add words here as new items come in.
+const ACCESSORIES = [
+  ["HARD ?CASE","Hard Case"],["SOFT ?CASE","Soft Case"],["CARRY(?:ING)? CASE","Case"],["CASES?","Case"],
+  ["ORIG(?:INAL)? BOX","Box"],["BOX(?:ES)?","Box"],["BAGS?","Bag"],
+  ["BATT(?:ERY|ERIES|S)?","Battery","Batteries"],["CHARGERS?","Charger"],
+  ["POWER (?:CORDS?|SUPPLY|CABLES?)","Power Cord"],["HDMI(?: CABLES?| CORDS?)?","HDMI Cord"],["CORDS?","Cord"],["CABLES?","Cable","Cables"],["ADAPTERS?","Adapter","Adapters"],
+  ["REMOTES?","Remote","Remotes"],["CONTROLLERS?","Controller","Controllers"],["HEADSETS?","Headset","Headsets"],
+  ["JOY-?CONS?","Joy-Cons"],["GAMES?","Game","Games"],["DOCK","Dock"],
+  ["BLADES?","Blade","Blades"],["BITS?","Bit","Bits"],["HEADPHONES?","Headphones"],["STAND","Stand"],
+  ["MANUALS?","Manual"],["STRAPS?","Strap"],["KEYS?","Key","Keys"],["LENS(?:ES)?","Lens","Lenses"],
+];
+const NUMWORD={ONE:1,TWO:2,THREE:3,FOUR:4,FIVE:5,SIX:6};
+// Printed in this order every time, so tags read the same way: what makes it work first,
+// then extras, then what it's carried in, paperwork last. Words not listed go before "Case".
+const ACC_ORDER=["Joy-Cons","Controller","Power Cord","HDMI Cord","Battery","Charger","Adapter","Cord","Cable","Remote","Dock",
+  "Headset","Headphones","Game","Lens","Blade","Bit","Strap","Stand","Key",
+  "Hard Case","Soft Case","Case","Bag","Box","Manual"];
+const accRank=n=>{ const i=ACC_ORDER.indexOf(n); return i<0?ACC_ORDER.indexOf("Hard Case")-.5:i; };
+// "NO CONTROLLER", "W/O CHARGER", "MISSING HDMI": left off (and taken off a console's defaults)
+const NOT_WITH=/(?:\bNO|\bW\s*\/\s*O|\bWITHOUT|\bMISSING|\bLESS)\s+(?:THE\s+|\w+\s+)?$/;
+// Game consoles (CONFIG.consoles): print the console's kit unless the description (or a lower price) says
+// something's missing. Controllers, games, cases, chargers... sold on their own aren't the console.
+const NOT_CONSOLE=/\b(PORTAL|CONTROLLERS?|GAMES?|HEADSETS?|CHARGING|CHARGERS?|DOCK|JOY-?CONS?|REMOTE|CASES?|BAGS?|SKINS?|STAND|GRIPS?)\b/;
+const kitItem=s=>{ const m=String(s).match(/^(\d+)\s+(.*)$/), w=(m?m[2]:s).toUpperCase(), n=m?+m[1]:1;
+  const a=ACCESSORIES.find(a=>new RegExp("^(?:"+a[0]+")$").test(w))||[w,s,s];
+  return {name:a[1],n,text:n>1?n+" "+(a[2]||a[1]+"s"):a[1]}; };
+function findConsole(item){
+  const c=(CONFIG.consoles||[]).find(c=>new RegExp("\\b(?:"+c.match+")\\b").test(item));
+  return c&&!NOT_CONSOLE.test(item)?c:null;
+}
+// price lower than a complete console's: which missing pieces add up to the difference (null if none do)
+function missingByPrice(c,price,kit,said){
+  if(!c.price||!(price>0)||price>=c.price) return [];
+  const D=CONFIG.consoleDeduct||{}, opts=kit.filter(k=>D[k.name]&&!said.has(k.name)), diff=Math.round(c.price-price);
+  let best=null;
+  (function go(i,sum,take){ if(sum===diff&&(!best||take.length<best.length)) best=take.slice(); if(i>=opts.length||sum>=diff) return;
+    for(let q=0;q<=opts[i].n;q++){ go(i+1,sum+q*D[opts[i].name],q?take.concat([[opts[i].name,q]]):take); } })(0,0,[]);
+  return best||[];
+}
+// Power tool kits: "DRILL/DRIVER" (or "IMPACT DRILL/DRIVER") is ONE tool; "HAMMER DRILL/IMPACT DRIVER",
+// "DRILL & IMPACT", "2-TOOL COMBO", "2PC KIT" are sets. A set prints "2-Tool Kit" first.
+const TOOLS=["HAMMER ?DRILL","DRILLDRIVER","IMPACT DRIVER","IMPACT WRENCH","DRILL","IMPACT(?! ?DRILL)",
+  "CIRCULAR SAW","RECIP(?:ROCATING)? SAW","SAWZALL","JIG ?SAW","MITER SAW","BAND ?SAW","GRINDER","OSCILLATING","MULTI-?TOOL",
+  "SANDER","ROUTER","BLOWER","(?:STRING )?TRIMMER","HEDGE TRIMMER","NAILER","STAPLER","(?:WORK ?|FLASH ?)?LIGHT","RADIO","VACUUM|VAC"];
+function toolCount(s){
+  s=s.replace(/\bDRILL\s*\/\s*DRIVER\b|\bDRILL[- ]DRIVER\b/g,"DRILLDRIVER");
+  const n=s.match(/\b(\d)\s*-?\s*(?:TOOL|PC|PIECE)S?\s*(?:COMBO|KIT|SET)\b|\b(\d)\s*-?\s*TOOLS?\b/); if(n) return +(n[1]||n[2]);
+  const seen=new Set(), re=new RegExp("\\b("+TOOLS.map(t=>"(?:"+t+")").join("|")+")\\b","g"); let x;
+  while((x=re.exec(s))) seen.add(TOOLS.findIndex(t=>new RegExp("^(?:"+t+")$").test(x[1])));
+  return seen.size;
+}
+// cordless tool: needs a battery + charger (CONFIG.toolRequired)
+const CORDLESS=/\b(M12|M18|MX FUEL|FUEL|\d{1,2}(?:\.\d)?\s?V(?:OLT)?|V\d{2}|\d{2}V MAX|FLEXVOLT|ONE\+|CORDLESS|BRUSHLESS)\b/;
+function parseAccessories(desc,model,category,price){
+  const vg=s=>String(s||"").toUpperCase().replace(/…|\.\.\.$/g,"").replace(/\b(?:VIDEO ?)?GAME ?(?:CONSOLE|SYSTEM)\b/g,"CONSOLE");
+  const d=vg(desc), mo=vg(model);
+  const m=d.match(/(?:^|[\s|(])(?:W\s*\/(?!\s*O\b)|WITH\b(?!OUT)|INCL(?:UDES?|\.)?\b|COMES WITH\b)\s*(.*)$/), seg=m?m[1]:d;
+  const accRe="(?:"+ACCESSORIES.map(a=>a[0]).join("|")+")";
+  const item=((m?d.slice(0,m.index):d)+" "+mo)           // what the item itself is (before W/, minus "NO CONTROLLER")
+    .replace(new RegExp("(?:\\bNO|\\bW\\s*\\/\\s*O|\\bWITHOUT|\\bMISSING|\\bLESS)\\s+(?:\\S+\\s+)?"+accRe+"\\b","g")," ");
+  const out=[], gone=new Set(), re=new RegExp("(?:\\(?\\b(\\d+|"+Object.keys(NUMWORD).join("|")+")\\)?\\s*(?:X\\s*|-\\s*)?)?\\b("+ACCESSORIES.map(a=>"(?:"+a[0]+")").join("|")+")\\b","g");
+  let x; while((x=re.exec(d))){
+    const a=ACCESSORIES.find(a=>new RegExp("^(?:"+a[0]+")$").test(x[2])); if(!a) continue;
+    if(NOT_WITH.test(d.slice(0,x.index))){ gone.add(a[1]); continue; }
+    if(m&&x.index<d.length-seg.length) continue;           // before W/: part of the item's name
+    const n=x[1]?(NUMWORD[x[1]]||+x[1]):0;
+    out.push({name:a[1],n:n||1,text:n>1?n+" "+(a[2]||a[1]+"s"):a[1]});
+  }
+  let list=out;
+  const con=findConsole(item);
+  if(con){
+    if(/\bCORDS\b|\bCABLES\b/.test(d)&&gone.has("Cord")) gone.add("HDMI Cord");     // "NO CORDS" (power cord is required)
+    if(/\b(?:CONSOLE|SYSTEM|UNIT) ONLY\b/.test(d)) con.kit.forEach(k=>gone.add(kitItem(k).name));   // "CONSOLE ONLY"
+    const req=CONFIG.consoleRequired||[], said=new Set([...gone,...list.map(o=>o.name)]);
+    let kit=con.kit.map(kitItem).filter(k=>req.includes(k.name)||!gone.has(k.name)).map(k=>list.find(o=>o.name===k.name)||k);
+    for(const [name,q] of missingByPrice(con,price,kit,said))             // price says a controller / HDMI is missing
+      kit=kit.map(k=>k.name!==name?k:k.n-q>0?kitItem((k.n-q)+" "+k.name):null).filter(Boolean);
+    const names=new Set(con.kit.map(k=>kitItem(k).name));
+    list=kit.concat(list.filter(o=>!names.has(o.name)&&o.name!=="Cord"&&o.name!=="Cable"));
+  } else if(!m&&!gone.size&&list.length<2) list=[];   // no W/ or WITH: one lone word is usually the item itself ("M18 BATTERY", "CASE KNIFE")
+  const tools=Math.max(toolCount(d.slice(0,m?m.index:d.length)),toolCount(mo));
+  if(!con&&tools>=1&&CORDLESS.test(item))                                 // cordless tool: at least 1 battery + charger
+    for(const r of CONFIG.toolRequired||[]) if(!list.some(o=>o.name===r)) list.push(kitItem(r));
+  let texts=[...new Set(list.slice().sort((a,b)=>accRank(a.name)-accRank(b.name)).map(o=>o.text))];
+  const pc=texts.indexOf("Power Cord"), hc=texts.indexOf("HDMI Cord");                  // shorter, reads better
+  if(pc>=0&&hc>=0){ texts[pc]="Power & HDMI Cords"; texts.splice(hc,1); }
+  if(tools>=2) texts.unshift(tools+"-Tool Kit");
+  return texts.join(", ");
+}
+
 // rows: [{cells:[{x,w,str}], page}] sorted; returns raw records.
 // Works with the old "Custom" report and the newer one with Category / Description columns,
 // read from Bravo's own saved report (.prnx).
@@ -1079,7 +1203,7 @@ function toTag(r){
   const g=caliber.match(/^(\d+) Gauge$/); if(g) model=model.replace(new RegExp("(^|\\s)"+g[1]+"(?=\\s|$)"),"$1").replace(/\s+/g," ").trim();
   // 3) known model-name corrections
   for(const f of MODEL_FIXES){ if((!f.brand||f.brand.test(brand)) && f.model.test(model)){ model=model.replace(f.model,f.to).trim(); if(f.brandTo) brand=f.brandTo; } }
-  return {include:true, brand, model, caliber, extras:parseExtras(r.desc), finish, category:r.category||"", price:r.price, cost:r.cost, number:r.number,
+  return {include:true, brand, model, caliber, extras:parseExtras(r.desc), accessories:parseAccessories(r.desc,r.mfr+" "+r.model,r.category,r.price), finish, category:r.category||"", price:r.price, cost:r.cost, number:r.number,
           raw:[r.mfr, r.model, r.desc, r.caliberRaw].filter(Boolean).join(" | ")};
 }
 
@@ -1136,7 +1260,8 @@ function fitRow(g,str,cx,top,maxW,h,scale,wrap,col){
   const words=str.split(" ");
   if(wrap && words.length>1 && g.fitSize(str,maxW,h*scale)<h*.42){
     let best=null;
-    for(let i=1;i<words.length;i++){const a=words.slice(0,i).join(" "),b=words.slice(i).join(" ");
+    const commas=words.some((w,i)=>i<words.length-1&&w.endsWith(","));    // a list ("Bag, 2 Batteries"): break only between items
+    for(let i=1;i<words.length;i++){ if(commas&&!words[i-1].endsWith(",")) continue; const a=words.slice(0,i).join(" "),b=words.slice(i).join(" ");
       const sz=Math.min(g.fitSize(a,maxW,h*.42),g.fitSize(b,maxW,h*.42)), bal=-Math.abs(a.length-b.length);
       if(!best||sz>best[2]+.01||(Math.abs(sz-best[2])<=.01&&bal>best[3])) best=[a,b,sz,bal];}
     g.fitText(best[0],cx,top+h*.29,maxW,best[2],col); g.fitText(best[1],cx,top+h*.72,maxW,best[2],col);
@@ -1439,7 +1564,13 @@ const tagBox = s => ({ W:s.W, H:s.H, k:s.H/216, pad:s.W*.035, thick:Math.max(3,s
 function drawGunFront(g,x,y,t,s){
   const {W,H,k,pad,thick}=tagBox(s), F=LAY.front;
   g.role("bg"); g.rect(x,y,W,H,C.white);
-  const groups=topGroups(TYPES.guns,t), top=groups.reduce((a,r)=>a+r.h,0)*k;
+  // General Merchandise: the "Comes with" list takes the caliber row (and may wrap to two lines)
+  let type=TYPES.guns;
+  if(s.extrasFront){ t={...t,caliber:t.extras||"",fit:t.fit&&{...t.fit,caliber:undefined}};
+    // a long list gets a taller row (two lines) from the price box, which has room to spare
+    const long=g.fitSize(t.caliber,W-2*pad,1000)<(MIN_TEXT.caliber||12)+2;
+    type={...type,rows:type.rows.map(r=>r[0]==="caliber"?[r[0],long?r[1]*1.7:r[1],r[2],true]:r)}; }
+  const groups=topGroups(type,t), top=groups.reduce((a,r)=>a+r.h,0)*k;
   const lb=F.layawayBand*k, pr=F.payments*k;
   const yPrice=y+top, yLay=y+H-pr-lb, ph=yLay-yPrice, yPay=yLay+lb;
   let cy=y; const ys=groups.map(gr=>{ const r=[cy,gr.h*k]; cy+=gr.h*k; return r; });
@@ -1456,7 +1587,7 @@ function drawGunFront(g,x,y,t,s){
   g.lw(thick);
   for(let i=1;i<ys.length;i++) g.line(x,ys[i][0],x+W,ys[i][0]);
   [yPrice,yLay,yPay].forEach(v=>g.line(x,v,x+W,v));
-  groups.forEach((gr,i)=>{ g.role(TYPES.guns.rows[gr.owner??0][0]); fitRow(g,gr.text,x+W/2,ys[i][0],W-2*pad,ys[i][1],gr.scale,gr.wrap); });
+  groups.forEach((gr,i)=>{ g.role(type.rows[gr.owner??0][0]); fitRow(g,gr.text,x+W/2,ys[i][0],W-2*pad,ys[i][1],gr.scale,gr.wrap); });
   g.lw(thick); g.strokeRect(x,y,W,H);      // the front's outer line is the cut line
 }
 
@@ -1472,7 +1603,7 @@ function drawGunBack(g,x0,y0,t,s0){
   g.role("bg"); g.rect(x0,y0,s0.W,s0.H,C.white); g.role("");
   const x=x0+m, y=y0+m, s={...s0,W:s0.W-2*m,H:s0.H-2*m};
   const {W,H,k,pad}=tagBox(s), cx=x+W/2, B=LAY.backText||1;   // B: back text size (CONFIG.layout.backText)
-  const l=layaway(t.price||0), extras=String(t.extras||"").trim();
+  const l=layaway(t.price||0), extras=s0.extrasFront?"":String(t.extras||"").trim();   // General Merchandise: already on the front
   const zone=Math.min(LAY.barcodeH*72,H*.5);            // sticker spot at the bottom
   const hh=LAY.header*k*.92, gap=Math.max(3,4*k);
   const tall=t.fit&&t.fit.extrasTall, ex=Math.min(LAY.extras*k*(tall?1.7:1),(H-hh-zone)*(tall?.42:.3));
@@ -1643,12 +1774,17 @@ const subs=()=>{ const m=new Map(CONFIG.tagTypes.map(x=>[x.id,x])); (SH.data.tag
   return [...m.values()].filter(x=>!x.deleted&&TYPES[x.cat]&&!(CONFIG.retiredTypes||[]).includes(x.id)); };
 const kinds=()=>TYPE?subs().filter(x=>x.cat===TYPE.id):[];
 const kindOf=id=>{ const l=kinds(); return l.find(x=>x.id===id)||l.find(x=>x.id===CONFIG.defaultTagType)||l[0]; };
-// Pistol -> Handguns, Rifle / Shotgun -> Long Guns; anything else -> CONFIG.defaultTagType
+// Pistol -> Handguns, Rifle / Shotgun -> Long Guns; any other category -> CONFIG.otherTagType
+// (General Merchandise); no category at all (old gun-only report) -> CONFIG.defaultTagType
 function autoKind(t){
   const c=String(t.category||"").trim();
   if(c) for(const k of kinds()) if(k.categories&&new RegExp("^("+k.categories+")$","i").test(c)) return k.id;
-  return kindOf(CONFIG.defaultTagType).id;
+  return kindOf(c&&CONFIG.otherTagType||CONFIG.defaultTagType).id;
 }
+// General Merchandise: "Comes with" read from the whole description (bag, 2 batteries, charger...)
+const useAccessories=t=>{ if(kindOf(t.kind).extrasOnFront&&t.accessories) t.extras=t.accessories; };
+// categories with no tag format yet (Computer, Jewelry) start unchecked
+const skipCat=t=>!!CONFIG.skipCategories&&new RegExp("^("+CONFIG.skipCategories+")","i").test(String(t.category||"").trim());
 // tags of one tag type, in report order
 const ofKind=(list,id)=>list.filter(t=>kindOf(t.kind).id===id);
 function saveSubs(list){
@@ -1711,7 +1847,7 @@ async function handleFile(file){
   finally{ $("drop").classList.remove("busy"); $("dropBig").textContent="Drop Bravo report"; $("dropSmall").textContent="or click to pick it"; }
 }
 function loadLines(lines,quiet){
-  lastLines=lines; const list=TYPE.parse(lines); list.forEach(t=>t.kind=autoKind(t));
+  lastLines=lines; const list=TYPE.parse(lines); list.forEach(t=>{ t.kind=autoKind(t); if(skipCat(t)) t.include=false; useAccessories(t); });
   tags=applyFixes(list); skips={}; $("q").value="";             // a tag type changed on the Edit panel is remembered by item #
   if(!tags.length){ $("emptyMsg").textContent="No items found in that file."; view(); return; }
   $("emptyMsg").textContent=""; view(); window.scrollTo({top:0}); if(!quiet) prawn("load",tags.map(t=>t.number||t.raw||""));
@@ -1735,7 +1871,7 @@ function view(){
 let skips={};                                   // start spot per tag type (used sheets)
 function settings(kindId){
   const k=kindOf(kindId), z=TYPE.sizes[k.size]||TYPE.sizes[0];
-  return {W:z.w*72,H:z.h*72,portrait:z.orient==="portrait",skip:skips[k.id]||0};
+  return {W:z.w*72,H:z.h*72,portrait:z.orient==="portrait",skip:skips[k.id]||0,extrasFront:!!k.extrasOnFront};
 }
 const obs=new IntersectionObserver(es=>es.forEach(e=>{ const c=e.target;
   if(e.isIntersecting) drawCard(c); else if(c._cv){ c._cv.remove(); c._cv=null; } }),{rootMargin:"600px"});
@@ -1827,7 +1963,7 @@ function openEditor(i){
     <div class="body">
       <div class="kindrow">${kinds().map(x=>`<button class="chip${x.id===kd.id?" on":""}" data-kind="${esc(x.id)}">${esc(x.name)}</button>`).join("")}</div>
       <div class="sides">${two?"<span>Front</span>":""}<canvas id="edFront"></canvas>${two?'<span>Back</span><canvas id="edBack"></canvas>':""}</div>
-      ${TYPE.fields.map(x=>f(x[0],x[1],t[x[0]]||"")).join("")}
+      ${TYPE.fields.filter(x=>!(s.extrasFront&&x[0]==="caliber")).map(x=>f(x[0],s.extrasFront&&x[0]==="extras"?"Comes with":x[1],t[x[0]]||"")).join("")}
       <div class="row2">${f("price","Price",t.price||"",1)}${f("cost","Cost",isFinite(t.cost)?t.cost:"",1)}</div>
       ${f("number","Item #",t.number||"")}
       ${t.category?`<div class="raw">Bravo category: ${esc(t.category)}</div>`:""}
@@ -1841,7 +1977,7 @@ function openEditor(i){
   const inc=()=>{ $("edInc").textContent=t.include?"Skip":"Print"; };
   draw(); inc();
   $("drawer").querySelectorAll("[data-kind]").forEach(b=>b.onclick=()=>{
-    if(t.kind===b.dataset.kind) return; t.kind=b.dataset.kind; rememberEdit(t,"kind"); view(); openEditor(i); });
+    if(t.kind===b.dataset.kind) return; t.kind=b.dataset.kind; rememberEdit(t,"kind"); if(!t.extras) useAccessories(t); view(); openEditor(i); });
   $("drawer").querySelectorAll("input[data-k]").forEach(inp=>inp.oninput=()=>{
     const k=inp.dataset.k, v=inp.value;
     if(k==="price"){ const m=money(v); t.price=isFinite(m)?m:0; }
@@ -1904,7 +2040,7 @@ $("dlBack").onclick=()=>savePdf("back");
 // still prints, gets a "!" on screen, and is named when you print.
 // skipped when nothing that changes the fit (size, text, price) changed since the last check
 const CHECKED=new WeakMap();
-function checkOne(t){ const s=settings(t.kind), key=JSON.stringify([s.W,s.H,TYPE.fields.map(f=>t[f[0]]),t.price]);
+function checkOne(t){ const s=settings(t.kind), key=JSON.stringify([s.W,s.H,s.extrasFront,TYPE.fields.map(f=>t[f[0]]),t.price]);
   if(CHECKED.get(t)===key) return; CHECKED.set(t,key);
   const r=fitTag(TYPE,t,s); t._warn=r.left.length?r.left:null; }
 function checkAll(){ tags.forEach(checkOne); }
