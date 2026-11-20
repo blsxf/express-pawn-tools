@@ -7,7 +7,7 @@
 <script>
 // ---- self-update: checks the public mirror when online, keeps the newest build on this computer ----
 // Newer build saved earlier -> run that instead of this file. Add ?local to the address to skip it.
-var TT_BUILD=1795191530964;
+var TT_BUILD=1795194449221;
 (function(){
   var REMOTE="https://raw.githubusercontent.com/blsxf/express-pawn-tools/main/tagtool/", KEY="tagtool.update";
   function db(){ return new Promise(function(res,rej){ var r=indexedDB.open("tagtool",1);
@@ -123,7 +123,8 @@ const CONFIG = {
   // ---- Checked before every print ---------------------------------------
   // Smallest text allowed (font size in points; 72 = 1 inch). A tag that would print smaller
   // gets fixed automatically (extras on 2 lines, words below shortened) or listed before printing.
-  minText: { brand:16, model:10, caliber:12, price:30, monthly:14, hook:14, total:18, totalLabel:7, down:11, extras:9 },
+  minText: { brand:16, model:10, caliber:12, price:30, monthly:14, hook:14, total:18, totalLabel:7, down:11, extras:9,
+             eTitle:12, eSpec:5, eLabel:6, eMoney:10, ePrice:18, eTax:7, eBanner:6 },   // electronics tags
   // Words the tool may shorten on the MODEL line, only when the full name won't fit big enough.
   shorten: [["Government","Gov't"],["Semi-Automatic","Semi-Auto"],["Automatic","Auto"],["Tactical","Tac"],
             ["Standard","Std"],["Limited","Ltd"],["Edition","Ed."],["Anniversary","Anniv."],["Commemorative","Comm."]],
@@ -150,6 +151,8 @@ const CONFIG = {
         {label:'6 per sheet (3 x 2)', w:3.5, h:4.0, orient:"landscape"},
         {label:'9 per sheet (small)', w:3.0, h:2.65, orient:"landscape"},
         {label:'12 per sheet (compact)', w:2.625, h:2.65, orient:"landscape"},   // narrowest that still fits the 2.5" barcode sticker
+        {label:'6 per sheet (wide)', w:5.25, h:2.65, orient:"landscape"},       // computers
+        {label:'8 per sheet (wide, short)', w:5.25, h:2.0, orient:"landscape"}, // TVs, monitors
       ],
     },
   },
@@ -166,10 +169,14 @@ const CONFIG = {
     {id:"rifle",   cat:"guns", name:"Long Guns", size:0, designDate:"2026-11-19", categories:"Rifle|Shotgun"},
     {id:"general", cat:"guns", group:"General Merchandise", name:"General Merchandise", size:3, designDate:"2026-11-19",   // same small format as Handguns
      extrasOnFront:true},   // "Comes with" (bag, batteries, charger...) prints in the caliber row; back leaves it off
-    // Electronics: each has its own tag design (design: drawing code in src/types.js DESIGNS; placeholders for now)
-    {id:"tv",       cat:"guns", group:"Electronics", name:"TVs",       design:"tv",       size:3, extrasOnFront:true, categories:"TV|TVs|Television|Televisions"},
-    {id:"computer", cat:"guns", group:"Electronics", name:"Computers", design:"computer", size:3, extrasOnFront:true, categories:"Computer|Computers|Laptop|Laptops"},
-    {id:"monitor",  cat:"guns", group:"Electronics", name:"Monitors",  design:"monitor",  size:3, extrasOnFront:true, categories:"Monitor|Monitors"},
+    // Electronics: each has its own tag design (design: drawing code in src/types.js DESIGNS), from the shop's tags 11-20-2026.
+    // categories must match Bravo's whole category ("Monitor/Speakers" is a speaker set, not a monitor).
+    {id:"tv",       cat:"guns", group:"Electronics", name:"TVs",       design:"tv",       size:5, designDate:"2026-11-20", extrasOnFront:true,
+     categories:"TV|TVs|Television|Televisions|Flat Panel Television|LED Television|LCD Television|Smart TV"},
+    {id:"computer", cat:"guns", group:"Electronics", name:"Computers", design:"computer", size:4, designDate:"2026-11-20", extrasOnFront:true,
+     categories:"Computer|Computers|Laptop|Laptops|Laptop Computer|Desktop Computer|Notebook Computer|All-in-One Computer|Chromebook|Gaming Laptop"},
+    {id:"monitor",  cat:"guns", group:"Electronics", name:"Monitors",  design:"monitor",  size:5, designDate:"2026-11-20", extrasOnFront:true,
+     categories:"Monitor|Monitors|Computer Monitor|LCD Monitor|Gaming Monitor"},
   ],
   // No Category column (old gun-only report): this tag type (change it on the tag's Edit panel)
   defaultTagType: "rifle",
@@ -1025,6 +1032,27 @@ function cleanCaliber(raw){
   return titleCase(u);
 }
 const money = s => parseFloat(String(s).replace(/[$,]/g,""));
+// cost code on the barcode label: whole dollars of Cost, one letter per digit (P=1 … R=0). $450 -> HFR
+// Electronics tags (TV / monitor / computer): specs found in Bravo's make/model/description. Every key is always
+// there (even "") so changes on the Edit panel are remembered per item #. title/specs/modelLine "" = worked out when drawn.
+function specsOf(r){
+  const d=" "+[r.mfr,r.model,r.desc].filter(Boolean).join(" ").toUpperCase()+" ", m=re=>((d.match(re)||[])[1]||"").replace(/\s+/g," ").trim();
+  let cpu=m(/\b((?:INTEL\s+)?(?:CORE\s+)?I[3579][- ]?\d{0,5}[A-Z]{0,2}|(?:AMD\s+)?RYZEN\s*(?:AI\s*)?[3579](?:\s*\d{3,4}[A-Z]{0,2})?|(?:APPLE\s+)?M[1-5](?:\s+(?:PRO|MAX|ULTRA))?|CELERON\s*[A-Z]?\d*|PENTIUM\s*[A-Z]?\d*|SNAPDRAGON\s*X?\s*(?:ELITE|PLUS)?)(?=[\s,\/|)@]|$)/);
+  if(cpu) cpu=/RYZEN/.test(cpu)?"AMD "+titleCase(cpu.replace(/^AMD\s*/,"")):/^(INTEL\s+)?(CORE\s+)?I\d/.test(cpu)?"Intel Core "+cpu.replace(/^(INTEL\s+)?(CORE\s+)?I/,"i")
+    :/^(APPLE\s+)?M\d/.test(cpu)?"Apple "+titleCase(cpu.replace(/^APPLE\s*/,"")):titleCase(cpu);
+  // service-sheet style "8 Cores @ 3.80GHz" after the chip, like the shop's tags: "AMD Ryzen 7 8845HS | 8 Cores @ 3.80GHz"
+  const cores=m(/\bCORES?\s*[=:]?\s*(\d{1,2})\b/)||m(/\b(\d{1,2})[- ]?CORES?\b/), ghz=m(/@\s*(\d\.\d{1,2})\s*GHZ/)||m(/\b(\d\.\d{1,2})\s*GHZ/);
+  if(cpu&&(cores||ghz)) cpu+=" | "+[cores&&cores+" Cores",ghz&&"@ "+ghz+"GHz"].filter(Boolean).join(" ");
+  let ram=m(/\b(\d{1,3})\s*GB\s*(?:OF\s*)?(?:RAM|DDR\d?X?|LPDDR\d?X?|MEMORY)\b/)||m(/\b(?:MEMORY|RAM)\s*[=:]?\s*(\d{1,3})\s*GB\b/);
+  if(!ram){ const g=[...d.matchAll(/\b(\d{1,2})\s*GB\b(?!\s*(?:SSD|HDD|NVME|EMMC|M\.2|STORAGE|HD\b))/g)].map(x=>x[1]).find(v=>[4,6,8,12,16,24,32,64].includes(+v)); ram=g||""; }
+  const st=d.match(/\b(\d+(?:\.\d)?)\s*(GB|TB)\s*(SSD|NVME|HDD|EMMC|M\.2)\b/);
+  const gpu=m(/\b((?:NVIDIA\s+)?(?:GEFORCE\s+)?(?:RTX|GTX)\s*\d{3,4}(?:\s*TI)?(?:\s*SUPER)?|(?:AMD\s+)?RADEON\s*(?:RX\s*)?\d{3,4}[MS]?|(?:INTEL\s+)?(?:IRIS\s*XE|ARC\s*[A-Z]?\d{3,4}))\b/);
+  const os=/\bWIN(?:DOWS)?\s*11\b/.test(d)?"Windows 11":/\bWIN(?:DOWS)?\s*10\b/.test(d)?"Windows 10":/\bMAC\s*OS\b/.test(d)?"macOS":/\bCHROME\s*(?:OS|BOOK)\b/.test(d)?"ChromeOS":"";
+  return { title:"", specs:"", modelLine:"", cpu, ram:ram?ram+" GB":"", storage:st?st[1]+st[2]+" "+st[3]:"", os,
+    gpu:gpu?gpu.replace(/^(?:NVIDIA\s+)?(?:GEFORCE\s+)?(RTX|GTX)\s*/,"$1 ").replace(/\bTI\b/,"Ti").replace(/\bSUPER$/,"Super").replace(/^(?:AMD\s+)?RADEON\s*/,"AMD Radeon ").replace(/^(?:INTEL\s+)?IRIS\s*XE/,"Intel Iris Xe").replace(/^(?:INTEL\s+)?ARC/,"Intel Arc"):"",
+    src:{mfr:r.mfr||"", model:r.model||"", desc:r.desc||""} };
+}
+const costCode = c =>isFinite(c)&&c>0 ? String(Math.round(c)).replace(/\d/g,d=>(CONFIG.costKey||"RPATHFINDE")[d]) : "";
 
 // ---- "Comes with" extras from Bravo's Description ("... W/CASE/2MAGS") ----
 // Words staff use, in the order to match. Bravo cuts long descriptions short,
@@ -1149,18 +1177,20 @@ function parseAccessories(desc,model,category,price){
 // rows: [{cells:[{x,w,str}], page}] sorted; returns raw records.
 // Works with the old "Custom" report and the newer one with Category / Description columns,
 // read from Bravo's own saved report (.prnx). Columns can be in any order; any other column
-// (Status, Type, Action, Barcode, Serial Number, Date to Inventory…) is kept apart and ignored.
+// (Status, Type, Action, Barcode Image…) is kept apart and ignored. Barcode / Location / Serial Number /
+// Date to Inventory feed the barcode label printed on the back (t.label).
 function parseRows(lines){
   let cols=null; const out=[];
-  const NAMES={Manufacturer:"mfr",Model:"model",Number:"number",Category:"category",Description:"desc",Caliber:"caliber",Cost:"cost",Price:"price"};
+  const NAMES={Manufacturer:"mfr",Model:"model",Number:"number",Category:"category",Description:"desc",Caliber:"caliber",Cost:"cost",Price:"price",
+    Location:"location",Barcode:"barcode","Serial Number":"serial","Date to Inventory":"date"};     // last four: the printed barcode label
   for(const line of lines){
     const txt = line.map(c=>c.str).join(" ");
     if(/Manufacturer/.test(txt) && /Caliber/.test(txt)){
-      cols = line.filter(c=>c.str.trim()).map(c=>{ const h=c.str.trim(); return {key:NAMES[h]||(/^(Retail|Selling) Price$/i.test(h)?"price":"skip"),x:c.x}; }).sort((a,b)=>a.x-b.x);
+      cols = line.filter(c=>c.str.trim()).map(c=>{ const h=c.str.trim(); return {key:NAMES[h]||(/^(Retail|Selling) Price$/i.test(h)?"price":/^Gun\s*(#|No\.?|Number)$/i.test(h)?"gun":"skip"),x:c.x}; }).sort((a,b)=>a.x-b.x);
       continue;
     }
     if(!cols) continue;
-    const parts={mfr:[],model:[],number:[],category:[],desc:[],caliber:[],cost:[],price:[],skip:[]};
+    const parts={mfr:[],model:[],number:[],category:[],desc:[],caliber:[],cost:[],price:[],location:[],barcode:[],serial:[],date:[],gun:[],skip:[]};
     for(const c of line){
       const cx = c.x + (c.w ? Math.min(c.w/2,40) : 0.5);       // middle of the text decides its column
       let col=cols[0]; for(const k of cols) if(cx>=k.x-2) col=k;
@@ -1175,7 +1205,8 @@ function parseRows(lines){
     if(!isFinite(cost) && !isFinite(price)) continue;
     if(price===0.01) continue;                                  // penny price = not priced yet; no tag
     out.push({mfr:j(parts.mfr), model:j(parts.model), number, category:j(parts.category), desc:j(parts.desc),
-              caliberRaw:m?m[1].trim():j(parts.caliber), price:isFinite(price)?price:0, cost});
+              caliberRaw:m?m[1].trim():j(parts.caliber), price:isFinite(price)?price:0, cost,
+              label:{barcode:j(parts.barcode).replace(/\s/g,""), location:j(parts.location), serial:j(parts.serial), date:j(parts.date), gun:j(parts.gun), desc:j(parts.desc)}});
   }
   return out;
 }
@@ -1229,7 +1260,7 @@ function toTag(r){
   const g=caliber.match(/^(\d+) Gauge$/); if(g) model=model.replace(new RegExp("(^|\\s)"+g[1]+"(?=\\s|$)"),"$1").replace(/\s+/g," ").trim();
   // 3) known model-name corrections
   for(const f of MODEL_FIXES){ if((!f.brand||f.brand.test(brand)) && f.model.test(model)){ model=model.replace(f.model,f.to).trim(); if(f.brandTo) brand=f.brandTo; } }
-  return {include:true, brand, model, caliber, extras:parseExtras(r.desc), accessories:parseAccessories(r.desc,r.mfr+" "+r.model,r.category,r.price), finish, category:r.category||"", price:r.price, cost:r.cost, number:r.number,
+  return {include:true, brand, model, caliber, extras:parseExtras(r.desc), accessories:parseAccessories(r.desc,r.mfr+" "+r.model,r.category,r.price), finish, category:r.category||"", price:r.price, cost:r.cost, number:r.number, label:r.label, ...specsOf(r),
           raw:[r.mfr, r.model, r.desc, r.caliberRaw].filter(Boolean).join(" | ")};
 }
 
@@ -1642,7 +1673,7 @@ function pairRow(g,a,b,cx,cy,maxW,maxSize,ka,ra,rb,dcol,dw){
 }
 
 // ---------- GUN TAG: back = layaway panel, "Comes with" extras, spot for the barcode sticker ----------
-// Item # and cost code are on the barcode sticker, so the tag doesn't print them.
+// Bottom of the back = the Bravo barcode label (item #, cost code, location…), printed on the tag (11-20-2026).
 // 11-19-2026: two-sided printing drifts the back left-right (~1/16") against the front's cut, so there are
 // NO side lines or outlines. The ink runs edge to edge and past the cut ("bleed", layout.backBleed): navy
 // "12-MONTH LAYAWAY!" header flush with the top edge (black rule on the top cut), full-width yellow total,
@@ -1685,25 +1716,146 @@ function drawGunBack(g,x0,y0,t,s0){
     else { const q=extras.split(", "), h=Math.ceil(q.length/2), a=W_.withPrefix+q.slice(0,h).join(", ")+",", b=q.slice(h).join(", ");
       const sz=Math.min(g.fitSize(a,ew,he*.36*B),g.fitSize(b,ew,he*.36*B));
       g.fitText(a,cx,ye+he*.3,ew,sz); g.fitText(b,cx,ye+he*.7,ew,sz); } }
-  // sticker spot: a quiet hint (the sticker covers it)
+  // bottom: the shop's barcode label, printed (11-20-2026). No Bravo barcode (hand-added tag) = spot for the sticker.
   const yz=y+H-zone;
-  g.role("label"); g.fitText(W_.barcode+" sticker",cx,yz+(zone+m)/2,W*.6,8,C_HINT);
+  if(t.label&&t.label.barcode) drawBarcodeLabel(g,x,yz+Math.max(3,4*k),W,y0+s0.H-m*.5-(yz+Math.max(3,4*k)),t);
+  else { g.role("label"); g.fitText(W_.barcode+" sticker",cx,yz+(zone+m)/2,W*.6,8,C_HINT); }
+}
+
+// Code 128 (what Bravo's own labels use): text -> bar/space pattern, "1" = one black module
+const C128="212222 222122 222221 121223 121322 131222 122213 122312 132212 221213 221312 231212 112232 122132 122231 113222 123122 123221 223211 221132 221231 213212 223112 312131 311222 321122 321221 312212 322112 322211 212123 212321 232121 111323 131123 131321 112313 132113 132311 211313 231113 231311 112133 112331 132131 113123 113321 133121 313121 211331 231131 213113 213311 213131 311123 311321 331121 312113 312311 332111 314111 221411 431111 111224 111422 121124 121421 141122 141221 112214 112412 122114 122411 142112 142211 241211 221114 413111 241112 134111 111242 121142 121241 114212 124112 124211 411212 421112 421211 212141 214121 412121 111143 111341 131141 114113 114311 411113 411311 113141 114131 311141 411131 211412 211214 211232 2331112".split(" ");
+function code128(str){
+  const s=String(str).replace(/[^\x20-\x7e]/g,""), codes=[]; let i=0, set="";
+  while(i<s.length){
+    let d=0; while(/\d/.test(s[i+d]||"")) d++;
+    if(d>=4||(d>=2&&set==="C"&&d%2===0)){ const n=d-d%2;                 // digit pairs: set C
+      if(set!=="C"){ codes.push(set?99:105); set="C"; }
+      for(let j=0;j<n;j+=2) codes.push(+s.substr(i+j,2)); i+=n; }
+    else { if(set!=="B"){ codes.push(set?100:104); set="B"; } codes.push(s.charCodeAt(i)-32); i++; }
+  }
+  codes.push(codes.reduce((a,c,j)=>a+c*(j||1),0)%103, 106);
+  return codes.map(c=>[...C128[c]].map((w,j)=>(j%2?"0":"1").repeat(+w)).join("")).join("");
+}
+// The Bravo label, same layout as the shop's stickers: price | barcode + item #, REGULAR / cost code,
+// Location / date, Gun# / Serial#, description. Space above the barcode stays free for the shelf code (GA…).
+function drawBarcodeLabel(g,x,y,W,h,t){
+  const L=t.label, LW=Math.min(W,2.6*72), lx=x+(W-LW)/2, per1=str=>1000/g.fitSize(str,1000,1e9);
+  const left=(str,x0,cy,maxW,size)=>{ const z=g.fitSize(str,maxW,size); g.fitText(str,x0+per1(str)*z/2,cy,maxW,z); };
+  const right=(str,x1,cy,maxW,size)=>{ const z=g.fitSize(str,maxW,size); g.fitText(str,x1-per1(str)*z/2,cy,maxW,z); };
+  // barcode: right half, bars at least 0.0125" wide, 10-module quiet zone on the left
+  const bits=code128(L.barcode), mw=Math.min(LW*.5/bits.length,1.3), bw=bits.length*mw;
+  const bx=lx+LW-bw, bTop=y+h*.12, bH=h*.36, colW=LW-bw-10*mw;
+  g.role("sticker");
+  for(let i=0;i<bits.length;){ if(bits[i]!=="1"){ i++; continue; } let n=0; while(bits[i+n]==="1") n++; g.rect(bx+i*mw,bTop,n*mw,bH,[0,0,0]); i+=n; }
+  g.fitText(t.number||"",bx+bw/2,bTop+bH+h*.09,bw,h*.13);
+  // left column: big price, then the small lines
+  const sm=Math.min(h*.095,7);
+  left(fmtC(t.price),lx,y+h*.3,colW,h*.3);
+  left("REGULAR - "+fmtC(t.price),lx,y+h*.56,colW*.72,sm);   right(costCode(t.cost),lx+colW,y+h*.56,colW*.26,sm);
+  left("Location - "+(L.location||""),lx,y+h*.68,colW*.62,sm); right(L.date||"",lx+colW,y+h*.68,colW*.36,sm);
+  left([L.gun&&"Gun# "+L.gun,L.serial&&"Serial# "+L.serial].filter(Boolean).join("   "),lx,y+h*.80,LW,sm);
+  left(L.desc||"",lx,y+h*.93,LW,h*.12);
 }
 
 // ---------- DESIGNS: a tag type's own look (CONFIG.tagTypes design:"tv") ----------
 // Same report reading, sheet sizes and printing; only the drawing changes. No design = the gun / General Merchandise tag.
-// Electronics: placeholders for now (General Merchandise look) until each gets its own layout.
 //   front(g,x,y,t,s) / back(g,x,y,t,s): same arguments as drawGunFront / drawGunBack.
-function drawTvFront(g,x,y,t,s){ drawGunFront(g,x,y,t,s); }             // TODO: TV tag
-function drawTvBack(g,x,y,t,s){ drawGunBack(g,x,y,t,s); }
-function drawComputerFront(g,x,y,t,s){ drawGunFront(g,x,y,t,s); }       // TODO: Computer tag
-function drawComputerBack(g,x,y,t,s){ drawGunBack(g,x,y,t,s); }
-function drawMonitorFront(g,x,y,t,s){ drawGunFront(g,x,y,t,s); }        // TODO: Monitor tag
-function drawMonitorBack(g,x,y,t,s){ drawGunBack(g,x,y,t,s); }
+//   fields: boxes on the Edit panel. def(t): what those boxes show (and the tag prints) while left blank.
+// Electronics (11-20-2026), from the shop's own TV / monitor / computer tags: one-sided look, layaway on the front,
+// prices with cents. Back = the Bravo barcode label only. Logo = a drawn stand-in until the shop sends the logo file.
+const tcase=s=>titleCase(String(s||"").replace(/[^\w"'.\-\/()+ ]/g," "));
+function elecDefaults(t){
+  const S=t.src||{}, d=" "+[S.mfr,S.model,S.desc].join(" ").toUpperCase()+" ", m=re=>(d.match(re)||[])[1]||"";
+  const inch=m(/\b(\d{2,3})(?:\.\d)?\s*(?:"|''|IN\b|INCH)/), hz=m(/\b(\d{2,3})\s*HZ\b/);
+  let res=m(/\b(8K|4K|UHD|QHD|WQHD|1440P|2160P|1080P|FHD|720P)\b/); res={UHD:"4K","2160P":"4K",WQHD:"1440p",QHD:"1440p",FHD:"1080p"}[res]||res.replace(/P$/,"p");
+  const brand=tcase(S.mfr||t.brand), ml=tcase([S.mfr||t.brand,S.model||t.model].filter(v=>v&&!/^n\/?a$/i.test(v.trim())).join(" "));   // "n/a" model = none
+  return {
+    tv:{ title:[inch&&inch+'"',res.replace("K","k"),/\bSMART\b/.test(d)&&"Smart","TV"].filter(Boolean).join(" "), specs:"" },
+    monitor:{ title:[brand,inch&&inch+'"',"Monitor"].filter(Boolean).join(" "), specs:[res&&res.replace("p","P")+" Resolution",hz&&hz+"Hz Refresh Rate"].filter(Boolean).join(" | ") },
+    computer:{ title:ml.replace(/\s*\(.*$/,""), modelLine:ml },
+  };
+}
+const elecText=(t,kind)=>{ const d=elecDefaults(t)[kind]; const o={...t}; for(const k in d) if(!t[k]) o[k]=d[k]; return o; };
+const fmtC=v=>"$"+(+v||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const C_RED=()=>C.red||[200,16,46];
+// text in a box: centered (or left/right), shrinks to fit
+function cellText(g,role,str,x,y,w,h,size,col,align){
+  if(!str) return; const p=Math.min(w*.04,h*.25), sz=Math.min(size,g.fitSize(str,w-2*p,size)), tw=1000/g.fitSize(str,1000,1e9)*sz;
+  const cx=align==="left"?x+p+tw/2:align==="right"?x+w-p-tw/2:x+w/2;
+  g.role(role); g.fitText(str,cx,y+h/2+1,w-2*p,sz,col);
+  return {cx,tw,sz};
+}
+function underText(g,role,str,x,y,w,h,size){                       // "Our Price:" underlined
+  const r=cellText(g,role,str,x,y,w,h,size); if(!r) return;
+  g.role(""); g.rect(r.cx-r.tw/2,y+h/2+r.sz*.45,r.tw,Math.max(.8,r.sz*.07),[0,0,0]);
+}
+function drawLogo(g,x,y,w,h){                                       // stand-in for the Express Pawn logo
+  const lh=Math.min(h*.8,w*.42), lw=Math.min(w*.9,lh*2.4), lx=x+(w-lw)/2, ly=y+(h-lh)/2;
+  g.role("logo"); g.rrect(lx,ly,lw,lh,lh/2,C.navy);
+  g.fitText("$",lx+lw*.2,ly+lh/2+1,lw*.2,lh*.85,C.yellow);
+  g.fitText("EXPRESS",lx+lw*.58,ly+lh*.33,lw*.58,lh*.36,C.white); g.fitText("PAWN",lx+lw*.58,ly+lh*.7,lw*.58,lh*.36,C.white);
+}
+// TV and monitor: logo | title (+ details line), Layaway / Down / Monthly with red "Sales Tax Paid!", yellow Our Price
+function drawScreenFront(g,x,y,t0,s,kind){
+  const {W,H}=tagBox(s), t=elecText(t0,kind), l=layaway(t.price||0), sub=!!t.specs;
+  g.role("bg"); g.rect(x,y,W,H,C.white);
+  const hT=H*(sub?.14:.21), hS=sub?H*.075:0, hr=H*(sub?.185:.19), y1=y+hT+hS, yY=y1+3*hr, hY=y+H-yY;
+  const xL=x+W*.27, xR=x+W*.785;
+  g.rect(x,yY,W,hY,C.yellow);
+  drawLogo(g,x,y,xL-x,hT+hS);
+  cellText(g,"eTitle",t.title,xL,y,x+W-xL,hT,hT*.78);
+  if(sub) cellText(g,"eSpec",t.specs,xL,y+hT,x+W-xL,hS,hS*.75);
+  [["Layaway:",l.total],["Down:",l.down],["Monthly:",l.monthly]].forEach(([lab,v],i)=>{ const ry=y1+i*hr;
+    cellText(g,"eLabel",lab,x,ry,xL-x,hr,hr*.5);
+    cellText(g,"eMoney",fmtC(v),xL,ry,xR-xL,hr,hr*.86);
+    cellText(g,"eTax",["Sales","Tax","Paid!"][i],xR,ry,x+W-xR,hr,hr*.62,C_RED()); });
+  underText(g,"eLabel","Our Price:",x,yY,xL-x,hY,hY*.42);
+  cellText(g,"ePrice",fmtC(t.price),xL,yY,x+W-xL,hY,hY*.86);
+  g.lw(Math.max(1,W*.004));
+  if(sub) g.line(xL,y+hT,x+W,y+hT);
+  [y1,y1+hr,y1+2*hr,yY].forEach(v=>g.line(x,v,x+W,v));
+  g.line(xL,y,xL,y+H);
+  g.lw(Math.max(1.5,W*.006)); g.strokeRect(x,y,W,H);      // the outer line is the cut line
+}
+function drawTvFront(g,x,y,t,s){ drawScreenFront(g,x,y,t,s,"tv"); }
+function drawMonitorFront(g,x,y,t,s){ drawScreenFront(g,x,y,t,s,"monitor"); }
+// Computer: title + item #, navy "SERVICED BY A CERTIFIED COMPUTER TECHNICIAN", layaway | specs grid,
+// yellow Out the Door Price, logo / ! SALES TAX PAID ! / logo
+function drawComputerFront(g,x,y,t0,s){
+  const {W,H}=tagBox(s), t=elecText(t0,"computer"), l=layaway(t.price||0);
+  g.role("bg"); g.rect(x,y,W,H,C.white);
+  const R=[.13,.1,.1,.1,.1,.1,.1,.14,.13].map(v=>v*H), Y=[y]; R.forEach(h=>Y.push(Y[Y.length-1]+h));
+  const xB=x+W*.175, xC=x+W*.36, xD=x+W*.535, xE=x+W, ch=R[2];
+  g.rect(xD,y,xE-xD,R[0]+R[1],C.navy); g.rect(x,Y[7],W,R[7],C.yellow);
+  cellText(g,"eBanner","SERVICED BY A CERTIFIED",xD,y,xE-xD,R[0],R[0]*.5,C.yellow);
+  cellText(g,"eBanner","COMPUTER TECHNICIAN",xD,Y[1],xE-xD,R[1],R[1]*.62,C.yellow);
+  cellText(g,"eTitle",t.title,x,y,xD-x,R[0],R[0]*.75);
+  cellText(g,"eSpec",t.number||"",x,Y[1],xD-x,R[1],R[1]*.6);
+  cellText(g,"eLabel","Great Deals on Computers!",x,Y[2],xC-x,ch,ch*.5);
+  [["Layaway Price:",fmtC(l.total)],["Down:",fmtC(l.down)],["Monthly:",fmtC(l.monthly)],["OS",t.os]].forEach(([a,b],i)=>{ const ry=Y[3+i];
+    cellText(g,"eLabel",a,x,ry,xB-x,ch,ch*.48,null,i<3?"left":""); cellText(g,i<3?"eMoney":"eSpec",b,xB,ry,xC-xB,ch,ch*(i<3?.62:.5)); });
+  [["Model",t.modelLine],["CPU",t.cpu],["Storage",t.storage],["RAM",t.ram],["GPU",t.gpu]].forEach(([a,b],i)=>{ const ry=Y[2+i];
+    cellText(g,"eLabel",a,xC,ry,xD-xC,ch,ch*.56); cellText(g,"eSpec",b,xD,ry,xE-xD,ch,ch*.5); });
+  underText(g,"eLabel","Out the Door Price:",x,Y[7],xC-x,R[7],R[7]*.42);
+  cellText(g,"ePrice",fmtC(t.price),xC,Y[7],xE-xC,R[7],R[7]*.82);
+  drawLogo(g,x,Y[8],W*.13,R[8]); drawLogo(g,xE-W*.13,Y[8],W*.13,R[8]);
+  cellText(g,"eTax","! SALES TAX PAID !",x+W*.15,Y[8],W*.7,R[8],R[8]*.5,C_RED());
+  g.lw(Math.max(1,W*.004));
+  g.line(x,Y[1],xD,Y[1]); for(let i=2;i<=8;i++) g.line(x,Y[i],xE,Y[i]);
+  g.line(xD,y,xD,Y[7]); g.line(xC,Y[2],xC,Y[8]); g.line(xB,Y[3],xB,Y[7]);
+  g.lw(Math.max(1.5,W*.006)); g.strokeRect(x,y,W,H);
+}
+// Back: just the Bravo barcode label, in the middle (layaway is already on the front)
+function drawElecBack(g,x0,y0,t,s){
+  const m=(LAY.backMargin||0)*72, h=Math.min(1.05*72,s.H-2*m), y=y0+(s.H-h)/2;
+  g.role("bg"); g.rect(x0,y0,s.W,s.H,C.white);
+  if(t.label&&t.label.barcode) drawBarcodeLabel(g,x0+m,y,s.W-2*m,h,t);
+  else { g.role("label"); g.fitText(W_.barcode+" sticker",x0+s.W/2,y0+s.H/2,s.W*.5,8,C_HINT); }
+}
 const DESIGNS = {
-  tv:       {front:drawTvFront,       back:drawTvBack},
-  computer: {front:drawComputerFront, back:drawComputerBack},
-  monitor:  {front:drawMonitorFront,  back:drawMonitorBack},
+  tv:       {front:drawTvFront,       back:drawElecBack, fields:[["title","Title"],["specs","Line under title (blank = none)"]], def:t=>elecDefaults(t).tv},
+  monitor:  {front:drawMonitorFront,  back:drawElecBack, fields:[["title","Title"],["specs","Line under title"]], def:t=>elecDefaults(t).monitor},
+  computer: {front:drawComputerFront, back:drawElecBack, fields:[["title","Title"],["modelLine","Model"],["cpu","CPU"],["storage","Storage"],["ram","RAM"],["gpu","GPU"],["os","OS"]], def:t=>elecDefaults(t).computer},
 };
 const design=s=>DESIGNS[s&&s.design]||{};
 
@@ -1898,7 +2050,7 @@ function autoKind(t){
 }
 // General Merchandise: "Comes with" read from the whole description (bag, 2 batteries, charger...)
 const useAccessories=t=>{ if(kindOf(t.kind).extrasOnFront&&t.accessories) t.extras=t.accessories; };
-// categories with no tag format yet (Computer, Jewelry) start unchecked
+// categories with no tag format yet (Computer…, Jewelry) start unchecked, unless they matched a tag type (Laptop Computer -> Computers)
 const skipCat=t=>!!CONFIG.skipCategories&&new RegExp("^("+CONFIG.skipCategories+")","i").test(String(t.category||"").trim());
 // tags of one tag type, in report order
 const ofKind=(list,id)=>list.filter(t=>kindOf(t.kind).id===id);
@@ -1973,7 +2125,7 @@ async function handleFile(file){
   finally{ $("drop").classList.remove("busy"); $("dropBig").textContent="Drop Bravo report"; $("dropSmall").textContent="or click to pick it"; }
 }
 function loadLines(lines,quiet){
-  lastLines=lines; const list=TYPE.parse(lines); list.forEach(t=>{ t.kind=autoKind(t); if(skipCat(t)) t.include=false; useAccessories(t); });
+  lastLines=lines; const list=TYPE.parse(lines); list.forEach(t=>{ t.kind=autoKind(t); if(skipCat(t)&&t.kind===CONFIG.otherTagType) t.include=false; useAccessories(t); });
   tags=applyFixes(list); skips={}; $("q").value="";             // a tag type changed on the Edit panel is remembered by item #
   if(!tags.length){ $("emptyMsg").textContent="No items found in that file."; view(); return; }
   $("emptyMsg").textContent=""; view(); window.scrollTo({top:0}); if(!quiet) prawn("load",tags.map(t=>t.number||t.raw||""));
@@ -2002,11 +2154,13 @@ function settings(kindId){
 const obs=new IntersectionObserver(es=>es.forEach(e=>{ const c=e.target;
   if(e.isIntersecting) drawCard(c); else if(c._cv){ c._cv.remove(); c._cv=null; } }),{rootMargin:"600px"});
 let cardK=1;
+// tag types in the loaded report (all types if none): wide electronics tags only shrink the cards when they're loaded
+const usedKinds=()=>{ const u=kinds().filter(k=>tags.some(t=>kindOf(t.kind).id===k.id)); return u.length?u:kinds(); };
 const cards=()=>[...$("grid").querySelectorAll(".card")];
 function buildGrid(){
   const grid=$("grid"), q=$("q").value.trim().toLowerCase(), gw=grid.clientWidth||1100;
   // one scale for every size, so cards show their real size next to each other
-  const maxW=Math.max(...kinds().map(k=>settings(k.id).W)), cols=Math.max(1,Math.floor((gw+18)/(300+18)));
+  const maxW=Math.max(...usedKinds().map(k=>settings(k.id).W)), cols=Math.max(1,Math.floor((gw+18)/(300+18)));
   cardK=Math.floor((gw-18*(cols-1))/cols-1)/maxW; const k=cardK;
   cards().forEach(c=>obs.unobserve(c)); grid.innerHTML="";
   let shown=0;
@@ -2090,7 +2244,8 @@ function openEditor(i){
       <div class="kindrow">${kinds().map(x=>`<button class="chip${x.id===kd.id?" on":""}" data-kind="${esc(x.id)}">${esc(x.name)}</button>`).join("")}</div>
       ${(sm=>sm&&/^data:image/.test(sm.data)?`<div class="raw">New sample for ${esc(kd.name)}: the tag below gets rebuilt to match it</div><img class="edsample" src="${sm.data}" alt="">`:"")(needsDesign(kd)&&sampleOf(kd.id))}
       <div class="sides">${two?"<span>Front</span>":""}<canvas id="edFront"></canvas>${two?'<span>Back</span><canvas id="edBack"></canvas>':""}</div>
-      ${TYPE.fields.filter(x=>!(s.extrasFront&&x[0]==="caliber")).map(x=>f(x[0],s.extrasFront&&x[0]==="extras"?"Comes with":x[1],t[x[0]]||"")).join("")}
+      ${(D=>D.fields?D.fields.map(x=>f(x[0],x[1],t[x[0]]||D.def(t)[x[0]]||"")).join(""):   // electronics: their own boxes
+        TYPE.fields.filter(x=>!(s.extrasFront&&x[0]==="caliber")).map(x=>f(x[0],s.extrasFront&&x[0]==="extras"?"Comes with":x[1],t[x[0]]||"")).join(""))(design(s))}
       <div class="row2">${f("price","Price",t.price||"",1)}${f("cost","Cost",isFinite(t.cost)?t.cost:"",1)}</div>
       ${f("number","Item #",t.number||"")}
       ${t.category?`<div class="raw">Bravo category: ${esc(t.category)}</div>`:""}
@@ -2098,7 +2253,7 @@ function openEditor(i){
     </div>
     <div class="foot"><button class="btn" id="edInc"></button>${t.hand?'<button class="btn" id="edDel">Delete</button>':""}<button class="btn primary grow" id="edDone">Done</button></div>`);
   // preview scale: same for every tag type, so the drawer shows real relative size
-  const maxW=Math.max(...kinds().map(x=>settings(x.id).W)), maxH=Math.max(...kinds().map(x=>settings(x.id).H));
+  const maxW=Math.max(...usedKinds().map(x=>settings(x.id).W)), maxH=Math.max(...usedKinds().map(x=>settings(x.id).H));
   const k=Math.min(384/maxW,(two?200:300)/maxH);
   const draw=()=>{ paint($("edFront"),t,k,false); if(two) paint($("edBack"),t,k,true); };
   const inc=()=>{ $("edInc").textContent=t.include?"Skip":"Print"; };
