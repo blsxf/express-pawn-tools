@@ -7,7 +7,7 @@
 <script>
 // ---- self-update: checks the public mirror when online, keeps the newest build on this computer ----
 // Newer build saved earlier -> run that instead of this file. Add ?local to the address to skip it.
-var TT_BUILD=1795194449221;
+var TT_BUILD=1795196208376;
 (function(){
   var REMOTE="https://raw.githubusercontent.com/blsxf/express-pawn-tools/main/tagtool/", KEY="tagtool.update";
   function db(){ return new Promise(function(res,rej){ var r=indexedDB.open("tagtool",1);
@@ -963,7 +963,7 @@ const BRAND_MAP = {
 // brands that sometimes appear as the first word of the model (importer listed as maker)
 const MODEL_BRANDS = {"CANIK":"Canik"};
 const ACRONYMS = new Set(("MCX LT XD XDS XDM SKS BPS SXP MOS EZ TS FDE UFX BLK WSM LCP LCR RS RXM RXP II III IV VI M&P CC RF PA SA SC MC AR RR PG CF " +
-  "BMAG NATO ACP LR SF TP SP DA SAO DAO HD SBR SBS OD ODG FS LE PC CO2 SS CA EC EC9S XL XR CS USA TRP").split(" "));
+  "JBL KRK EVH ESP PRS MXR TCL AOC MSI DJI ASUS RCA BMAG NATO ACP LR SF TP SP DA SAO DAO HD SBR SBS OD ODG FS LE PC CO2 SS CA EC EC9S XL XR CS USA TRP").split(" "));
 const SMALL_TITLE = new Set(["HI","MAX","GUN","PRO","GEN","AIR","ONE","TAC","OPS","MAG","OF","IN","ON","TO","A","AN","OR","BY","FOR","AND","THE","WITH"]);
 
 function titleWord(w){
@@ -1092,8 +1092,16 @@ const ACCESSORIES = [
   ["POWER (?:CORDS?|SUPPLY|CABLES?)","Power Cord"],["HDMI(?: CABLES?| CORDS?)?","HDMI Cord"],["CORDS?","Cord"],["CABLES?","Cable","Cables"],["ADAPTERS?","Adapter","Adapters"],
   ["REMOTES?","Remote","Remotes"],["CONTROLLERS?","Controller","Controllers"],["HEADSETS?","Headset","Headsets"],
   ["JOY-?CONS?","Joy-Cons"],["GAMES?","Game","Games"],["DOCK","Dock"],
-  ["BLADES?","Blade","Blades"],["BITS?","Bit","Bits"],["HEADPHONES?","Headphones"],["STAND","Stand"],
+  ["BLADES?","Blade","Blades"],["BITS?","Bit","Bits"],["HEADPHONES?","Headphones"],["STANDS?","Stand","Stands"],
   ["MANUALS?","Manual"],["STRAPS?","Strap"],["KEYS?","Key","Keys"],["LENS(?:ES)?","Lens","Lenses"],
+  // shorthand staff type in Bravo (11-20-2026): W/PWR, W/1CONT/HOOKUPS, CHGR, ADPTR, FTSW...
+  ["PWR(?: CORDS?| SUPPLY| CABLES?| ADAPTER)?|POWER SUPPLY","Power Cord"],["HOOK-?UPS?","Cord","Cords"],
+  ["CONTS?|CTRLS?|CTRLRS?|CNTRLS?|CONTROLLRS?","Controller","Controllers"],["CHGRS?|CHRGRS?","Charger"],
+  ["ADPTRS?|ADPTS?","Adapter","Adapters"],["RMTS?","Remote","Remotes"],
+  ["GIG ?BAGS?","Gig Bag"],["FOOT ?SWITCH(?:ES)?|FTSW","Footswitch"],["PEDALS?","Pedal","Pedals"],
+  ["(?:TREM(?:OLO)?|WHAMMY) (?:ARM|BAR)","Tremolo Arm"],["CAPO","Capo"],["MICS?|MICROPHONES?","Mic","Mics"],
+  ["QUIVERS?","Quiver"],["BOLTS","Bolts"],["ARROWS","Arrows"],["BROADHEADS?","Broadheads"],["(?:ROPE )?COCK(?:ER|ING (?:DEVICE|ROPE|AID))|CRANK","Cocking Device"],
+  ["SCOPE RINGS|RINGS","Rings"],["TRIPOD","Tripod"],["MEMORY CARDS?|SD CARDS?","Memory Card"],["STYLUS|PENCIL","Stylus"],
 ];
 const NUMWORD={ONE:1,TWO:2,THREE:3,FOUR:4,FIVE:5,SIX:6};
 // Printed in this order every time, so tags read the same way: what makes it work first,
@@ -1144,13 +1152,13 @@ function parseAccessories(desc,model,category,price){
   const accRe="(?:"+ACCESSORIES.map(a=>a[0]).join("|")+")";
   const item=((m?d.slice(0,m.index):d)+" "+mo)           // what the item itself is (before W/, minus "NO CONTROLLER")
     .replace(new RegExp("(?:\\bNO|\\bW\\s*\\/\\s*O|\\bWITHOUT|\\bMISSING|\\bLESS)\\s+(?:\\S+\\s+)?"+accRe+"\\b","g")," ");
-  const out=[], gone=new Set(), re=new RegExp("(?:\\(?\\b(\\d+|"+Object.keys(NUMWORD).join("|")+")\\)?\\s*(?:X\\s*|-\\s*)?)?\\b("+ACCESSORIES.map(a=>"(?:"+a[0]+")").join("|")+")\\b","g");
-  let x; while((x=re.exec(d))){
+  const out=[], gone=new Set(), re=new RegExp("(?:\\(?\\b(\\d+|"+Object.keys(NUMWORD).join("|")+")\\)?\\s*(?:X\\s*|-\\s*)?)?(?:\\b|(?<=\\d))("+ACCESSORIES.map(a=>"(?:"+a[0]+")").join("|")+")\\b","g");
+  const con0=findConsole(item); let x; while((x=re.exec(d))){
     const a=ACCESSORIES.find(a=>new RegExp("^(?:"+a[0]+")$").test(x[2])); if(!a) continue;
     if(NOT_WITH.test(d.slice(0,x.index))){ gone.add(a[1]); continue; }
     if(m&&x.index<d.length-seg.length) continue;           // before W/: part of the item's name
     const n=x[1]?(NUMWORD[x[1]]||+x[1]):0;
-    out.push({name:a[1],n:n||1,text:n>1?n+" "+(a[2]||a[1]+"s"):a[1]});
+    out.push({name:a[1],n:n||1,text:n>1||(!n&&a[2]&&/[^S]S$/.test(x[2])&&!con0)?(n>1?n+" ":"")+(a[2]||a[1]+"s"):a[1]});   // "W/STANDS" -> Stands
   }
   let list=out;
   const con=findConsole(item);
@@ -1170,9 +1178,59 @@ function parseAccessories(desc,model,category,price){
   let texts=[...new Set(list.slice().sort((a,b)=>accRank(a.name)-accRank(b.name)).map(o=>o.text))];
   const pc=texts.indexOf("Power Cord"), hc=texts.indexOf("HDMI Cord");                  // shorter, reads better
   if(pc>=0&&hc>=0){ texts[pc]="Power & HDMI Cords"; texts.splice(hc,1); }
+  if(m){ const known=new RegExp("(?:\\b|(?<=\\d))"+accRe+"\\b");                            // W/ words not in the list yet: print them as typed
+    for(const e of (parseExtras(desc)||"").split(", ")) if(e&&!known.test(e.toUpperCase())&&!texts.includes(e)) texts.push(e); }
   if(tools>=2) texts.unshift(tools+"-Tool Kit");
+  else { const q=itemNotes(m?d.slice(0,m.index):d,mo); if(q) texts.unshift(q); }      // "Vintage 2-Piece Set"
   return texts.join(", ");
 }
+
+// ---- what the item itself is, read from the whole description (11-20-2026) ----
+// "2PC VINTAGE KUSTOM 2-10 SET" -> "Vintage 2-Piece Set". Reads only the item part (before W/), so a count on an
+// accessory ("W/2 MAGS") never counts. "2-10" / "4-12X40" / "2X10" are sizes, not counts; "PC" without a digit is a computer.
+// Skipped when Bravo's model already says it ("150PC SOCKET SET" model) so the tag never repeats itself.
+// Add words here as new items come in: [match, printed].
+const ITEM_WORDS=[
+  [/\bVINTAGE\b|\bVTG\b/,"Vintage"],[/\bANTIQUE\b/,"Antique"],[/\bNIB\b|\bNEW IN (?:THE )?BOX\b|\bBRAND NEW\b/,"New in Box"],
+  [/\b(?:FACTORY )?SEALED\b/,"Sealed"],[/\bOPEN[- ]BOX\b/,"Open Box"],[/\bREFURB(?:ISHED)?\b/,"Refurbished"],
+  [/\bLEFT[- ]?HAND(?:ED)?\b|\bLEFTY\b|\bLH\b/,"Left-Handed"],[/\bLIMITED EDITION\b|\bLTD ED(?:ITION|\.)?\b/,"Limited Edition"],
+  [/\bSIGNED\b|\bAUTOGRAPHED\b/,"Signed"],[/\bCUSTOM SHOP\b/,"Custom Shop"],[/\bMADE IN (?:THE )?USA\b|\bUSA MADE\b/,"Made in USA"],
+  [/\bMADE IN JAPAN\b|\bMIJ\b/,"Made in Japan"],[/\bMADE IN MEXICO\b|\bMIM\b/,"Made in Mexico"],
+];
+const NWORD={TWO:2,THREE:3,FOUR:4,FIVE:5,SIX:6,SEVEN:7,EIGHT:8,TEN:10,TWELVE:12};
+function itemCount(s){
+  const n=v=>NWORD[v]||+v, N="(\\d{1,3}|"+Object.keys(NWORD).join("|")+")"; let x;
+  // 2PC, 2 PC, 3-PIECE: only with SET / KIT / LOT / PAIR too ("2PC UGLY STIK ROD" is one rod, "WINDOWS 11 PC" a computer)
+  if(/\b(?:SET|KIT|LOT|COMBO|PAIR)\b/.test(s)&&(x=s.match(new RegExp("\\b"+N+"\\s*-?\\s*(?:PC|PCS|PIECES?)\\b")))) return {n:n(x[1]),kind:"set"};
+  if((x=s.match(new RegExp("\\bSET OF "+N+"\\b"))))                            return {n:n(x[1]),kind:"set"};
+  if((x=s.match(new RegExp("\\b"+N+"\\s*-?\\s*(?:PACK|PK)\\b"))))           return {n:n(x[1]),kind:"pack"};  // 6PK, 12-PACK
+  if((x=s.match(/\bQTY\.?\s*:?\s*(\d{1,3})\b|\((\d{1,2})\)\s*[A-Z]/)))         return {n:+(x[1]||x[2]),kind:"qty"};  // QTY 2, (2) SPEAKERS
+  if((x=s.match(/^\s*(\d{1,2})\s*X\s+[A-Z]/)))                                  return {n:+x[1],kind:"qty"};       // "2 X KUSTOM ..." (not 2X10)
+  if(/\bPAIR\b|\bPR OF\b|\(PR\)/.test(s))                                     return {n:2,kind:"pair"};
+  return null;
+}
+function itemNotes(item,model){
+  const s=" "+String(item||"").toUpperCase().replace(/…|\.\.\.$/g,"")+" ", mo=" "+String(model||"").toUpperCase()+" ";
+  const words=ITEM_WORDS.filter(([re])=>re.test(s)&&!re.test(mo)).map(w=>w[1]);
+  const c=itemCount(s), had=c&&itemCount(mo);
+  let set="";
+  if(c&&c.n>=2&&!(had&&had.n===c.n))
+    set=c.kind==="pair"?"Pair":c.kind==="pack"?c.n+"-Pack":c.kind==="qty"?"Set of "+c.n:c.n+"-Piece Set";
+  const out=set?[words.concat(set).join(" ")]:words.slice();
+  // specs the buyer knows the gear by, when Bravo's model left them out ("CABELAS INTENSITY 4-12X40" -> "4-12x40")
+  const flat=v=>v.replace(/\s+/g,"").replace(/WATTS?\b/g,"W"), fm=flat(mo);
+  for(const [re,f] of ITEM_SPECS){ const x=s.match(re); if(!x) continue; const v=f(x); if(!fm.includes(flat(v.toUpperCase()))&&!out.includes(v)) out.push(v); }
+  return out.join(", ");
+}
+// Specs and grades experts look for (11-20-2026). The tag shows them when the description has them and the model doesn't.
+const ITEM_SPECS=[
+  [/\b(\d{1,2}(?:\.\d)?(?:-\d{1,2}(?:\.\d)?)?)\s?X\s?(\d{2})(?:\s?MM)?\b/,x=>x[1]+"x"+x[2]],   // scope 4-12x40, cab 2x10
+  [/\b(\d{1,4})\s?(?:W|WATTS?)\b/,x=>x[1]+"W"],[/\b(\d{1,4})\s?(GB|TB)\b/,x=>x[1]+x[2]],
+  [/\bSTD\b|\bSTANDARD\b/,()=>"Standard"],[/\bDLX\b|\bDELUXE\b/,()=>"Deluxe"],[/\bA\/E\b|\bACOUSTIC[- ]ELECTRIC\b/,()=>"Acoustic-Electric"],
+  [/\b12[- ]?STRING\b/,()=>"12-String"],[/\b(?:ALL[- ])?TUBE\b/,()=>"Tube"],[/\bSOLID[- ]?STATE\b/,()=>"Solid State"],
+  [/\bILLUM(?:INATED)?\b/,()=>"Illuminated"],[/\bFFP\b|\bFIRST FOCAL\b/,()=>"First Focal Plane"],[/\bZERO STOP\b/,()=>"Zero Stop"],
+  [/\bBRUSHLESS\b/,()=>"Brushless"],[/\bWIRELESS\b/,()=>"Wireless"],[/\bBLUETOOTH\b/,()=>"Bluetooth"],
+];
 
 // rows: [{cells:[{x,w,str}], page}] sorted; returns raw records.
 // Works with the old "Custom" report and the newer one with Category / Description columns,
@@ -1258,6 +1316,9 @@ function toTag(r){
   for(const [re,name] of FINISHES){ if(re.test(model)){ finish=finish||name; model=model.replace(re," ").replace(/\s+/g," ").trim(); } }
   // 2) drop a bare gauge number repeated in the model ("A300 Ultima 12" when caliber is 12 Gauge)
   const g=caliber.match(/^(\d+) Gauge$/); if(g) model=model.replace(new RegExp("(^|\\s)"+g[1]+"(?=\\s|$)"),"$1").replace(/\s+/g," ").trim();
+  // 2b) catalog-style model ("Xbox Series S - Console - 1TB - 1883"): drop the category word and the part number
+  if(/\s-\s(?:Video\s+)?(?:Game\s+)?(?:Console|System|Gaming Console)(?=\s-\s|$)/i.test(model))
+    model=model.replace(/\s-\s(?:Video\s+)?(?:Game\s+)?(?:Console|System|Gaming Console)(?=\s-\s|$)/i,"").replace(/\s-\s\d{4}$/,"").replace(/\s-\s/g," ").trim();
   // 3) known model-name corrections
   for(const f of MODEL_FIXES){ if((!f.brand||f.brand.test(brand)) && f.model.test(model)){ model=model.replace(f.model,f.to).trim(); if(f.brandTo) brand=f.brandTo; } }
   return {include:true, brand, model, caliber, extras:parseExtras(r.desc), accessories:parseAccessories(r.desc,r.mfr+" "+r.model,r.category,r.price), finish, category:r.category||"", price:r.price, cost:r.cost, number:r.number, label:r.label, ...specsOf(r),
@@ -1689,13 +1750,14 @@ function drawGunBack(g,x0,y0,t,s0){
   // sticker spot: from the tag's own bottom edge (the sticker goes on by hand after cutting)
   const zone=Math.min(LAY.barcodeH*72-m,H*.5);
   const lw=Math.max(1.5,s0.W*.009), xa=x0-BL, xb=x0+s0.W+BL, K=[0,0,0];
-  const top=y0, BT=.04*72;
+  // 11-20-2026: no navy above the top edge (it showed as a blue strip on the bottom of the tag above when cut)
+  const top=y0, BT=0;
   // shares are of the old panel (top white edge included); the height freed at the top goes to the yellow total
   const pH=(y+H-zone-Math.max(3,4*k))-top-lw, F=BACK_PANEL, U=(pH-m)/(F.band+F.total+F.row+F.extras);
   const hb=F.band*U, ht=F.total*U+m, hr=F.row*U, he=F.extras*U;
   const yt=top+hb, yr=yt+ht, ye=yr+hr+lw/2, yEnd=ye+he;
   // header: navy, edge to edge, white letters with a black outline
-  g.role("bleed"); g.rect(xa,top-BT,xb-xa,hb+BT,C.navy); g.rect(xa,top-lw/2,xb-xa,lw,K);
+  g.role("bleed"); g.rect(xa,top-BT,xb-xa,hb+BT,C.navy); g.rect(xa,top,xb-xa,lw/2,K);
   g.role("band"); g.fitText(W_.layaway,cx,top+hb/2+1,W-2*pad-hb*.12,Math.min(hb*.7,hb*.6*B),C.white,{k:.075,col:K});
   // layaway total: full-width yellow band, black rules under the navy and yellow bands
   const p=Math.max(3,5*k), by=yt, bh=ht-p*.7;
@@ -1718,7 +1780,7 @@ function drawGunBack(g,x0,y0,t,s0){
       g.fitText(a,cx,ye+he*.3,ew,sz); g.fitText(b,cx,ye+he*.7,ew,sz); } }
   // bottom: the shop's barcode label, printed (11-20-2026). No Bravo barcode (hand-added tag) = spot for the sticker.
   const yz=y+H-zone;
-  if(t.label&&t.label.barcode) drawBarcodeLabel(g,x,yz+Math.max(3,4*k),W,y0+s0.H-m*.5-(yz+Math.max(3,4*k)),t);
+  if(t.label&&t.label.barcode) drawBarcodeLabel(g,x,yz+Math.max(3,4*k),W,y0+s0.H-m-(yz+Math.max(3,4*k)),t);   // full white edge under it (11-20-2026)
   else { g.role("label"); g.fitText(W_.barcode+" sticker",cx,yz+(zone+m)/2,W*.6,8,C_HINT); }
 }
 
