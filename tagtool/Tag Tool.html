@@ -7,7 +7,7 @@
 <script>
 // ---- self-update: checks the public mirror when online, keeps the newest build on this computer ----
 // Newer build saved earlier -> run that instead of this file. Add ?local to the address to skip it.
-var TT_BUILD=1795142516010;
+var TT_BUILD=1795180923108;
 (function(){
   var REMOTE="https://raw.githubusercontent.com/blsxf/express-pawn-tools/main/tagtool/", KEY="tagtool.update";
   function db(){ return new Promise(function(res,rej){ var r=indexedDB.open("tagtool",1);
@@ -2758,7 +2758,7 @@ var PRAWN=(function(){
     if(S.cr.candy<cost||c.lv>=cap()) return; S.cr.candy-=cost; critXp(c,needXp(c.lv)-c.xp); G.touch(); }
   function togglePartyMember(id){ const P=G.S.cr.party, i=P.indexOf(id); if(i>=0) P.splice(i,1); else if(P.length<slots()) P.push(id); G.touch(); }
 
-  // ---- dives: the party auto-battles down, 10 critters per depth, a boss every 5 depths ----
+  // ---- dives: the crew auto-resolves down, 10 critters per depth, a big one every 5 depths ----
   const ztype=d=>Math.floor((d-1)/5)%4;
   const isBoss=(d,cell)=>d%D.bossEvery===0&&cell===D.cells-1;
   const eHp=(d,cell)=>D.hp*Math.pow(D.hpGrow,d-1)*(isBoss(d,cell)?D.bossHp:1);
@@ -2949,7 +2949,7 @@ var PRAWN=(function(){
       if(id==="burrow"&&!S.stall){ g.fillStyle="#e2c27a"; for(let i=0;i<5;i++){ const q=(t*3+i/5)%1; g.beginPath(); g.arc(px+V.dir*30+Math.sin(i*9)*q*25,py+30-q*25,2.5,0,7); g.fill(); } }
       if(id==="forage"){ g.fillStyle="#b8ffb0"; for(let i=0;i<9;i++){ g.beginPath(); g.arc((i*57+t*12)%480,60+((i*37)%170)+Math.sin(t+i)*6,2,0,7); g.fill(); } }
       if((id==="cook"||id==="craft")&&!S.stall){ g.font="28px serif"; g.fillText(id==="cook"?"🍳":"🏰",px+V.dir*50-14,py+20); }
-      // party critters trail behind
+      // crew critters trail behind
       const P=S.dive.on?[]:G.party(); while(V.cr.length<P.length) V.cr.push({x:px,y:py}); V.cr.length=P.length;
       P.forEach((c,i)=>{ const q=V.cr[i], gx=px-V.dir*(60+i*34), gy=py+18+Math.sin(t*2+i)*10; q.x+=(gx-q.x)*Math.min(1,dt*2); q.y+=(gy-q.y)*Math.min(1,dt*2);
         g.font="24px serif"; g.textAlign="center"; g.fillText(G.form(c)[0],q.x,q.y); if(c.shiny){ g.font="11px serif"; g.fillText("✨",q.x+12,q.y-14); } g.textAlign="left"; });
@@ -3116,7 +3116,7 @@ var PRAWN=(function(){
 </script>
 <script>
 // ---------- PRAWN: pixel art (every sprite is drawn here in code, plus a pixel font) ----------
-// make(w,h,fn,outline) paints into a tiny pixel buffer and returns a canvas; the game scales it up
+// make(w,h,fn,outline) paints into a tiny pixel buffer and returns a canvas; the panel scales it up
 // by whole numbers with smoothing off, so everything stays crisp.
 var TIDEART=(function(){
   const rgb=c=>[parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16)];
@@ -3242,6 +3242,8 @@ var TIDEART=(function(){
       A.l(8,10,4,3,"#ff7fae"); A.l(8,10,12,4,"#ff7fae"); A.l(8,10,8,2,"#ff7fae"); A.p(4,3,"#ffb3cf"); A.p(12,4,"#ffb3cf"); A.p(8,2,"#ffb3cf"); });
     else if(ch==="C") cv=make(16,16,A=>{ A.r(0,0,16,16,"#e8f7fa"); A.r(0,3,16,12,"#ffffff"); A.r(0,3,16,2,"#ff9ec4"); A.r(0,13,16,2,"#e5d8ea"); A.p(7,8,"#ff9ec4"); A.p(8,8,"#ff9ec4"); });
     else if(ch==="~") cv=make(16,16,A=>{ A.r(0,0,16,16,"#3f9fe8"); A.p((v*5+f*3)%16,4,"#7cc8ff"); A.p((v*3+8+f*2)%16,11,"#7cc8ff"); });
+    else if(ch==="V") cv=make(16,16,A=>{ sandBase(A,v,1); const C=["#ff6fb5","#ffcf3d","#7be0ff","#b98cff"];   // the Tidegate swirl (Lantern Deep)
+      for(let r=7;r>=1;r--) for(let a=0;a<6.3;a+=.18){ const aa=a+r*.55+f*.8; A.p(8+Math.cos(aa)*r,8+Math.sin(aa)*r*.8,C[(r+f)%4]); } A.e(8,8,1.5,1.2,"#ffffff"); });
     else cv=make(16,16,A=>A.r(0,0,16,16,"#ff00ff"));
     return TILE[k]=cv; }
 
@@ -3290,7 +3292,7 @@ var TIDEART=(function(){
 
   // ---------- characters (16x16, overworld) ----------
   // prawn(dir,frame,opt): dir 0 down 1 up 2 left 3 right
-  // the hero is a young cleaner shrimp: coral red with a white back stripe and long white feelers
+  // the main sprite is a young cleaner shrimp: coral red with a white back stripe and long white feelers
   function prawnSpr(dir,fr,o){ o=o||{}; const C=o.c||"#ff5a4f", BL=o.belly||"#ffd2bd", AN=o.ant||"#ffffff", ST=o.stripe===undefined?"#ffffff":o.stripe;
     const bob=fr?1:0;
     const cv=make(16,16,A=>{
@@ -3369,7 +3371,7 @@ var TIDEART=(function(){
   function npc(kind,opt){ const k=kind+JSON.stringify(opt||{}); return CCACHE[k]||(CCACHE[k]=NPCDRAW[kind](opt||{})); }
   function hero(dir,fr,gold){ const k="hero"+dir+fr+(gold?"g":""); return CCACHE[k]||(CCACHE[k]=prawnSpr(dir,fr,gold?{c:"#ffb13b",ant:"#fff4b0",stripe:"#fff4b0"}:null)); }
 
-  // ---------- critters (48x48 battle sprites) ----------
+  // ---------- critters (48x48 sprites) ----------
   const CRIT={
     bubblet:A=>{ // pink pygmy seahorse: bumpy, round, with a bubble crest and a yellow fin
       const C="#ff8fc0";
@@ -3434,6 +3436,36 @@ var TIDEART=(function(){
       A.eye(33,13,3); A.blush(37,20); A.p(47,19,"#6a9a2a");
       for(let x=17;x<30;x+=3) A.p(x,23,"#e8ff9a"); }
   };
+  // ---------- molted forms: the base critter, hue-shifted, with its new look on top ----------
+  function hue(c,deg){ let [r,g,b]=rgb(c).map(v=>v/255); const mx=Math.max(r,g,b), mn=Math.min(r,g,b), l=(mx+mn)/2; let h=0, s=0;
+    if(mx!==mn){ const d=mx-mn; s=l>.5?d/(2-mx-mn):d/(mx+mn); h=mx===r?(g-b)/d+(g<b?6:0):mx===g?(b-r)/d+2:(r-g)/d+4; h/=6; }
+    h=(h+deg/360+1)%1; const f=(p,q,t)=>{ t=(t+1)%1; return t<1/6?p+(q-p)*6*t:t<.5?q:t<2/3?p+(q-p)*(2/3-t)*6:p; };
+    if(!s) return c; const q=l<.5?l*(1+s):l+s-l*s, p=2*l-q; return toHex([f(p,q,h+1/3),f(p,q,h),f(p,q,h-1/3)].map(v=>v*255)); }
+  const molt=(base,deg,extra)=>A=>{ CRIT[base](A);
+    if(deg) for(let y=0;y<48;y++) for(let x=0;x<48;x++){ const c=A.g(x,y); if(c&&c!==INK&&c!=="#ffffff") A.p(x,y,hue(c,deg)); }
+    extra(A); };
+  const onBody=(A,x,y,w,h,c)=>{ for(let j=0;j<h;j++) for(let i=0;i<w;i++) if(A.g(x+i,y+j)) A.p(x+i,y+j,c); };   // paint only over the critter
+  const GOLD="#ffd84d";
+  Object.assign(CRIT,{
+    effervessa:molt("bubblet",25,A=>{ A.r(18,4,13,3,GOLD); A.p(18,2,GOLD); A.p(18,3,GOLD); A.p(24,1,GOLD); A.r(24,2,1,2,GOLD); A.p(30,2,GOLD); A.p(30,3,GOLD); A.p(24,5,"#ff4f8f");
+      [[40,6,2],[8,12,2.4],[42,30,1.6],[6,24,1.6]].forEach(([x,y,r])=>{ A.e(x,y,r,r,"#e8fbff"); A.p(x-1,y-1,"#ffffff"); }); }),
+    frillustra:molt("frillip",-40,A=>{ for(let i=0;i<6;i++){ const x=10+i*4.4; A.b(x,20-(i%2)*2,2.6,3.4,i%2?"#ff7ad9":"#b98cff",false); }
+      A.r(35,22,8,2,GOLD); A.p(36,21,GOLD); A.p(39,20,"#ff4f8f"); A.p(42,21,GOLD); }),
+    flarefin:molt("cindrop",-15,A=>{ A.b(25,5,4,5,"#ffd84d"); A.p(25,1,"#fff4b0"); A.b(19,8,2.4,4,"#ff9a3b"); A.b(31,9,2.4,4,"#ff9a3b");
+      A.r(18,23,7,4,INK); A.r(26,23,7,4,INK); A.r(25,24,1,1,INK); A.p(19,23,"#7be0ff"); A.p(27,23,"#7be0ff"); }),
+    snapmansion:molt("snipsnap",15,A=>{ [[11,15],[20,11],[13,25]].forEach(([x,y])=>{ A.r(x,y,5,5,"#5d3a24"); A.r(x+1,y+1,3,3,"#bff2ff"); A.p(x+2,y+1,"#5d3a24"); });
+      A.r(22,27,5,7,"#8a5a37"); A.p(25,30,GOLD); A.r(8,3,4,7,"#c94a4a"); A.e(9,1,2,1.4,"#e8e8f0");
+      A.r(30,13,12,2,INK); A.r(32,5,8,8,INK); A.r(32,11,8,1,"#ff4f8f"); }),
+    puffbrawl:molt("pufflo",-20,A=>{ A.b(6,31,4.6,4.6,"#ff3b4f"); A.b(42,31,4.6,4.6,"#ff3b4f"); A.p(4,29,"#ff9aa6"); A.p(40,29,"#ff9aa6");
+      onBody(A,8,13,32,2,"#ff3b4f"); A.l(38,13,44,9,"#ff3b4f"); A.l(38,14,44,11,"#ff3b4f"); }),
+    plumoir:molt("plumo",10,A=>{ A.l(34,40,42,30,INK); A.l(35,40,43,30,INK); A.r(42,28,3,3,"#ffffff");   // magic wand + sparkles
+      [[44,22],[38,20],[8,14],[40,12]].forEach(([x,y])=>{ A.p(x,y,GOLD); A.p(x-1,y,GOLD); A.p(x+1,y,GOLD); A.p(x,y-1,GOLD); A.p(x,y+1,GOLD); }); }),
+    stellarm:molt("starlet",40,A=>{ A.r(19,9,11,1,"#d9d9e6"); A.e(24,7,3,3,"#e8f0ff"); A.e(24,7,1.6,1.6,"#9fc9ff"); A.r(23,31,3,8,"#ff4f6d"); A.r(20,33,9,3,"#ff4f6d"); }),
+    jelloquent:molt("jellum",-30,A=>{ A.e(20,27,2.8,2,"#ff4f8f"); A.e(28,27,2.8,2,"#ff4f8f"); A.r(23,26,2,3,"#d93a72");
+      A.l(36,30,40,38,"#9aa6bd"); A.l(37,30,41,38,"#9aa6bd"); A.b(37,27,3.2,3.2,"#4b3f66",false); A.p(36,26,"#9aa6bd"); }),
+    kelpshade:molt("fronda",-30,A=>{ onBody(A,27,11,16,3,"#2a1a2e"); A.p(33,12,"#ffffff"); A.r(32,12,3,2,"#ffffff"); A.p(33,12,INK);
+      A.l(26,12,19,9,"#2a1a2e"); A.l(26,13,20,14,"#2a1a2e"); [[12,15],[40,36],[6,40]].forEach(([x,y],i)=>A.b(x,y,3,2.4,i%2?"#4fcf6e":"#3fbf62",false)); })
+  });
   const SCACHE={};
   function critter(id,shiny){ const k=id+(shiny?"*":""); if(SCACHE[k]) return SCACHE[k];
     const cv=make(48,48,CRIT[id],true); SCACHE[k]=cv; SCACHE[k+"<"]=flip(cv); return cv; }
@@ -3441,14 +3473,14 @@ var TIDEART=(function(){
   function icon(id){ const k="i"+id; if(SCACHE[k]) return SCACHE[k];
     const s=critter(id), o=document.createElement("canvas"); o.width=24; o.height=24; const g=o.getContext("2d"); g.imageSmoothingEnabled=false; g.drawImage(s,0,0,24,24); return SCACHE[k]=o; }
 
-  return {make,flip,mix,dk,lt,text,textW,wrap,tile,building,npc,hero,critter,critterBack,icon,INK};
+  return {make,flip,mix,dk,lt,text,textW,wrap,tile,building,npc,hero,critter,critterBack,icon,INK,prawn:prawnSpr};
 })();
 
 </script>
 <script>
-// ---------- PRAWN: game data (types, critters, moves, maps, story) ----------
-// Story events are async functions that get the engine API E (say/ask/battle/give/flag...).
-// Text tokens: {P} player name, {R} rival name.
+// ---------- PRAWN panel data (types, critters, moves, maps, scripts) ----------
+// Script events are async functions that get the engine API E (say/ask/battle/give/flag...).
+// Text tokens: {P} user's chosen name, {R} rival name.
 var TIDEDATA=(function(){
   // ---- types: Tide > Vent > Kelp > Tide; Shell critters are tough but weak to Kelp ----
   const TYPES={
@@ -3470,10 +3502,18 @@ var TIDEDATA=(function(){
     ember:{n:"Ember Puff",t:"vent",p:40,a:100},
     steam:{n:"Steam Spout",t:"vent",p:55,a:95},
     stare:{n:"Cute Stare",t:"shell",p:0,a:100,fx:"foeAtk-"},
-    curl:{n:"Curl Up",t:"shell",p:0,a:100,fx:"selfDef+"}
+    curl:{n:"Curl Up",t:"shell",p:0,a:100,fx:"selfDef+"},
+    // evolved forms learn these
+    crash:{n:"Riptide Crash",t:"tide",p:75,a:95}, abyss:{n:"Abyss Wave",t:"tide",p:90,a:85},
+    lash:{n:"Kelp Lash",t:"kelp",p:75,a:95}, bloom:{n:"Kelp Bloom",t:"kelp",p:90,a:85},
+    gush:{n:"Magma Gush",t:"vent",p:75,a:95}, plume:{n:"Scald Plume",t:"vent",p:90,a:85},
+    crush:{n:"Carapace Crush",t:"shell",p:75,a:95}, quake:{n:"Seabed Quake",t:"shell",p:90,a:85}
   };
 
   // b:[hp,atk,def,spd]  learn:[[level,move]]  rate: how easily it befriends (0..1)  xp: base exp
+  // evo:{to,lv}: molts into that form at that level. The same molt also happens through Lantern Deep's
+  // Molt Rite (src/deep*.js), where each form is a class: base form = first class, molted form = second.
+  const EVO_LV=16;
   const SPECIES={
     bubblet:{n:"Bubblet",t:"tide",b:[45,49,48,55],learn:[[1,"nibble"],[1,"stare"],[6,"splash"],[10,"burst"]],rate:.3,xp:64,
       d:"The pygmy seahorse. It blows a fresh bubble crest every morning."},
@@ -3492,8 +3532,29 @@ var TIDEDATA=(function(){
     jellum:{n:"Jellum",t:"tide",b:[42,52,38,58],learn:[[1,"sting"],[5,"stare"]],rate:.35,xp:56,
       d:"A drifting jellyfish. It goes wherever the current is going."},
     fronda:{n:"Fronda",t:"kelp",b:[46,46,48,46],learn:[[1,"whip"],[5,"stare"]],rate:.5,xp:52,
-      d:"A leafy sea dragon. It hides among the seaweed by looking like seaweed."}
+      d:"A leafy sea dragon. It hides among the seaweed by looking like seaweed."},
+    // molted forms
+    effervessa:{n:"Effervessa",t:"tide",b:[62,60,62,72],learn:[[16,"crash"],[28,"abyss"]],rate:.1,xp:150,
+      d:"A seahorse with a crown of champagne bubbles. It rates every current out of ten."},
+    frillustra:{n:"Frillustra",t:"kelp",b:[66,60,70,58],learn:[[16,"lash"],[28,"bloom"]],rate:.1,xp:150,
+      d:"A towering sea slug in a frill gown. Nobody has ever finished a bite of it."},
+    flarefin:{n:"Flarefin",t:"vent",b:[58,72,54,78],learn:[[16,"gush"],[28,"plume"]],rate:.1,xp:150,
+      d:"It cheers so hard its fins catch fire. The sunglasses keep its own glow out of its eyes."},
+    snapmansion:{n:"Snapmansion",t:"shell",b:[60,64,84,40],learn:[[16,"crush"],[28,"quake"]],rate:.1,xp:140,
+      d:"A hermit crab that finally found the fanciest shell: a three-floor house with a chimney."},
+    puffbrawl:{n:"Puffbrawl",t:"tide",b:[74,62,62,48],learn:[[16,"crash"],[24,"bash"]],rate:.15,xp:130,
+      d:"It inflates, throws a punch, and forgets why. The punch still lands."},
+    plumoir:{n:"Plumoir",t:"vent",b:[54,66,54,64],learn:[[16,"gush"],[28,"plume"]],rate:.12,xp:135,
+      d:"A tube worm with a magic wand. Its plumes vanish and reappear somewhere else entirely."},
+    stellarm:{n:"Stellarm",t:"shell",b:[64,62,70,66],learn:[[16,"crush"],[28,"quake"]],rate:.1,xp:145,
+      d:"A starfish that grew a spare arm for every friend. It lends them out freely."},
+    jelloquent:{n:"Jelloquent",t:"tide",b:[58,70,52,74],learn:[[16,"crash"],[28,"abyss"]],rate:.1,xp:145,
+      d:"A jellyfish with a voice like warm current. It sings wherever the tide takes it."},
+    kelpshade:{n:"Kelpshade",t:"kelp",b:[62,62,64,64],learn:[[16,"lash"],[28,"bloom"]],rate:.12,xp:140,
+      d:"So good at looking like seaweed that other seaweed asks it for directions."}
   };
+  [["bubblet","effervessa"],["frillip","frillustra"],["cindrop","flarefin"],["snipsnap","snapmansion"],["pufflo","puffbrawl"],
+   ["plumo","plumoir"],["starlet","stellarm"],["jellum","jelloquent"],["fronda","kelpshade"]].forEach(([a,b])=>{ SPECIES[a].evo={to:b,lv:EVO_LV}; SPECIES[b].from=a; });
   const STARTERS=["bubblet","frillip","cindrop"];
   const COUNTER={bubblet:"frillip",frillip:"cindrop",cindrop:"bubblet"};   // rival picks the one strong against yours
 
@@ -3529,12 +3590,12 @@ var TIDEDATA=(function(){
       "T..b..m..,,..oo..w.T",
       "T.##..s..,,.....##.T",
       "Tw##.k...,,..f.m##uT",
-      "TTTTTTTTTTTTTTTTTTTT"],
+      "TTTTTTTTTVVTTTTTTTTT"],
       bld:[{k:"home",x:2,y:5,w:4,h:3,doors:[[3,7]],to:["home",3,6,1]},{k:"lab",x:13,y:5,w:5,h:3,doors:[[15,7]],to:["lab",5,7,1]}],
       warps:[[9,0,"route",9,20,1],[10,0,"route",10,20,1]],
       npcs:[{id:"shelly",kind:"snail",x:12,y:2,dir:2,ev:"shelly"},{id:"kidtip",kind:"goby",x:6,y:11,dir:0,ev:"kidtip"},
         {id:"crate",kind:"crate",x:6,y:7,ev:"crate"},{id:"tsign",kind:"sign",x:8,y:9,ev:"townSign"}],
-      trig:[[9,1,"block"],[10,1,"block"]]},
+      trig:[[9,1,"block"],[10,1,"block"],[9,15,"gate"],[10,15,"gate"]]},   // V: the Tidegate to Lantern Deep (src/deep*.js)
     route:{name:"Seagrass Path",out:1,rows:[
       "TTTTTTTTT,,TTTTTTTTT",
       "Tu.......,,......kwT",
@@ -3648,7 +3709,7 @@ var TIDEDATA=(function(){
         {id:"brine",kind:"elder",x:5,y:2,dir:0,ev:"elder"}]}
   };
 
-  // ---------- story events ----------
+  // ---------- script events ----------
   const R="Kip";
   const EV={
     async intro(E){
@@ -3682,6 +3743,7 @@ var TIDEDATA=(function(){
     async worry(E){ await E.say(E.f("badge1")?"You beat Elder Brine? Maybe you could stop Team Trawl someday...":
         "Have you seen those crabs wearing nets? Team Trawl! They want to scoop up every critter in the reef.","GRANNY SNAIL"); },
     async crate(E){ await E.crate(); },
+    async gate(E){ await E.deep(); },
     async tank(E){ if(!(await E.yes("Your pet shrimp's tank! It keeps busy while you're out exploring. Check on it?"))) return;
       if(!(await E.pet())) await E.say("The tank's lid is stuck. Try again later!"); },
     async prof(E){
@@ -3753,16 +3815,950 @@ var TIDEDATA=(function(){
     }
   };
 
-  return {TYPES,CHART,eff,MOVES,SPECIES,STARTERS,ITEMS,PERKS,MAPS,EV,RIVAL:R};
+  return {TYPES,CHART,eff,MOVES,SPECIES,STARTERS,ITEMS,PERKS,MAPS,EV,RIVAL:R,EVO_LV,TEAM_MAX:4};
+})();
+
+</script>
+<script>
+// ---------- Lantern Deep panel data: classes, gear, items, skills, foes, maps, scripts, art (engine: src/deep.js) ----------
+// Reached through the Tidegate at the south end of Tidepool Town. The party is the PRAWN team (1-4 critters).
+// Each critter line is a class here: base form = first class, molted form (tide-data.js evo) = second class.
+// Level and XP are shared with PRAWN (tide.js growMon); HP, MP, gear and bought skills live in critter.dp.
+var DEEPDATA=(function(){
+  const A=TIDEART, make=A.make, dk=A.dk, lt=A.lt, INK=A.INK;
+
+  // ---------- classes: growth [base, per level]; hits = levels per extra hit; sk [level, skill] ----------
+  const CLS={
+    somm:{n:["Bubble Sommelier","Grand Fizzmaster"],d:"Tastes every bubble it blows and describes foes as 'oaky, with notes of fear'.",
+      hp:[14,4],mp:[8,2.4],str:[3,.7],agi:[6,1],int:[10,2.2],hits:99,wpn:["staff"],arm:["light","robe"],
+      sk:[[1,"uncork"],[8,"breathe"],[12,"spray"],[16,"geyser"]],perk:"Its tide skills hit 20% harder."},
+    frill:{n:["Etiquette Slug","Duchess of Distaste"],d:"Its frills warn everyone it tastes awful. It considers this a social grace.",
+      hp:[16,4.6],mp:[7,2],str:[4,.9],agi:[5,.9],int:[9,2],hits:99,wpn:["whip","staff"],arm:["light","robe"],
+      sk:[[1,"warn"],[6,"rude"],[9,"poultice"],[16,"glare"]],perk:"Foes that bite it may get poisoned."},
+    raver:{n:["Hype Fish","Supernova Spirit Captain"],d:"Its swirls glow when it's happy, and it is always, aggressively happy. Cheers at foes until they give up.",
+      hp:[18,5],mp:[5,1.2],str:[6,1.4],agi:[10,2],int:[3,.6],hits:5,wpn:["glow","blade"],arm:["light"],
+      sk:[[1,"jab"],[7,"strobe"],[11,"danceoff"],[16,"lava"]],perk:"Lands lucky hits and dodges more."},
+    landlord:{n:["Shell Landlord","Shell Estate Tycoon"],d:"Swaps into fancier shells whenever it can, and charges everyone else rent.",
+      hp:[24,7],mp:[4,.8],str:[8,1.8],agi:[4,.8],int:[2,.4],hits:6,wpn:["blade","claw"],arm:["light","medium","heavy"],
+      sk:[[1,"hunker"],[6,"evict"],[10,"deposit"],[16,"tax"]],perk:"Collects rent: more gold after every win."},
+    puff:{n:["Puff Pugilist","Blowfish Heavyweight"],d:"Inflates when startled, throws a punch, then forgets why. Fists only.",
+      hp:[24,7.5],mp:[4,.8],str:[8,1.9],agi:[6,1.1],int:[1,.3],hits:4,wpn:["knuckle"],arm:["light"],fist:1,
+      sk:[[1,"inflate"],[6,"upper"],[10,"forget"],[16,"pop"]],perk:"Fists grow with level. Sometimes punches back."},
+    sauce:{n:["Vent Conjurer","Grand Prestidigitube"],d:"Hides its plumes in a blink, then makes them reappear somewhere ridiculous. Its tube is bigger on the inside.",
+      hp:[15,4.2],mp:[8,2.3],str:[3,.7],agi:[6,1],int:[10,2.1],hits:99,wpn:["staff","whip"],arm:["light","robe"],
+      sk:[[1,"hot"],[7,"simmer"],[12,"reduce"],[16,"mother"]],perk:"Every heal it pulls out comes with a little extra for everyone."},
+    lender:{n:["Limb Lender","Five-Armed Surgeon"],d:"A lost arm grows back in a few tides, so it lends them out. Interest-free.",
+      hp:[17,4.8],mp:[8,2.3],str:[4,.9],agi:[5,.9],int:[10,2],hits:99,wpn:["staff"],arm:["light","robe"],
+      sk:[[1,"hand"],[5,"regrow"],[8,"spare"],[16,"hug"]],perk:"Regrows a little HP every round."},
+    crooner:{n:["Drift Crooner","Current Chart-Topper"],d:"Goes wherever the current is going, singing about it the whole way.",
+      hp:[16,4.6],mp:[7,2],str:[5,1.1],agi:[8,1.4],int:[7,1.5],hits:8,wpn:["whip","staff"],arm:["light","robe"],
+      sk:[[1,"ballad"],[5,"solo"],[9,"flow"],[16,"power"]],perk:"Hums between rounds: the whole team slowly regains MP."},
+    impostor:{n:["Seaweed Impostor","Grandmaster of Kelp"],d:"Hides among the seaweed by looking like seaweed. Has fooled three crabs and one mirror.",
+      hp:[18,5],mp:[5,1.2],str:[6,1.4],agi:[10,1.9],int:[4,.8],hits:5,wpn:["blade","whip"],arm:["light","medium"],
+      sk:[[1,"blend"],[5,"pilfer"],[9,"shuriken"],[16,"ambush"]],perk:"Slips away from fights and swipes things after wins."}
+  };
+  // critter species -> [class, tier]
+  const SPCLS={bubblet:["somm",0],effervessa:["somm",1],frillip:["frill",0],frillustra:["frill",1],cindrop:["raver",0],flarefin:["raver",1],
+    snipsnap:["landlord",0],snapmansion:["landlord",1],pufflo:["puff",0],puffbrawl:["puff",1],plumo:["sauce",0],plumoir:["sauce",1],
+    starlet:["lender",0],stellarm:["lender",1],jellum:["crooner",0],jelloquent:["crooner",1],fronda:["impostor",0],kelpshade:["impostor",1]};
+
+  // skills. tg: foe foes foes2 (two random foes) ally allies self.  el: PRAWN types (tide kelp vent shell), via TIDEDATA.eff
+  // pw: [lo,hi] + int/2 (spell-like), or mul: x attack (blow-like).  t2: needs the molted form.  buy: sold by the Tutor in town.
+  const SK={
+    uncork:{n:"Uncork",cls:"somm",mp:3,tg:"foe",el:"tide",pw:[12,20],d:"Pops a bubble right in a foe's face."},
+    breathe:{n:"Let It Breathe",cls:"somm",mp:0,tg:"ally",fx:"mp",v:8,hpcost:.2,d:"Gives a friend 8 MP. Costs 20% of its own HP."},
+    spray:{n:"Vintage Spray",cls:"somm",mp:7,tg:"foes",el:"tide",pw:[10,18],d:"Sprays every foe with a fine old vintage."},
+    geyser:{n:"Grand Cru Geyser",cls:"somm",t2:1,mp:14,tg:"foes",el:"tide",pw:[24,36],d:"An eruption of the good stuff. Hits every foe."},
+    corked:{n:"Corked",cls:"somm",mp:5,tg:"foe",fx:"sleep",ch:.75,buy:150,d:"Seals a foe in a bubble. It may sleep a turn or two."},
+    warn:{n:"Warning Frills",cls:"frill",mp:4,tg:"foes",fx:"atkDn",d:"Flashes its frills. Every foe hits softer."},
+    rude:{n:"Rude Remark",cls:"frill",mp:4,tg:"foe",el:"kelp",pw:[8,14],fx:"poison",ch:.7,d:"A cutting comment. Hurts, and may poison."},
+    poultice:{n:"Kelp Poultice",cls:"frill",mp:4,tg:"ally",fx:"heal",pw:[16,26],d:"A soothing kelp wrap for one friend."},
+    glare:{n:"Withering Glare",cls:"frill",t2:1,mp:10,tg:"foes",el:"kelp",pw:[14,22],fx:"poison",ch:.5,d:"Every foe feels judged. And poisoned."},
+    snub:{n:"Social Snub",cls:"frill",mp:5,tg:"foe",fx:"sleep",ch:.85,buy:150,d:"Ignores a foe so hard it forgets to act."},
+    jab:{n:"High-Five Jab",cls:"raver",mp:3,tg:"foe",mul:.8,hits:2,pierce:1,d:"Two enthusiastic high-fives to the face. Slips past armor."},
+    strobe:{n:"Blinding Glow",cls:"raver",mp:5,tg:"foes",fx:"hitDn",d:"Its swirls blaze with joy. Foes miss a lot more."},
+    danceoff:{n:"Pep Talk",cls:"raver",mp:4,tg:"foe",fx:"sleep",ch:.7,d:"Tells a foe it believes in it. The foe is too confused to act."},
+    lava:{n:"Burning Spirit",cls:"raver",t2:1,mp:10,tg:"foes",el:"vent",mul:1.3,d:"So fired up it is literally on fire. Hits every foe."},
+    moonwalk:{n:"You Got This!",cls:"raver",mp:8,tg:"allies",fx:"evaUp",buy:200,d:"The team believes in itself so hard that foes miss more."},
+    hunker:{n:"Hunker Down",cls:"landlord",mp:2,tg:"self",fx:"guard",d:"Hides in its shell and draws every attack this round."},
+    evict:{n:"Eviction Notice",cls:"landlord",mp:5,tg:"foe",fx:"evict",el:"shell",mul:1.2,d:"A weakened foe (not a boss) is thrown out. Otherwise, a shove."},
+    deposit:{n:"Security Deposit",cls:"landlord",mp:6,tg:"allies",fx:"defUp",d:"Everyone's shell gets tougher for this fight."},
+    tax:{n:"Property Tax",cls:"landlord",t2:1,mp:9,tg:"foes",el:"shell",mul:1.2,d:"Every foe owes. Collects in damage."},
+    upgrade:{n:"Shell Upgrade",cls:"landlord",mp:5,tg:"self",fx:"heal",pct:.5,buy:180,d:"Moves into a fresh shell: heals half its HP."},
+    inflate:{n:"Inflate",cls:"puff",mp:3,tg:"self",fx:"counter",d:"Puffs up: tougher, and punches back at anyone who hits it."},
+    upper:{n:"Spine Uppercut",cls:"puff",mp:4,tg:"foe",mul:1.6,d:"A spiky uppercut to one foe."},
+    forget:{n:"Forget Why",cls:"puff",mp:2,tg:"self",fx:"heal",pct:.25,cure:1,d:"Forgets it was hurt. Cures poison, heals a quarter."},
+    pop:{n:"Big Pop",cls:"puff",t2:1,mp:8,tg:"foes",mul:1.2,self:.1,d:"Inflates until it pops. Hits every foe, costs 10% of its HP."},
+    haymaker:{n:"Haymaker",cls:"puff",mp:7,tg:"foe",mul:2.4,buy:200,d:"A wild swing with everything behind it."},
+    hot:{n:"Now You See It",cls:"sauce",mp:3,tg:"foe",el:"vent",pw:[12,20],d:"A plume vanishes... and reappears, scalding, next to a foe."},
+    simmer:{n:"Snack From Tube",cls:"sauce",mp:6,tg:"allies",fx:"heal",pw:[8,14],d:"Pulls a warm snack out of its tube for everyone. How?"},
+    reduce:{n:"Smoke and Vents",cls:"sauce",mp:8,tg:"foes",el:"vent",pw:[10,18],d:"A puff of vent steam engulfs every foe. Ta-da."},
+    mother:{n:"Grand Finale",cls:"sauce",t2:1,mp:12,tg:"allies",fx:"heal",pw:[22,34],cure:1,d:"The big trick: everyone is healed and cured. Applause."},
+    glaze:{n:"Sawn in Half",cls:"sauce",mp:9,tg:"foe",el:"vent",pw:[30,44],buy:220,d:"One foe goes in the box. It does not enjoy the trick."},
+    hand:{n:"Lend a Hand",cls:"lender",mp:3,tg:"ally",fx:"heal",pw:[18,30],d:"Heals one friend."},
+    regrow:{n:"Regrow",cls:"lender",mp:4,tg:"ally",fx:"heal",pw:[10,16],cure:1,d:"Cures poison and heals a little."},
+    spare:{n:"Spare Arm",cls:"lender",mp:8,tg:"ally",fx:"revive",pct:.25,ko:1,d:"Wakes a knocked-out friend with a quarter of its HP."},
+    hug:{n:"Group Hug",cls:"lender",t2:1,mp:10,tg:"allies",fx:"heal",pw:[18,28],d:"Five arms, one big hug. Heals everyone."},
+    transplant:{n:"Full Transplant",cls:"lender",mp:16,tg:"ally",fx:"revive",pct:1,ko:1,buy:300,d:"Wakes a knocked-out friend at full HP."},
+    ballad:{n:"Ebb Ballad",cls:"crooner",mp:4,tg:"allies",fx:"agiUp",d:"A slow song. Everyone moves first and dodges more."},
+    solo:{n:"Sting Solo",cls:"crooner",mp:3,tg:"foe",el:"tide",pw:[11,19],d:"A shocking high note."},
+    flow:{n:"Go With the Flow",cls:"crooner",mp:5,tg:"self",fx:"flow",d:"Sings whatever the current wants. Could be anything."},
+    power:{n:"Power Ballad",cls:"crooner",t2:1,mp:9,tg:"allies",fx:"atkUp",d:"Everyone hits harder for the rest of the fight."},
+    lullaby:{n:"Lullaby Tide",cls:"crooner",mp:8,tg:"foes",fx:"sleep",ch:.5,buy:220,d:"Every foe may nod off."},
+    blend:{n:"Blend In",cls:"impostor",mp:3,tg:"self",fx:"hide",d:"Becomes seaweed. Can't be hit this round; its next hit lands double."},
+    pilfer:{n:"Pilfer",cls:"impostor",mp:2,tg:"foe",fx:"steal",d:"Swipes gold or an item from a foe."},
+    shuriken:{n:"Frond Shuriken",cls:"impostor",mp:5,tg:"foes2",el:"kelp",mul:.9,d:"Two kelp stars at two foes."},
+    ambush:{n:"Ambush",cls:"impostor",t2:1,mp:9,tg:"foes",el:"kelp",mul:1.1,d:"Springs out of nowhere at every foe."},
+    becomekelp:{n:"Become Kelp",cls:"impostor",mp:8,tg:"allies",fx:"evaUp",buy:200,d:"The whole party is suddenly seaweed. Foes miss more."}
+  };
+
+  const GEAR={
+    rod:{n:"Driftwood Rod",k:"w",cat:"staff",atk:4,hit:0,p:10},
+    shiv:{n:"Shell Dagger",k:"w",cat:"blade",atk:5,hit:10,p:10},
+    whip:{n:"Kelp Whip",k:"w",cat:"whip",atk:6,hit:5,p:30},
+    glow:{n:"Glow Pom-Pom",k:"w",cat:"glow",atk:7,hit:15,p:40},
+    knux:{n:"Pearl Knuckles",k:"w",cat:"knuckle",atk:6,hit:5,p:40},
+    claw:{n:"Crab Claw",k:"w",cat:"claw",atk:9,hit:0,p:60},
+    sword:{n:"Coral Sword",k:"w",cat:"blade",atk:10,hit:5,p:70},
+    pincer:{n:"Pincer Blade",k:"w",cat:"blade",atk:16,hit:10,p:0},
+    vest:{n:"Kelp Vest",k:"a",cat:"light",def:2,p:10},
+    robe:{n:"Sponge Robe",k:"a",cat:"robe",def:3,p:30},
+    scale:{n:"Scale Mail",k:"a",cat:"medium",def:6,p:70},
+    plate:{n:"Barnacle Plate",k:"a",cat:"heavy",def:9,p:120},
+    pearlrobe:{n:"Pearl Robe",k:"a",cat:"robe",def:6,p:0}
+  };
+  const ITEMS={
+    tonic:{n:"Kelp Tonic",d:"Restores 30 HP to one friend.",p:20,use:"heal",v:30},
+    spritz:{n:"Sea Spritz",d:"Restores 15 MP to one friend.",p:60,use:"mp",v:15},
+    salt:{n:"Sea Salt",d:"Cures poison.",p:15,use:"cure"},
+    spark:{n:"Spark Shell",d:"Wakes a knocked-out friend with a little HP.",p:120,use:"revive"},
+    sponge:{n:"Sleep Sponge",d:"Camp on the open sea floor: everyone rests to full HP and MP.",p:75,use:"camp",field:1},
+    lens:{n:"Lantern Lens",d:"The great glass eye of the Harbor Lantern. Heavy and warm.",key:1}
+  };
+
+  // t: PRAWN type, so skills use the same strengths and weaknesses as PRAWN moves. xp is on PRAWN's level curve.
+  const MON={
+    nipper:{n:"Nipper",t:"shell",hp:14,atk:5,def:1,agi:6,ev:5,xp:40,g:5,art:["crab","#ff7a4d"]},
+    jelly:{n:"Glimjelly",t:"tide",hp:16,atk:5,def:0,agi:4,ev:10,xp:45,g:6,art:["jelly","#ff8fd0"],poi:.25},
+    spine:{n:"Spinekin",t:"shell",hp:22,atk:7,def:4,agi:3,ev:0,xp:65,g:9,art:["urchin","#9a6cff"],poi:.3},
+    gloom:{n:"Gloomfry",t:"vent",hp:26,atk:8,def:2,agi:8,ev:8,xp:75,g:12,art:["fish","#3f5fa8"]},
+    eel:{n:"Murkeel",t:"tide",hp:34,atk:10,def:3,agi:10,ev:10,xp:110,g:16,art:["eel","#5fbf6a"],zap:.25},
+    ghost:{n:"Ghost Shrimp",t:"tide",hp:30,atk:10,def:2,agi:12,ev:25,xp:120,g:14,art:["shrimp","#cfe6ff"]},
+    brute:{n:"Barnacle Brute",t:"shell",hp:50,atk:12,def:8,agi:3,ev:0,xp:160,g:24,art:["crab","#9b8f80",{rock:1}]},
+    deck:{n:"Deckhand",t:"shell",hp:40,atk:11,def:4,agi:8,ev:6,xp:150,g:30,art:["crab","#e04848",{hat:"band"}]},
+    rust:{n:"Capt. Rustclaw",t:"shell",hp:420,atk:15,def:6,agi:9,ev:5,xp:1800,g:500,art:["crab","#c0582c",{hat:"tri",big:1}],boss:1,slam:3}
+  };
+  const ZONES={
+    near:[[["nipper",2]],[["nipper",3]],[["jelly",2]],[["nipper",1],["jelly",2]]],
+    far:[[["spine",2]],[["gloom",2]],[["spine",1],["gloom",2]],[["jelly",3],["spine",1]],[["nipper",4]],[["gloom",3]]],
+    gal:[[["ghost",2]],[["eel",2]],[["deck",2]],[["brute",1],["ghost",1]],[["deck",1],["eel",2]],[["ghost",3]],[["brute",2]]]
+  };
+
+  // ---------- maps ----------
+  // shared tiles from tide-art: . sand  , path  g seagrass  T reef wall  o rock  k u w m reef plants  f s b decor  _ X P r M indoors
+  // deep tiles (drawn below): O harbor  G wreck  @ Tidegate  Z gloom current  = planks  H hull  R barrel  > hatch down  < ladder up  x way out
+  const MAPS={
+    deep:{name:"The Wide Blue",out:1,zone:(x,y)=>x<=17?"near":"far",rows:[
+      "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
+      "T.....ggg.......TTTTT....ggggg.....T",
+      "T.k...ggg..m....TTTT.....ggggg..u..T",
+      "T..@,,,,,.......TTT........gg......T",
+      "T.......,...w.....T..ooo...........T",
+      "T.gg....,.........T........ggg..k..T",
+      "T.gg....,....gggg......m...ggg.....T",
+      "T.......,....gggg..................T",
+      "T..u....,,,,.................ggg...T",
+      "T.......O..,,,,,,,,,,,,......ggg...T",
+      "T....k.....g..........,..........w.T",
+      "T..gggg....g..TTTT....,....gggg....T",
+      "T..gggg.......TTTTT...,....gggg....T",
+      "T..gggg..m.....TTT....,,,,,,.......T",
+      "T.....................ggg...,,G....T",
+      "TTT.....oo............ggg..........T",
+      "TT..........gggg............ooo....T",
+      "T...w.......gggg...k..........ZZZZZT",
+      "T.........................ZZZZZZZZZT",
+      "T..gg....m.....gggg.....ZZZZZZZZZZZT",
+      "T..gg...........gggg...ZZZZZZZZZZZZT",
+      "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT"],
+      warps:[[8,9,"harbor",10,14,1],[30,14,"gal1",9,12,1]], trig:[[3,3,"gate"]],
+      ents:[{id:"tsign",kind:"sign",x:27,y:17,ev:"trench"}]},
+    harbor:{name:"Brightwater Harbor",rows:[
+      "TTTTTTTTTTTTTTTTTTTTTT",
+      "Tw...f..........f...wT",
+      "T..m..............k..T",
+      "T....................T",
+      "T.f..................T",
+      "T.........,,.........T",
+      "T.........,,.........T",
+      "T.........,,.........T",
+      "T..,,,,,,,,,,,,,,,,..T",
+      "T.........,,.........T",
+      "Tu........,,........uT",
+      "T.........,,.........T",
+      "T.........,,.........T",
+      "T..,,,,,,,,,,,,,,,,..T",
+      "Tw.s......,,.....b..wT",
+      "TTTTTTTTTT,,TTTTTTTTTT"],
+      warps:[[10,15,"deep",8,10,0],[11,15,"deep",8,10,0]],
+      bld:[{k:"hall",x:7,y:1,w:8,h:4,doors:[[10,4],[11,4]],ev:"hall",label:"LANTERN HALL"},
+        {k:"clinic",x:2,y:5,w:4,h:3,doors:[[3,7]],ev:"inn",label:"INN"},
+        {k:"cottage",x:16,y:5,w:4,h:3,doors:[[17,7]],ev:"item",label:"ITEMS"},
+        {k:"home",x:2,y:10,w:4,h:3,doors:[[3,12]],ev:"arms",label:"ARMS"},
+        {k:"cottage",x:6,y:10,w:4,h:3,doors:[[7,12]],ev:"shrine",label:"SHRINE"},
+        {k:"lab",x:14,y:10,w:5,h:3,doors:[[16,12]],ev:"tutor",label:"TUTOR"}],
+      ents:[{id:"greet",kind:"goby",x:12,y:14,dir:0,ev:"greet"},{id:"kid",kind:"swim",x:6,y:8,dir:0,ev:"kid"},
+        {id:"granny",kind:"snail",x:15,y:3,dir:2,ev:"granny"},{id:"sailor",kind:"appr",x:19,y:9,dir:2,ev:"sailor"}]},
+    lhall:{name:"Lantern Hall",rows:[
+      "XXXXXXXXXXXX",
+      "XPP______PPX",
+      "X__________X",
+      "X__________X",
+      "X_rrrrrrrr_X",
+      "X__________X",
+      "X__________X",
+      "X__________X",
+      "XXXXXMXXXXXX"],
+      warps:[[5,8,"harbor",10,5,0]],
+      ents:[{id:"lantern",kind:"lantern",x:5,y:1},{id:"pinch",kind:"whelk",x:5,y:3,dir:0,ev:"pinch"},
+        {id:"guard",kind:"elder",x:9,y:5,dir:2,ev:"guard"}]},
+    gal1:{name:"Sunken Galleon",zone:()=>"gal",dark:1,rows:[
+      "HHHHHHHHHHHHHHHHHHHH",
+      "H==R=====H=====R==RH",
+      "H========H=========H",
+      "H==~~====H====HHH==H",
+      "H==~~=========H>===H",
+      "H=========R===H====H",
+      "HHHH==HHHHHH==HHH==H",
+      "H=====H=====R======H",
+      "H=R===H==~~========H",
+      "H=====H==~~===HHHHHH",
+      "H==========R=======H",
+      "HHHHHHHH==HHHHHHHHHH",
+      "H======R==========RH",
+      "HHHHHHHHHxxHHHHHHHHH"],
+      warps:[[9,13,"deep",30,15,0],[10,13,"deep",30,15,0],[15,4,"gal2",5,4,3]],
+      ents:[{id:"c1",kind:"chest",x:18,y:2,chest:["tonic",3]},{id:"c2",kind:"chest",x:1,y:10,chest:["gold",120]},
+        {id:"c3",kind:"chest",x:1,y:1,chest:["scale",1]}]},
+    gal2:{name:"Galleon Hold",zone:()=>"gal",dark:1,rows:[
+      "HHHHHHHHHHHHHHHHHHHH",
+      "H===R====HH===R===RH",
+      "H========HH========H",
+      "H==HHHH==HH==HHHH==H",
+      "H==H<=H==========H=H",
+      "H==H==H==HH===R==H=H",
+      "H=====H==HH======H=H",
+      "HHHHH=HHHHHHH=HHHH=H",
+      "H=R=====R==========H",
+      "H==========HHHHH===H",
+      "H===HHHHH==H===H===H",
+      "H===H=========R====H",
+      "H===H==============H",
+      "HHHHHHHHHHHHHHHHHHHH"],
+      warps:[[4,4,"gal1",15,5,0]],
+      ents:[{id:"c4",kind:"chest",x:1,y:1,chest:["pincer",1]},{id:"c5",kind:"chest",x:18,y:1,chest:["spark",1]},
+        {id:"c6",kind:"chest",x:1,y:12,chest:["pearlrobe",1]},{id:"c7",kind:"chest",x:5,y:11,chest:["gold",200]},
+        {id:"rust",kind:"captain",x:13,y:10,dir:0,ev:"rust",hide:"lens"}]}
+  };
+
+  // ---------- scripts: the Harbor Lantern keeps the cold Gloom away; Captain Rustclaw stole its lens ----------
+  const EV={
+    async arrive(E){
+      await E.say("The swirl spits you and your team out onto warm white sand.");
+      await E.say("This is the Wide Blue, the open sea beyond Tidepool Town. The water is darker here, and colder.");
+      await E.say("To the south, a lantern glimmers weakly over a harbor. Someone there might know why the sea feels so gloomy.");
+      await E.say("Out here, your critters fight their own way. Each one has a calling, and it changes when they molt.");
+      await E.say("Tip: Z talks and checks, C opens the party menu (STATUS shows each critter's calling). Buy gear in town before you wander far!");
+    },
+    async gate(E){ if(await E.yes("The Tidegate swirls. Swim back to Tidepool Town?")) await E.leave(); },
+    async trench(E){ await E.say("DANGER: GLOOM TRENCH\nA freezing black current pours out of the deep. Nobody can swim against it... yet."); },
+    async greet(E){ await E.say(E.f("lit")?"The Lantern's shining again! You little critters are heroes!":"Welcome to Brightwater Harbor! Our Lantern's gone dim lately. Gives me the shivers.","DOCKHAND"); },
+    async kid(E){ await E.say("Mom says don't leave town without armor! The Arms shop is right by the Inn.","KID"); },
+    async granny(E){ await E.say(E.f("lens")?"You found the lens? Then take it to Mother Pinch in the Lantern Hall!":
+        "Pirates sailed east with something big and shiny. Their old wreck lies past the seagrass. Follow the path!","GRANNY SNAIL"); },
+    async sailor(E){ await E.say(E.f("lit")?"The Shrine keeper does a Molt Rite now. Brave critters of level 12 or more can molt early, for a price.":
+        "Spinekin spines are poisonous. Carry Sea Salt, or a friend who can cure it.","OLD SAILOR"); },
+    async guard(E){ await E.say(E.f("lit")?"Mother Pinch hasn't smiled like that in years.":"Mother Pinch keeps the Lantern lit. Well... she used to.","LANTERN GUARD"); },
+    async pinch(E){
+      if(E.f("lit")){ await E.say("The Lantern holds the Gloom back for now. But the cold keeps pouring out of the Trench...","MOTHER PINCH");
+        await E.say("Rest up, little heroes. When the current eases, the sea will need you again.","MOTHER PINCH"); return; }
+      if(E.f("lens")){
+        await E.say("Is that... the Lantern Lens! You brought it back!","MOTHER PINCH");
+        await E.say("Quickly now, help me set it in place.","MOTHER PINCH");
+        E.set("lit"); E.take("lens"); await E.relight();
+        await E.say("Look how it shines! Warmth is flooding back into the harbor!","MOTHER PINCH");
+        await E.say("Take this, with the whole town's thanks.","MOTHER PINCH");
+        E.gold(400); E.give("sponge",2); await E.say("The party received 400 G and 2 Sleep Sponges!");
+        await E.say("Oh, and talk to the Shrine keeper. Now the light's back, the old Molt Rite works again.","MOTHER PINCH");
+        await E.say("But mark me: Rustclaw didn't make the Gloom. It's rising from the Trench, colder every tide.","MOTHER PINCH");
+        await E.say("One lantern can't hold it back forever. Something down there is waking up.","MOTHER PINCH");
+        await E.card(["CHAPTER 1 COMPLETE!","","The Harbor Lantern burns again.","But the Gloom stirs in the Trench...","","Chapter 2 is coming soon!","","Press Z to keep exploring"]);
+        return; }
+      if(!E.f("met")){ E.set("met");
+        await E.say("Little critters from the shallows? Through the Tidegate? Well, I'll be barnacled.","MOTHER PINCH");
+        await E.say("I'm Pinch. I've tended the Harbor Lantern for ninety tides. Its light keeps the Gloom away.","MOTHER PINCH");
+        await E.say("The Gloom is a cold black current from the Trench. Where it flows, critters turn mean and the coral goes grey.","MOTHER PINCH");
+        await E.say("Three nights ago, Captain Rustclaw's crew pried the Lens right out of the Lantern and hauled it off!","MOTHER PINCH");
+        await E.say("Their ship sank years ago, east past the seagrass. They hide in the wreck now.","MOTHER PINCH");
+        await E.say("Please. Bring the Lens home before the light goes out for good.","MOTHER PINCH"); return; }
+      await E.say("The Sunken Galleon lies east of town. Follow the path past the seagrass. Bring back the Lens!","MOTHER PINCH");
+    },
+    async rust(E){
+      await E.say("Arr! Who's clompin' around me hold?","CAPT. RUSTCLAW");
+      await E.say("The Lens? Aye, I took it. It keeps the Gloom off me crew! Without it we'd be frozen solid!","CAPT. RUSTCLAW");
+      await E.say("You want it, you'll have to pry it from me claw! DECKHANDS!","CAPT. RUSTCLAW");
+      const r=await E.battle([["rust",1],["deck",2]],{boss:1});
+      if(r!=="win") return;
+      await E.say("Oof... alright, alright! Take the blasted thing.","CAPT. RUSTCLAW");
+      await E.say("But I'm warnin' ye. The Gloom's comin' up from the Trench, and no lens'll stop it forever.","CAPT. RUSTCLAW");
+      E.set("lens"); E.give("lens",1); E.jingle(1);
+      await E.say("The party got the LANTERN LENS!");
+      await E.say("Rustclaw scuttles off into the dark hold, grumbling.");
+    }
+  };
+
+  // ---------- art ----------
+  const sandBase=(Z,v,c)=>{ Z.r(0,0,16,16,c||"#ffe9b8"); for(let i=0;i<6;i++){ const x=(v*7+i*5)%16, y=(v*3+i*11)%16; Z.p(x,y,"#f9d792"); } };
+  const TL={};
+  function tile(ch,v,f){ const k=ch+v+"_"+f; if(k in TL) return TL[k]; let cv=null;
+    if(ch==="=") cv=make(16,16,Z=>{ Z.r(0,0,16,16,"#9a6a45"); for(let y=0;y<16;y+=4){ Z.r(0,y,16,1,"#7a4f32"); Z.r(((v+y)*5)%16,y+1,1,3,"#7a4f32"); } if(v%3===0) Z.p(4,6,"#b98a5e"); });
+    else if(ch==="H") cv=make(16,16,Z=>{ Z.r(0,0,16,16,"#4d3226"); Z.r(0,0,16,2,"#6b4634"); for(let x=v%2?2:7;x<16;x+=8){ Z.r(x,3,2,12,"#3a251c"); } Z.p(4,5,"#c9a86b"); Z.p(12,10,"#c9a86b");
+      if(v%5===0){ Z.e(8,8,3.5,3.5,"#3a251c"); Z.e(8,8,2.4,2.4,"#2c7fa8"); Z.p(7,7,"#9fe0ff"); } });
+    else if(ch==="R") cv=make(16,16,Z=>{ Z.r(0,0,16,16,"#9a6a45"); Z.e(8,9,6,6.5,"#8a5a37"); Z.r(2,5,12,1,"#5d3a24"); Z.r(2,12,12,1,"#5d3a24"); Z.e(8,4,5,1.6,"#b07a4f"); Z.p(5,7,"#c99a6b"); },true);
+    else if(ch===">") cv=make(16,16,Z=>{ Z.r(0,0,16,16,"#9a6a45"); Z.r(2,2,12,12,"#2a1810"); for(let y=4;y<14;y+=3) Z.r(4,y,8,1,"#b07a4f"); Z.r(4,3,1,11,"#b07a4f"); Z.r(11,3,1,11,"#b07a4f"); });
+    else if(ch==="<") cv=make(16,16,Z=>{ Z.r(0,0,16,16,"#9a6a45"); Z.r(4,0,1,16,"#e0b07a"); Z.r(11,0,1,16,"#e0b07a"); for(let y=2;y<16;y+=4) Z.r(4,y,8,1,"#e0b07a"); Z.e(8,1,5,1.6,"#bff2ff"); });
+    else if(ch==="x") cv=make(16,16,Z=>{ Z.r(0,0,16,16,"#9a6a45"); Z.r(2,0,12,16,"#7fd3ff"); Z.r(4,0,8,16,"#bff2ff"); Z.p(6,4,"#ffffff"); Z.p(9,10,"#ffffff"); });
+    else if(ch==="Z") cv=make(16,16,Z=>{ Z.r(0,0,16,16,"#1c2350"); for(let i=0;i<3;i++){ const y=(i*6+f*2+v)%16; Z.l((v*3+i*5)%12,y,(v*3+i*5)%12+4,y,"#3b4a8f"); } Z.p((v*5+f*7)%16,(v*3)%16,"#7fa0ff"); });
+    else if(ch==="@") cv=make(16,16,Z=>{ sandBase(Z,v,"#fff3d6"); const C=["#ff6fb5","#ffcf3d","#7be0ff","#b98cff"];
+      for(let r=7;r>=1;r--) for(let a=0;a<6.3;a+=.18){ const aa=a+r*.55+f*.8; Z.p(8+Math.cos(aa)*r,8+Math.sin(aa)*r*.8,C[(r+f)%4]); } Z.e(8,8,1.5,1.2,"#ffffff"); });
+    else if(ch==="O") cv=make(16,16,Z=>{ sandBase(Z,v); Z.b(4,11,3.5,3,"#ff8fc0",false); Z.r(3,12,2,2,INK); Z.b(12,12,3.5,2.6,"#7be0ff",false); Z.r(11,13,2,1,INK);
+      Z.r(7,4,3,10,"#fff1dc"); Z.r(7,4,1,10,"#e5cfa5"); Z.e(8.5,3,2.8,2.4,"#ffd84d"); Z.p(8,2,"#ffffff"); Z.r(6,14,5,1,"#d9b98a"); },true);
+    else if(ch==="G") cv=make(16,16,Z=>{ sandBase(Z,v); Z.l(1,11,14,8,"#5d3a24"); Z.l(1,12,14,9,"#7a4f32"); Z.l(2,13,13,11,"#7a4f32"); Z.l(3,14,12,12,"#5d3a24");
+      Z.l(8,10,7,1,"#4d3226"); Z.r(4,3,4,5,"#e9e1cf"); Z.r(5,4,1,1,"#c9bfa8"); Z.p(10,12,"#2c7fa8"); },true);
+    return TL[k]=cv; }
+  const ANIM="@Z";
+
+  // map things that aren't TIDE npcs: chests, the lantern, the captain
+  const SC={};
+  function ent(kind,o){ const k=kind+(o||""); if(SC[k]) return SC[k];
+    let cv=null;
+    if(kind==="chest") cv=make(16,16,Z=>{ if(o==="open"){ Z.r(2,7,12,8,"#8a5a37"); Z.r(3,8,10,3,"#2a1810"); Z.r(2,3,12,4,"#b07a4f"); Z.r(2,3,12,1,"#ffd84d"); }
+      else { Z.r(2,5,12,10,"#b07a4f"); Z.r(2,5,12,4,"#c98a5f"); Z.r(2,9,12,1,"#ffd84d"); Z.r(7,8,2,3,"#ffd84d"); Z.r(2,5,1,10,"#ffd84d"); Z.r(13,5,1,10,"#ffd84d"); Z.p(4,6,"#e0b07a"); } },true);
+    else if(kind==="lantern") cv=make(16,16,Z=>{ const on=o==="lit"; Z.r(6,12,4,4,"#8a5a37"); Z.r(4,2,8,10,on?"#fff27a":"#8fa0b8"); Z.r(5,3,6,8,on?"#ffffff":"#b8c6da");
+      Z.r(4,1,8,1,"#5d3a24"); Z.r(4,11,8,1,"#5d3a24"); Z.r(7,0,2,1,"#5d3a24"); if(on){ Z.p(3,5,"#fff27a"); Z.p(12,7,"#fff27a"); } },true);
+    else if(kind==="captain") cv=make(16,16,Z=>{ const c="#c0582c"; Z.e(2,9,2,2.6,c); Z.e(14,9,2,2.6,c); Z.b(8,10.5,5.5,4,c);
+      Z.r(3,3,10,3,"#2a1a2e"); Z.r(5,1,6,2,"#2a1a2e"); Z.r(3,5,10,1,"#ffd84d"); Z.p(8,2,"#ffffff");
+      Z.p(6,9,INK); Z.p(10,9,INK); Z.r(5,8,2,1,INK); Z.r(7,12,3,1,INK); Z.r(4,14,1,2,dk(c,.3)); Z.r(11,14,1,2,dk(c,.3)); },true);
+    return SC[k]=cv; }
+
+  // ---------- foes (facing right, toward the party) ----------
+  const MC={};
+  function mon(id){ if(MC[id]) return MC[id]; const [shape,c,o0]=MON[id].art, o=o0||{}, s=o.big?48:32, k=s/32;
+    const cv=make(s,s,Z=>{
+      const e=(x,y,rx,ry,col)=>Z.e(x*k,y*k,rx*k,ry*k,col), b=(x,y,rx,ry,col,sh)=>Z.b(x*k,y*k,rx*k,ry*k,col,sh),
+        l=(x0,y0,x1,y1,col)=>{ for(let t=0;t<k;t++) Z.l(x0*k+t,y0*k,x1*k+t,y1*k,col); }, p=(x,y,col)=>Z.r(x*k,y*k,Math.ceil(k),Math.ceil(k),col);
+      if(shape==="crab"){
+        for(let i=0;i<3;i++){ l(10+i*4,22,7+i*3,29,dk(c,.3)); l(22-i*3,22,25-i*2,29,dk(c,.3)); }
+        b(15,19,11,7.5,c); if(o.rock) for(const [x,y] of [[9,16],[15,14],[20,18],[12,21]]){ e(x,y,2,1.6,"#e8e2d6"); p(x,y,"#6a6056"); }
+        b(5,15,3.4,3,lt(c,.1)); l(17,13,17,8,dk(c,.3)); l(22,13,22,8,dk(c,.3)); e(17,7,2.2,2.2,"#ffffff"); e(22,7,2.2,2.2,"#ffffff"); p(18,7,INK); p(23,7,INK);
+        b(27,12,4,3.4,lt(c,.1)); b(29,8,3.4,2.2,lt(c,.15)); b(29,15,3,2,lt(c,.05));
+        l(19,22,23,22,INK);
+        if(o.hat==="band"){ for(let x=10;x<22;x++) p(x,12,"#2a1a2e"); p(12,11,"#ffffff"); p(16,11,"#ffffff"); }
+        if(o.hat==="tri"){ for(let y=0;y<4;y++) for(let x=13+y;x<27-y;x++) p(x,4-y,"#2a1a2e"); for(let x=13;x<27;x++) p(x,4,"#ffd84d"); p(20,2,"#ffffff"); }
+      } else if(shape==="jelly"){
+        for(let i=0;i<6;i++){ const x0=7+i*3.6; for(let y=18;y<30;y++) p(x0+Math.sin(y*.55+i)*1.4,y,i%2?lt(c,.3):dk(c,.1)); }
+        b(16,13,11,9,c); e(16,20,11,2,dk(c,.2)); e(12,8,3,2,lt(c,.5));
+        Z.eye(13*k,12*k,3); Z.eye(18*k,12*k,3); p(11,17,"#ff5f8f"); p(22,17,"#ff5f8f"); p(16,17,INK);
+      } else if(shape==="urchin"){
+        for(let a=0;a<6.28;a+=.4){ l(16,17,16+Math.cos(a)*14,17+Math.sin(a)*13,a%0.8<.4?dk(c,.3):lt(c,.2)); }
+        b(16,17,8,8,c); Z.eye(12*k,14*k,2); Z.eye(18*k,14*k,2); l(14,21,18,21,INK);
+      } else if(shape==="fish"){
+        for(let y=10;y<27;y++){ const w=Math.abs(y-18.5)*.5; l(1+w,y,7,y,dk(c,.15)); }
+        b(16,18,11,9,c); e(15,22,8,3,lt(c,.35));
+        l(14,9,19,3,"#a8b8ff"); e(21,3,2.4,2.4,"#fff27a"); p(20,2,"#ffffff");
+        for(let y=18;y<24;y++) for(let x=23;x<28;x++) p(x,y,"#1a1030"); for(let x=23;x<28;x+=2){ p(x,18,"#ffffff"); p(x+1,23,"#ffffff"); }
+        e(22,13,3,3,"#ffffff"); e(23,13,1.6,1.6,INK);
+      } else if(shape==="eel"){
+        for(let t=0;t<=1;t+=.02){ const x=3+t*21, y=26-t*12+Math.sin(t*Math.PI*2)*4; e(x,y,3.6-t*.4,3.6-t*.4,t%.1<.05?dk(c,.1):c); }
+        b(25,11,5.5,4.5,c); e(26,14,3.6,1.6,lt(c,.4)); e(26,9,2,2,"#ffffff"); p(27,9,INK); l(27,14,30,13,INK);
+        for(let i=0;i<5;i++) p(8+i*4,20-i*2.4,"#ffe14d");
+      } else {   // ghost shrimp
+        l(25,10,31,1,lt(c,.3)); l(24,10,30,4,lt(c,.3));
+        for(let i=0;i<6;i++){ const x=24-i*3.6, y=14+Math.sin(i*.55)*7; b(x,y,4.6-i*.4,4-i*.3,i%2?c:lt(c,.25),false); }
+        e(5,24,3,2,lt(c,.4)); e(26,12,2,2,"#ffffff"); p(26,12,"#5f7fd8");
+        for(let i=0;i<4;i++) l(12+i*3,19,11+i*3,25,dk(c,.15));
+      }
+    },true);
+    return MC[id]=cv; }
+
+  return {CLS,SPCLS,SK,GEAR,ITEMS,MON,ZONES,MAPS,EV,tile,ANIM,ent,mon};
+})();
+
+</script>
+<script>
+// ---------- Lantern Deep: the second PRAWN panel mode (scene "deep"; data + art: src/deep-data.js) ----------
+// tide.js shares its kit (dialog, menus, tweens, input, drawing, growMon/moltMon) through DEEP.attach. The party is
+// the PRAWN team: each critter's class comes from its species (DEEPDATA.SPCLS), level and XP are shared, and its
+// Lantern Deep state (HP, MP, gear, bought skills, poison) lives in critter.dp. Map progress is saved as S.deep.
+var DEEP=(function(){
+  const D=DEEPDATA, W=240, H=160, SPEED=5.5, SOLID="T#ouwkmXSELPC~ZHR";
+  let K=null, Q=null, mode="map", QB=null, banner=null;
+  const g=()=>K.g, rnd=(a,b)=>a+Math.floor(Math.random()*(b-a+1)), clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const box=(...a)=>K.box(...a), T=(...a)=>K.T(...a), TD=()=>TIDEDATA;
+
+  // ---------- party math: class from species; stats from class growth + the critter's own base stats ----------
+  const team=()=>K.S.team;
+  const CI=m=>D.SPCLS[m.sp]||["landlord",0], C=m=>D.CLS[CI(m)[0]], tier=m=>CI(m)[1];
+  const cname=m=>C(m).n[tier(m)], nm=m=>TD().SPECIES[m.sp].n, B4=m=>TD().SPECIES[m.sp].b, G=id=>id?D.GEAR[id]:null;
+  const gr=(m,k)=>{ const c=C(m)[k]; return c[0]+c[1]*(m.lv-1); };
+  const mhp=m=>Math.floor((gr(m,"hp")+B4(m)[0]/5)*(tier(m)?1.12:1)), mmp=m=>Math.floor(gr(m,"mp")*(tier(m)?1.15:1));
+  const str=m=>Math.floor(gr(m,"str")+B4(m)[1]/12), agi=m=>Math.floor(gr(m,"agi")+B4(m)[3]/12), intl=m=>Math.floor(gr(m,"int")*(tier(m)?1.1:1));
+  // Deep-only state, made the first time a critter shows up here; level-ups and molts add the difference to HP/MP
+  function dp(m){ if(!m.dp) m.dp={hp:0,mp:0,mh:0,mm:0,w:null,a:null,sk:[],poi:0}; const d=m.dp, h=mhp(m), p=mmp(m);
+    if(!d.mh){ d.hp=h; d.mp=p; } else { if(h!==d.mh&&d.hp>0) d.hp=Math.max(1,d.hp+h-d.mh); if(p!==d.mm) d.mp=Math.max(0,d.mp+p-d.mm); }
+    d.mh=h; d.mm=p; d.hp=Math.min(d.hp,h); d.mp=Math.min(d.mp,p); return d; }
+  const atk=m=>{ const w=G(dp(m).w); return Math.floor(str(m)/2)+(w?w.atk:0)+(C(m).fist?2+m.lv*2:0); };
+  const def=m=>{ const a=G(dp(m).a); return (a?a.def:0)+Math.floor(B4(m)[2]/14)+Math.floor(m.lv/3); };
+  const hits=m=>1+Math.floor((m.lv-1)/C(m).hits);
+  function skills(m){ const t=tier(m), L=C(m).sk.filter(([lv,id])=>m.lv>=lv&&(!D.SK[id].t2||t)).map(x=>x[1]);
+    for(const id of dp(m).sk) if(!L.includes(id)&&(!D.SK[id].t2||t)) L.push(id); return L; }
+  function rest(m){ const d=dp(m); d.hp=mhp(m); d.mp=mmp(m); d.poi=0; }
+  const canUse=(m,id)=>{ const it=G(id); return (it.k==="w"?C(m).wpn:C(m).arm).includes(it.cat); };
+  const canBuy=(m,id)=>CI(m)[0]===D.SK[id].cls&&!dp(m).sk.includes(id);
+  const up=m=>dp(m).hp>0, give=(it,n)=>{ Q.bag[it]=(Q.bag[it]||0)+n; };
+  const has=c=>team().filter(m=>up(m)&&CI(m)[0]===c);
+  function fresh(){ return {on:1,gold:400,bag:{tonic:3},stash:[],map:"deep",x:4,y:3,dir:3,f:{},inn:["harbor",3,8],chest:{},steps:0,safe:3}; }
+
+  // ---------- look: the critters' own 24px icons, flipped to face the foes in rounds ----------
+  const FLI=new Map(), flipI=im=>FLI.get(im)||(FLI.set(im,K.A.flip(im)),FLI.get(im));
+  const icon=(m,left)=>left?flipI(K.A.icon(m.sp)):K.A.icon(m.sp);
+  const leader=()=>team().find(up)||team()[0];
+  // ---------- map ----------
+  let MAP=null, MID="", ents=[];
+  const P={x:0,y:0,dir:0,mv:0,t:0,fx:0,fy:0,step:0};
+  const DIRS={down:[0,1,0],up:[0,-1,1],left:[-1,0,2],right:[1,0,3]}, DV=[[0,1],[0,-1],[-1,0],[1,0]];
+  function loadMap(id){ MID=id; const m=D.MAPS[id]; MAP={...m,id,w:m.rows[0].length,h:m.rows.length};
+    ents=(m.ents||[]).map(d=>({d,id:d.id,x:d.x,y:d.y,dir:d.dir||0})); }
+  function place(map,x,y,dir){ loadMap(map); P.x=Q.x=x; P.y=Q.y=y; P.dir=Q.dir=dir==null?P.dir:dir; P.mv=0; Q.map=map; }
+  const vis=e=>{ const d=e.d; if(d.hide&&Q.f[d.hide]) return false; if(d.show&&!Q.f[d.show]) return false; return true; };
+  const tileAt=(x,y)=>(y<0||y>=MAP.h||x<0||x>=MAP.w)?"T":MAP.rows[y][x];
+  const bldAt=(x,y)=>(MAP.bld||[]).find(b=>x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h);
+  const entAt=(x,y)=>ents.find(e=>vis(e)&&e.x===x&&e.y===y);
+  function solid(x,y){ const t=tileAt(x,y); if(t==="M") return false; return SOLID.includes(t)||!!bldAt(x,y)||!!entAt(x,y); }
+  const faceTo=(x,y,tx,ty)=>Math.abs(tx-x)>Math.abs(ty-y)?(tx>x?3:2):(ty>y?0:1);
+
+  async function warp(map,x,y,dir){ await K.fade(.2,1); const prev=MAP&&MAP.name; place(map,x,y,dir); Q.safe=Math.max(Q.safe,2);
+    if(MAP.name!==prev) banner={t:MAP.name,a:0}; await K.fade(.2,0); }
+
+  function update(){
+    if(!Q||!MAP||mode!=="map"||P.mv) return;
+    if(K.take("M")){ K.run(fieldMenu); return; }
+    if(K.take("A")){ K.run(interact); return; }
+    const held=K.held; let best=null, bt=0; for(const k in DIRS) if(held[k]&&held[k]>bt){ bt=held[k]; best=k; }
+    if(!best) return;
+    const [dx,dy,dir]=DIRS[best];
+    if(P.dir!==dir&&performance.now()-held[best]<90){ P.dir=dir; return; }
+    P.dir=dir; const nx=P.x+dx, ny=P.y+dy, b=bldAt(nx,ny);
+    if(b&&dir===1&&b.doors.some(d=>d[0]===nx&&d[1]===ny)){ K.run(()=>shop(b.ev)); return; }
+    if(solid(nx,ny)) return;
+    P.fx=P.x; P.fy=P.y; P.x=nx; P.y=ny; P.mv=1; P.t=0;
+    K.tween(1/SPEED,k=>{ P.t=k; }).then(()=>{ P.mv=0; P.step^=1; onStep(); });
+  }
+  function onStep(){ Q.x=P.x; Q.y=P.y; Q.dir=P.dir; Q.map=MID;
+    const w=(MAP.warps||[]).find(w=>w[0]===P.x&&w[1]===P.y); if(w){ K.run(()=>warp(w[2],w[3],w[4],w[5])); return; }
+    const tr=(MAP.trig||[]).find(t=>t[0]===P.x&&t[1]===P.y); if(tr&&D.EV[tr[2]]){ K.run(()=>D.EV[tr[2]](E)); return; }
+    if(++Q.steps%4===0) team().forEach(m=>{ const d=dp(m); if(d.poi&&d.hp>1) d.hp--; });
+    if(!MAP.zone) return; if(Q.safe>0){ Q.safe--; return; }
+    const t=tileAt(P.x,P.y), r=t==="g"?1/9:t===","?1/40:MAP.dark?1/14:1/20;
+    if(Math.random()<r){ const F=D.ZONES[MAP.zone(P.x,P.y)]; K.run(()=>battle(F[Math.floor(Math.random()*F.length)])); }
+  }
+  async function interact(){
+    const [dx,dy]=DV[P.dir]; const e=entAt(P.x+dx,P.y+dy); if(!e) return;
+    const d=e.d; if(!["sign","chest","lantern"].includes(d.kind)) e.dir=faceTo(e.x,e.y,P.x,P.y);
+    if(d.chest) return openChest(e);
+    if(d.kind==="lantern") return K.say(Q.f.lit?"The Harbor Lantern blazes warm and bright.":"The Harbor Lantern flickers. Its lens frame sits empty and cold.");
+    if(d.ev&&D.EV[d.ev]) await D.EV[d.ev](E);
+  }
+  async function openChest(e){
+    if(Q.chest[e.id]) return K.say("The chest is empty.");
+    Q.chest[e.id]=1; const [it,n]=e.d.chest; K.jingle();
+    if(it==="gold"){ Q.gold+=n; return K.say(`Inside the chest: ${n} G!`); }
+    if(D.GEAR[it]){ Q.stash.push(it); return K.say(`Inside the chest: ${D.GEAR[it].n}!\nEquip it from the menu (C).`); }
+    give(it,n); return K.say(`Inside the chest: ${n>1?n+" ":""}${D.ITEMS[it].n}${n>1?"s":""}!`);
+  }
+
+  // ---------- script API (deep-data.js EV) ----------
+  const E={
+    say:(t,w)=>K.say(t,w), yes:(t,w)=>K.yes(t,w), f:k=>Q.f[k], set:(k,v)=>{ Q.f[k]=v===undefined?1:v; },
+    give, take:it=>{ delete Q.bag[it]; }, gold:n=>{ Q.gold+=n; }, battle:(f,o)=>battle(f,o), jingle:b=>K.jingle(b),
+    leave, card:lines=>K.menu("qcard",{items:[{t:""}],lines,cancel:false}),
+    relight:async()=>{ for(let i=0;i<6;i++){ K.jingle(i%2); await K.wait(.3); } }
+  };
+  async function leave(){ await K.fade(.35,1); Q.on=0; place("deep",4,3,3); Q.safe=3; K.toTown(9,14,1); await K.fade(.35,0); }
+
+  // ---------- entering from Tidepool Town ----------
+  async function enter(){
+    await K.fade(.4,1); K.setScene("deep"); QB=null;
+    if(K.S.deep&&K.S.deep.f){ Q=K.S.deep; Q.on=1; place("deep",4,3,3); Q.safe=3; mode="map"; banner={t:MAP.name,a:0}; await K.fade(.4,0); return; }
+    Q=fresh(); team().forEach(rest); mode="title"; await K.fade(.4,0);
+    await K.menu("qpress",{items:[{t:""}],cancel:false});
+    await K.fade(.4,1); K.S.deep=Q; place("deep",4,3,3); mode="map"; await K.fade(.4,0);
+    banner={t:MAP.name,a:0}; await D.EV.arrive(E);
+  }
+  function resume(){ Q=K.S.deep; mode="map"; QB=null; place(Q.map,Q.x,Q.y,Q.dir); Q.safe=Math.max(Q.safe||0,2); banner={t:MAP.name,a:0}; }
+  function sync(){ if(Q&&MAP&&!P.mv){ Q.map=MID; Q.x=P.x; Q.y=P.y; Q.dir=P.dir; } }
+
+  // ---------- town buildings ----------
+  async function shop(kind){
+    if(kind==="hall") return warp("lhall",5,7,1);
+    if(kind==="inn"){
+      if(!(await K.yes("Welcome to the Driftwood Inn! A sponge bed for the night is 25 G. Stay?","INNKEEPER"))) return K.say("Swim safe out there!","INNKEEPER");
+      if(Q.gold<25) return K.say("Oh dear, you're a little short on gold.","INNKEEPER");
+      Q.gold-=25; await K.fade(.5,1); team().forEach(m=>{ if(up(m)) rest(m); }); Q.inn=["harbor",3,8]; await K.wait(.5); await K.fade(.5,0);
+      K.jingle(); K.save(); await K.say("Good morning! Everyone's rested.","INNKEEPER");
+      if(team().some(m=>!up(m))) await K.say("Your knocked-out friend needs the Shrine, though. It's just down the lane.","INNKEEPER");
+      return; }
+    if(kind==="shrine"){
+      for(;;){ const opts=["Wake a friend",...(Q.f.lit?["Molt Rite"]:[]),"Leave"];
+        const c=opts[await K.ask("Shrine of the Tide. How can the current help?",opts,"SHRINE KEEPER")];
+        if(!c||c==="Leave") return K.say("May the current carry you.","SHRINE KEEPER");
+        if(c==="Wake a friend"){ const L=team().filter(m=>!up(m)); if(!L.length){ await K.say("All your friends are awake and well.","SHRINE KEEPER"); continue; }
+          const i=await shopMenu({title:"WAKE A FRIEND",items:L.map(m=>({t:nm(m),p:20+m.lv*10,d:`Wake ${nm(m)} up with 1 HP.`}))}); if(i<0) continue; const m=L[i];
+          if(Q.gold<20+m.lv*10){ await K.say("You don't have enough gold.","SHRINE KEEPER"); continue; }
+          Q.gold-=20+m.lv*10; dp(m).hp=1; K.jingle(); await K.say(`${nm(m)} opens its eyes!`,"SHRINE KEEPER"); }
+        if(c==="Molt Rite"){
+          await K.say("The Molt Rite coaxes a critter into its grown-up form early. Its calling changes too. It needs level 12 and 300 G.","SHRINE KEEPER");
+          const i=await pickAlly("Who will molt?",m=>m.lv>=12&&!!TD().SPECIES[m.sp].evo); if(i<0) continue; const m=team()[i];
+          if(Q.gold<300){ await K.say("You don't have enough gold.","SHRINE KEEPER"); continue; }
+          Q.gold-=300; await K.say(`The keeper hums an old tide song over ${nm(m)}...`,"SHRINE KEEPER"); await K.molt(m); } } }
+    if(kind==="item"){
+      const ids=Object.keys(D.ITEMS).filter(k=>D.ITEMS[k].p);
+      for(;;){ const i=await shopMenu({title:"ITEM SHOP",items:ids.map(id=>({t:D.ITEMS[id].n,p:D.ITEMS[id].p,d:D.ITEMS[id].d+`  (have ${Q.bag[id]||0})`}))});
+        if(i<0) return K.say("Come again!","SHOPKEEP"); const id=ids[i];
+        if(Q.gold<D.ITEMS[id].p){ await K.say("You don't have enough gold.","SHOPKEEP"); continue; }
+        if((Q.bag[id]||0)>=99){ await K.say("Your bag can't hold any more.","SHOPKEEP"); continue; }
+        Q.gold-=D.ITEMS[id].p; give(id,1); } }
+    if(kind==="arms"){
+      for(;;){ const c=await K.ask("Arms and shells! Buy or sell?",["Buy","Sell","Leave"],"ARMORER"); if(c<0||c===2) return;
+        if(c===1){ await sellGear(); continue; }
+        const ids=Object.keys(D.GEAR).filter(k=>D.GEAR[k].p);
+        for(;;){ const i=await shopMenu({title:"ARMS",items:ids.map(id=>({t:D.GEAR[id].n,p:D.GEAR[id].p,d:gearDesc(id)}))});
+          if(i<0) break; const id=ids[i], it=G(id);
+          if(Q.gold<it.p){ await K.say("You don't have enough gold.","ARMORER"); continue; }
+          const j=await pickAlly(`Who gets the ${it.n}?`,m=>canUse(m,id)); if(j<0) continue;
+          const m=team()[j], d=dp(m), slot=it.k; Q.gold-=it.p; if(d[slot]) Q.stash.push(d[slot]); d[slot]=id;
+          await K.say(`${nm(m)} equips the ${it.n}!`); } } }
+    if(kind==="tutor"){
+      const ids=Object.keys(D.SK).filter(k=>D.SK[k].buy);
+      for(;;){ const i=await shopMenu({title:"SKILL TUTOR",items:ids.map(id=>{ const s=D.SK[id]; return {t:s.n,p:s.buy,d:`${s.d} For a ${D.CLS[s.cls].n[0]}.`}; })});
+        if(i<0) return K.say("Practice makes perfect. Mostly.","TUTOR"); const id=ids[i], s=D.SK[id];
+        if(Q.gold<s.buy){ await K.say("You don't have enough gold.","TUTOR"); continue; }
+        const j=await pickAlly(`Who learns ${s.n}?`,m=>canBuy(m,id)); if(j<0) continue;
+        const m=team()[j]; Q.gold-=s.buy; dp(m).sk.push(id); K.jingle(); await K.say(`${nm(m)} learned ${s.n}!`); } }
+  }
+  const gearDesc=id=>{ const it=G(id), who=Object.values(D.CLS).filter(c=>(it.k==="w"?c.wpn:c.arm).includes(it.cat)).map(c=>c.n[0]);
+    return (it.k==="w"?`Attack +${it.atk}. `:`Defense +${it.def}. `)+"For: "+who.join(", ")+"."; };
+  async function sellGear(){
+    for(;;){ if(!Q.stash.length) return K.say("You have no spare gear to sell.","ARMORER");
+      const i=await shopMenu({title:"SELL",items:Q.stash.map(id=>({t:G(id).n,p:Math.floor((G(id).p||60)/2),d:gearDesc(id)}))});
+      if(i<0) return; const id=Q.stash.splice(i,1)[0]; Q.gold+=Math.floor((G(id).p||60)/2); }
+  }
+
+  // ---------- pickers (shared by field and rounds) ----------
+  const shopCur={}, shopMenu=o=>K.menu("qshop",Object.assign(o,{cur:Math.max(0,Math.min(shopCur[o.title]||0,o.items.length-1))})).then(i=>{ if(i>=0) shopCur[o.title]=i; return i; });
+  async function pickAlly(prompt,ok){ const items=team().map(m=>({t:nm(m),m,dis:!ok(m)})); return K.menu("qally",{prompt,items,cur:Math.max(0,items.findIndex(it=>!it.dis))}); }
+  const fieldOk=s=>["heal","revive","mp"].includes(s.fx)||(s.cure&&s.tg!=="foe");
+  async function pickSkill(m,field){
+    const L=skills(m); if(!L.length){ await K.say(`${nm(m)} hasn't found its calling yet.`); return null; }
+    const i=await K.menu("qskill",{m,items:L.map(id=>({t:D.SK[id].n,id,dis:dp(m).mp<D.SK[id].mp||(field&&!fieldOk(D.SK[id]))}))});
+    return i<0?null:L[i]; }
+  async function pickItem(inBattle){
+    const ids=Object.keys(Q.bag).filter(k=>Q.bag[k]>0&&D.ITEMS[k]);
+    if(!ids.length){ await K.say("The bag is empty."); return null; }
+    const i=await K.menu("qitem",{items:ids.map(id=>({t:D.ITEMS[id].n,n:Q.bag[id],id,d:D.ITEMS[id].d,dis:D.ITEMS[id].key||(inBattle&&D.ITEMS[id].field)}))});
+    return i<0?null:ids[i]; }
+  // who a skill or item can go to: knocked-out friends only for revives
+  const allyOk=o=>m=>(o.fx==="revive"||o.use==="revive")?!up(m):up(m);
+
+  // ---------- field menu ----------
+  async function fieldMenu(){
+    for(;;){
+      const opts=["ITEMS","SKILLS","EQUIP","STATUS","ORDER","SAVE"];
+      const i=await K.menu("qmain",{items:opts.map(t=>({t}))}); if(i<0) return; const o=opts[i];
+      if(o==="ITEMS") await fieldItem();
+      if(o==="SKILLS") await fieldSkill();
+      if(o==="EQUIP") await equip();
+      if(o==="STATUS"){ const j=await pickAlly("Whose status?",()=>true); if(j>=0) await K.menu("qstat",{items:[{t:""}],m:team()[j]}); }
+      if(o==="ORDER"){ if(team().length<2) continue; const a=await pickAlly("Swap who?",()=>true); if(a<0) continue; const b=await pickAlly(`Swap ${nm(team()[a])} with?`,m=>m!==team()[a]);
+        if(b>=0){ const t=team()[a]; team()[a]=team()[b]; team()[b]=t; } }
+      if(o==="SAVE"){ K.save(); await K.say("Your journey has been saved."); }
+    }
+  }
+  async function fieldItem(){
+    for(;;){ const id=await pickItem(false); if(!id) return; const I=D.ITEMS[id];
+      if(I.use==="camp"){ if(MID!=="deep"){ await K.say("You can only camp out on the open sea floor."); continue; }
+        Q.bag[id]--; await K.fade(.5,1); team().forEach(m=>{ if(up(m)) rest(m); }); await K.wait(.4); await K.fade(.5,0); K.jingle(); await K.say("Everyone curls up in a Sleep Sponge and wakes up refreshed!"); return; }
+      const j=await pickAlly(`Use the ${I.n} on who?`,allyOk(I)); if(j<0) continue;
+      await useItem(id,team()[j],false); }
+  }
+  async function fieldSkill(){
+    const c=await pickAlly("Who uses a skill?",m=>up(m)&&skills(m).some(id=>fieldOk(D.SK[id]))); if(c<0) return; const m=team()[c];
+    for(;;){ const id=await pickSkill(m,true); if(!id) return; const s=D.SK[id]; let t=null;
+      if(s.tg==="ally"){ const j=await pickAlly(`${s.n} on who?`,allyOk(s)); if(j<0) continue; t=team()[j]; }
+      await useSkill(m,id,t,false); }
+  }
+  async function useItem(id,t,inB){
+    const I=D.ITEMS[id], d=dp(t), i=team().indexOf(t); if(!(Q.bag[id]>0)){ await say2("But there are none left!",inB); return; }
+    Q.bag[id]--;
+    if(I.use==="heal"){ if(!up(t)){ await say2(`${nm(t)} is knocked out. Nothing happens.`,inB); return; } const h=Math.min(I.v,mhp(t)-d.hp); d.hp+=h; pop(i,h,"#7dffa0",inB); await say2(`${nm(t)} recovers ${h} HP.`,inB); }
+    if(I.use==="mp"){ const h=Math.min(I.v,mmp(t)-d.mp); d.mp+=h; await say2(`${nm(t)} recovers ${h} MP.`,inB); }
+    if(I.use==="cure"){ d.poi=0; await say2(`${nm(t)} is no longer poisoned.`,inB); }
+    if(I.use==="revive"){ if(up(t)){ await say2("Nothing happens.",inB); return; } d.hp=Math.max(1,Math.floor(mhp(t)/4)); pop(i,d.hp,"#7dffa0",inB); await say2(`${nm(t)} wakes up!`,inB); }
+  }
+  async function equip(){
+    const j=await pickAlly("Equip who?",()=>true); if(j<0) return; const m=team()[j], d=dp(m);
+    for(;;){ const s=await K.menu("list",{items:[{t:"Weapon: "+(d.w?G(d.w).n:"none")},{t:"Armor: "+(d.a?G(d.a).n:"none")}]}); if(s<0) return;
+      const slot=s?"a":"w", opts=Q.stash.map((id,k)=>({id,k})).filter(o=>G(o.id).k===slot);
+      const items=[{t:"(take off)"},...opts.map(o=>({t:G(o.id).n+(canUse(m,o.id)?"":" (can't)"),o,dis:!canUse(m,o.id)}))];
+      const c=await K.menu("list",{items}); if(c<0) continue;
+      const old=d[slot], pick=items[c].o; if(pick) Q.stash.splice(pick.k,1); d[slot]=pick?pick.id:null; if(old) Q.stash.push(old);
+    }
+  }
+
+  // ---------- skills: one routine for the field and for rounds ----------
+  const EC={tide:"#9fe6ff",kelp:"#7be08a",vent:"#ff7a3d",shell:"#ffe0a0"};
+  async function useSkill(m,id,tgt,inB){
+    const s=D.SK[id], d=dp(m), mi=team().indexOf(m);
+    if(d.mp<s.mp){ await say2(`${nm(m)} is out of MP!`,inB); return; }
+    d.mp-=s.mp; if(inB) await msg(`${nm(m)}: ${s.n}!`,.55);
+    if(s.hpcost) d.hp=Math.max(1,d.hp-Math.ceil(mhp(m)*s.hpcost));
+    if(s.tg==="foe"||s.tg==="foes"||s.tg==="foes2"){
+      let L=s.tg==="foe"?[tgt&&!tgt.dead?tgt:aliveFoes()[0]]:aliveFoes();
+      if(s.tg==="foes2") L=L.sort(()=>Math.random()-.5).slice(0,2);
+      let strong=0, weak=0, said=[];
+      for(const f of L.filter(Boolean)){ const M=D.MON[f.id];
+        if(s.fx==="evict"&&!M.boss&&f.hp<=M.hp*.35){ f.hp=0; await killFoe(f); said.push(`${M.n} was evicted!`); continue; }
+        if(s.pw||s.mul){ const e=s.el?TD().eff(s.el,M.t):1; let dmg=0;
+          for(let h=0;h<(s.hits||1);h++){ const a0=atk(m)*buffAtk(mi);
+            dmg+=s.pw?rnd(s.pw[0],s.pw[1])+Math.floor(intl(m)/2):Math.max(1,Math.floor(rnd(a0,a0*2)*s.mul)-(s.pierce?0:M.def)); }
+          if(QB.ms[mi].amb){ dmg*=2; QB.ms[mi].amb=0; }
+          if(CI(m)[0]==="somm"&&s.el==="tide") dmg*=1.2;
+          dmg=Math.max(1,Math.floor(dmg*e)); if(e>1) strong=1; if(e<1) weak=1;
+          parts(f.x+fsz(f)/2,f.y+fsz(f)/2,EC[s.el]||"#ffffff",12); hurtFoe(f,dmg); }
+        if(f.dead) continue;
+        if(s.fx==="poison"&&Math.random()<(s.ch||1)){ f.poi=1; }
+        if(s.fx==="sleep"){ if(M.boss) said.push(`${M.n} shrugs it off!`); else if(Math.random()<s.ch){ f.sleep=rnd(1,2); said.push(`${M.n} stops to stare. It won't act!`); } else said.push(`${M.n} isn't fooled.`); }
+        if(s.fx==="atkDn") f.atkDn=1; if(s.fx==="hitDn") f.hitDn=1;
+        if(s.fx==="steal"){ if(f.stolen){ said.push("Nothing left to swipe!"); continue; } f.stolen=1;
+          if(Math.random()<.5){ const n=M.g*2+rnd(0,10); Q.gold+=n; said.push(`Swiped ${n} G!`); }
+          else { const it=Math.random()<.7?"tonic":"spritz"; give(it,1); said.push(`Swiped a ${D.ITEMS[it].n}!`); } }
+      }
+      await K.wait(.4);
+      if(s.fx==="atkDn") said.push("The foes hit softer now."); if(s.fx==="hitDn") said.push("The foes can barely see!");
+      if(s.fx==="poison"&&L.some(f=>f&&f.poi&&!f.dead)) said.push("Poisoned!");
+      if(strong) said.unshift("It's extra effective!"); else if(weak) said.unshift("It barely stings...");
+      const fell=L.filter(f=>f&&f.dead&&!f.told); fell.forEach(f=>f.told=1); if(fell.length) said.push(fell.length>1?"The foes are defeated!":`${D.MON[fell[0].id].n} is defeated!`);
+      if(s.self){ d.hp=Math.max(1,d.hp-Math.ceil(mhp(m)*s.self)); pop(mi,Math.ceil(mhp(m)*s.self),"#ffffff",1); }
+      for(const t of said) await msg(t,.55);
+      return; }
+    if(s.fx==="flow") return flow(m,inB);
+    const L=s.tg==="self"?[m]:s.tg==="ally"?[tgt]:team().filter(up);
+    const lines=[];
+    for(const t of L){ const td=dp(t), i=team().indexOf(t);
+      if(s.fx==="revive"){ if(up(t)){ lines.push(`${nm(t)} is already awake.`); continue; } td.hp=Math.max(1,Math.floor(mhp(t)*s.pct)); pop(i,td.hp,"#7dffa0",inB); lines.push(`${nm(t)} wakes up!`); continue; }
+      if(!up(t)) continue;
+      if(s.fx==="heal"){ const h=Math.min(mhp(t)-td.hp,s.pct?Math.floor(mhp(t)*s.pct):rnd(s.pw[0],s.pw[1])+Math.floor(intl(m)/2)); td.hp+=h; pop(i,h,"#7dffa0",inB); }
+      if(s.cure) td.poi=0;
+      if(s.fx==="mp"){ const h=Math.min(s.v,mmp(t)-td.mp); td.mp+=h; lines.push(`${nm(t)} gets ${h} MP.`); }
+      if(inB){ const ms=QB.ms[i];
+        if(s.fx==="guard"){ ms.guard=1; lines.push(`${nm(t)} hunkers down. Come at it!`); }
+        if(s.fx==="counter"){ ms.counter=1; lines.push(`${nm(t)} puffs up, spines out!`); }
+        if(s.fx==="hide"){ ms.hide=1; ms.amb=1; lines.push(`${nm(t)} is just some seaweed now.`); }
+        if(s.fx==="defUp") ms.def+=5; if(s.fx==="atkUp") ms.atk=Math.min(2,ms.atk+1); if(s.fx==="agiUp"){ ms.agi+=6; ms.eva+=8; } if(s.fx==="evaUp") ms.eva+=15; }
+    }
+    if(s.fx==="heal"){ if(CI(m)[0]==="sauce") team().filter(up).forEach(t=>{ dp(t).hp=Math.min(mhp(t),dp(t).hp+3); });
+      lines.push(L.length>1?"Everyone feels better!":`${nm(L[0])} feels better!`); }
+    if(s.cure&&s.fx!=="heal") lines.push("Cured!");
+    if(s.fx==="defUp") lines.push("Everyone's shell hardens!"); if(s.fx==="atkUp") lines.push("Everyone's fired up!");
+    if(s.fx==="agiUp") lines.push("Everyone sways to the beat. Quicker now!"); if(s.fx==="evaUp") lines.push("Everyone's harder to hit!");
+    for(const t of lines) await say2(t,inB);
+  }
+  async function flow(m,inB){   // Go With the Flow: the current picks the song
+    const r=Math.random();
+    if(r<.3){ team().filter(up).forEach(t=>{ const h=Math.floor(mhp(t)*.3); dp(t).hp=Math.min(mhp(t),dp(t).hp+h); pop(team().indexOf(t),h,"#7dffa0",inB); }); return say2("A warm current! Everyone feels better.",inB); }
+    if(r<.6&&inB){ for(const f of aliveFoes()) hurtFoe(f,rnd(10,18)+Math.floor(intl(m)/2)); await K.wait(.4); return msg("A riptide crashes into every foe!"); }
+    if(r<.85&&inB){ QB.ms.forEach(x=>x.atk=Math.min(2,x.atk+1)); return msg("An upbeat current! Everyone's fired up."); }
+    return say2("The current took the song somewhere else. Nothing happens.",inB);
+  }
+
+  // ---------- rounds ----------
+  // smaller teams meet smaller groups; a big foe keeps its helpers
+  function mkFoes(form){ const n=team().length, L=[];
+    for(const [id,c] of form){ const k=n>=4||D.MON[id].boss?c:Math.max(1,Math.round(c*(n+1)/5)); for(let i=0;i<k;i++) L.push({id,hp:D.MON[id].hp,dead:0,fade:0,fl:0,lx:0}); }
+    const F=L.slice(0,6), big=F.find(f=>D.MON[f.id].art[2]&&D.MON[f.id].art[2].big);
+    if(big){ big.x=8; big.y=26; F.filter(f=>f!==big).forEach((f,i)=>{ f.x=64+(i>=3?32:0); f.y=16+(i%3)*30; }); }
+    else { const cols=F.length>3?2:1; F.forEach((f,i)=>{ const c=cols===2?Math.floor(i/3):0, r=cols===2?i%3:i; f.x=cols===2?14+c*48:36; f.y=(cols===2?16:Math.round((3-F.length)*15)+16)+r*30; }); }   // rows clear of the message bar
+    return F; }
+  const msg=async(t,s)=>{ QB.msg=t; await K.wait((K.held.A?.45:1)*(s||.75)); };
+  const say2=(t,inB)=>inB&&QB?msg(t):K.say(t);
+  const py=i=>16+i*22;   // team icons on the right, clear of the message bar
+  function pop(i,n,c,inB){ if(!inB||!QB) return; QB.pops.push({x:212,y:py(i)+6,s:String(n),c,t:0}); }
+  const aliveFoes=()=>QB.foes.filter(f=>!f.dead);
+  function parts(x,y,c,n){ for(let i=0;i<(n||10);i++) QB.parts.push({x:x+(Math.random()-.5)*24,y:y+(Math.random()-.5)*20,vx:(Math.random()-.5)*40,vy:-20-Math.random()*30,life:.6+Math.random()*.3,c}); }
+  const fsz=f=>D.mon(f.id).width, buffAtk=i=>1+.3*QB.ms[i].atk;
+  const STANCE=["guard","counter","hide"];
+  const mkMs=()=>({atk:0,def:0,agi:0,eva:0,guard:0,counter:0,hide:0,amb:0});
+
+  async function battle(form,opt){ opt=opt||{};
+    K.fadeKind("bubbles"); await K.fade(.45,1);
+    QB={foes:mkFoes(form),opt,boss:!!opt.boss,msg:"",pops:[],parts:[],cur:-1,act:-1,ms:team().map(mkMs),shake:team().map(()=>0),dark:!!MAP.dark};
+    mode="battle"; K.fadeKind("black"); await K.fade(.35,0);
+    await msg(QB.boss?`${D.MON[QB.foes[0].id].n} blocks the way!`:QB.foes.length>1?"Foes swim out of the gloom!":"A foe swims out of the gloom!",.9);
+    let res=null, round=0;
+    while(!res){ round++;
+      const acts=[], n=team().length; let i=0;
+      while(i<n){ const m=team()[i]; if(!up(m)){ i++; continue; }
+        QB.cur=i; QB.msg=`${nm(m)} the ${cname(m)}`; const a=await command(m);
+        if(!a){ let j=i-1; while(j>=0&&!up(team()[j])) j--; if(j>=0){ acts.pop(); i=j; } continue; }
+        a.side="p"; a.i=i; acts.push(a); i++; }
+      QB.cur=-1;
+      for(const f of QB.foes) if(!f.dead) acts.push({side:"f",f});
+      acts.forEach(a=>a.spd=(a.side==="p"?agi(team()[a.i])+QB.ms[a.i].agi:D.MON[a.f.id].agi)+rnd(0,12)+(a.k==="skill"&&STANCE.includes(D.SK[a.id].fx)?999:0));
+      acts.sort((a,b)=>b.spd-a.spd);   // stances (guard, puff up, blend in) always go first
+      for(const a of acts){
+        if(a.side==="p"){ const m=team()[a.i]; if(!up(m)) continue; QB.act=a.i; const r=await partyAct(m,a); QB.act=-1; if(r){ res=r; break; } }
+        else { if(a.f.dead) continue; await foeAct(a.f,round); }
+        if(QB.foes.every(f=>f.dead)){ res="win"; break; }
+        if(!team().some(up)){ res="lose"; break; }
+      }
+      if(!res) res=await roundEnd();
+      QB.msg="";
+    }
+    if(res==="win"){
+      let xp=0, gold=0; for(const f of QB.foes){ xp+=D.MON[f.id].xp; gold+=D.MON[f.id].g; }
+      const rent=Math.max(0,...has("landlord").map(m=>tier(m)?.3:.15)); gold=Math.floor(gold*(1+rent));
+      const live=team().filter(up), each=Math.max(1,Math.floor(xp*(K.S.perks.pearl?1.2:1)/live.length)); Q.gold+=gold; QB.msg="";
+      await K.say(`Victory! The team gets ${gold} G${rent?" (rent included)":""} and ${each} XP each.`);
+      if(has("impostor").length&&Math.random()<.2){ const it=Math.random()<.7?"tonic":"spritz"; give(it,1); await K.say(`${nm(has("impostor")[0])} swiped a ${D.ITEMS[it].n} on the way out!`); }
+      for(const m of live) await K.grow(m,each);
+    }
+    if(res==="lose"){
+      await K.say("The whole team is knocked out..."); await K.say("A kind current sweeps them all the way back to the harbor.");
+      await K.fade(.6,1); mode="map"; QB=null; Q.gold=Math.floor(Q.gold/2); team().forEach(rest); const h=Q.inn; place(h[0],h[1],h[2],0); Q.safe=3;
+      await K.fade(.6,0); await K.say("You wake up at the Driftwood Inn, sore but safe. Half your gold washed away."); return res; }
+    await K.fade(.3,1); mode="map"; QB=null; Q.safe=2; await K.fade(.3,0);
+    return res;
+  }
+  async function roundEnd(){
+    for(const m of team()){ const d=dp(m), i=team().indexOf(m); if(!up(m)) continue;
+      if(d.poi){ const x=Math.max(1,Math.floor(mhp(m)/16)); d.hp=Math.max(1,d.hp-x); pop(i,x,"#b6ff6a",1); await msg(`${nm(m)} is hurt by poison.`,.5); }
+      if(CI(m)[0]==="lender"&&d.hp<mhp(m)){ const h=Math.max(1,Math.floor(mhp(m)*.05)); d.hp=Math.min(mhp(m),d.hp+h); pop(i,h,"#7dffa0",1); } }
+    if(has("crooner").length) team().filter(up).forEach(m=>{ dp(m).mp=Math.min(mmp(m),dp(m).mp+1); });
+    for(const f of aliveFoes()) if(f.poi){ hurtFoe(f,Math.max(1,Math.floor(D.MON[f.id].hp/10))); }
+    if(aliveFoes().some(f=>f.poi)) await K.wait(.4);
+    QB.ms.forEach(s=>{ s.guard=0; s.counter=0; s.hide=0; });
+    if(QB.foes.every(f=>f.dead)) return "win";
+    return null;
+  }
+  async function command(m){
+    for(;;){ if(!aliveFoes().length) return {k:"wait"};
+      const c=await K.menu("qcmd",{items:[{t:"FIGHT"},{t:"SKILL",dis:!skills(m).length},{t:"ITEM"},{t:"RUN"}]});
+      if(c<0) return null;
+      if(c===0){ const f=await pickFoe(); if(f) return {k:"fight",t:f}; }
+      if(c===1){ const id=await pickSkill(m,false); if(!id) continue; const s=D.SK[id]; let t=null;
+        if(s.tg==="foe"){ t=await pickFoe(); if(!t) continue; }
+        if(s.tg==="ally"){ const j=await pickAlly(`${s.n} on who?`,allyOk(s)); if(j<0) continue; t=team()[j]; }
+        return {k:"skill",id,t}; }
+      if(c===2){ const id=await pickItem(true); if(!id) continue; const I=D.ITEMS[id];
+        const j=await pickAlly(`Use the ${I.n} on who?`,allyOk(I)); if(j<0) continue; return {k:"item",id,t:team()[j]}; }
+      if(c===3) return {k:"run"};
+    }
+  }
+  async function pickFoe(){ const L=aliveFoes(); if(!L.length) return null; const i=await K.menu("qtgt",{items:L.map(f=>({t:D.MON[f.id].n,f})),lr:1}); return i<0?null:L[i]; }
+
+  async function killFoe(f){ f.dead=1; await K.tween(.35,k=>{ f.fade=k; }); }
+  function hurtFoe(f,d){ f.hp-=d; f.fl=.35; QB.pops.push({x:f.x+fsz(f)/2,y:f.y+8,s:String(d),c:"#ffffff",t:0});
+    if(f.hp<=0&&!f.dead) return killFoe(f); return Promise.resolve(); }
+  function hurtMember(m,d){ const i=team().indexOf(m), dd=dp(m); dd.hp=Math.max(0,dd.hp-d); QB.shake[i]=.35; pop(i,d,"#ffffff",1); if(!dd.hp) dd.poi=0; }
+
+  async function partyAct(m,a){
+    const mi=team().indexOf(m);
+    if(a.k==="run"){
+      if(QB.boss){ await msg("There's no swimming away from this one!"); return null; }
+      const fa=aliveFoes().reduce((s,f)=>s+D.MON[f.id].agi,0)/Math.max(1,aliveFoes().length);
+      const ch=clamp(.55+(agi(m)-fa)*.03+(CI(m)[0]==="impostor"?.3:0),.1,.97);
+      if(Math.random()<ch){ await msg(`${nm(m)} leads everyone away!`); return "run"; }
+      await msg(`${nm(m)} couldn't get away!`); return null; }
+    if(a.k==="item"){ await msg(`${nm(m)} uses a ${D.ITEMS[a.id].n}.`,.5); await useItem(a.id,a.t,true); return null; }
+    if(a.k==="skill"){ await useSkill(m,a.id,a.t,true); return null; }
+    if(a.k==="fight"){
+      const f=a.t&&!a.t.dead?a.t:aliveFoes()[0]; if(!f) return null; const M=D.MON[f.id], w=G(dp(m).w), n=hits(m), crit=CI(m)[0]==="raver"?.15:.04;
+      let tot=0, land=0, cr=0;
+      for(let h=0;h<n;h++){ if(rnd(1,100)>clamp(80+(w?w.hit:0)+agi(m)/2-M.ev,15,98)) continue;
+        land++; const a0=Math.floor(atk(m)*buffAtk(mi)); let d=rnd(a0,a0*2)-M.def; if(Math.random()<crit){ d+=a0; cr=1; } tot+=Math.max(1,d); }
+      if(QB.ms[mi].amb&&land){ tot*=2; QB.ms[mi].amb=0; }
+      QB.msg=`${nm(m)} attacks ${M.n}`+(n>1?` (${land} hit${land===1?"":"s"})`:"");
+      if(!land){ QB.pops.push({x:f.x+fsz(f)/2,y:f.y+8,s:"Miss",c:"#bfe6ff",t:0}); await msg(QB.msg,.6); return null; }
+      parts(f.x+fsz(f)/2,f.y+fsz(f)/2,"#ffffff",6); await hurtFoe(f,tot); await msg(QB.msg+(cr?" Lucky hit!":""),.6);
+      if(f.dead) await msg(`${M.n} is defeated!`,.5);
+      return null; }
+    return null;
+  }
+  async function foeAct(f,round){
+    const M=D.MON[f.id], L=team().filter(up); if(!L.length) return;
+    if(f.sleep>0){ f.sleep--; await msg(`${M.n} is too dazed to act.`,.5); return; }
+    await K.tween(.15,k=>{ f.lx=Math.sin(k*Math.PI)*8; }); f.lx=0;
+    const atkMul=f.atkDn?.75:1;
+    if(M.slam&&round%M.slam===0){ await msg(`${M.n} swings his rusty anchor!`,.6);
+      for(const m of L){ const i=team().indexOf(m); if(QB.ms[i].hide) continue; hurtMember(m,Math.max(1,Math.floor(rnd(14,22)*atkMul)-Math.floor((def(m)+QB.ms[i].def)/2))); }
+      await K.wait(.5); const ko=L.filter(m=>!up(m)); if(ko.length) await msg(ko.map(nm).join(" and ")+(ko.length>1?" are":" is")+" knocked out!");
+      return; }
+    // a guarding critter draws the hit; hidden ones can't be picked; otherwise the front of the line gets picked on more
+    const pool=team().map((m,i)=>({m,i})).filter(o=>up(o.m)&&!QB.ms[o.i].hide);
+    if(!pool.length){ await msg(`${M.n} looks around. Where did everyone go?`,.6); return; }
+    const g2=pool.find(o=>QB.ms[o.i].guard); let pick=g2;
+    if(!pick){ const wts=pool.map(o=>[4,3,2,2][o.i]); let r=Math.random()*wts.reduce((a,b)=>a+b,0), k=0; while(k<pool.length-1&&(r-=wts[k])>0) k++; pick=pool[k]; }
+    const t=pick.m, ti=pick.i, ms=QB.ms[ti];
+    if(M.zap&&Math.random()<M.zap){ await msg(`${M.n} crackles with a shock!`,.5); parts(212,py(ti)+12,"#ffe14d",12);
+      hurtMember(t,rnd(10,18)); await K.wait(.4); if(!up(t)) await msg(`${nm(t)} is knocked out!`); return; }
+    const ch=clamp(85-agi(t)/2-ms.eva-(f.hitDn?25:0)-(CI(t)[0]==="raver"?10:0),15,95);
+    QB.msg=`${M.n} attacks ${nm(t)}`;
+    if(rnd(1,100)>ch){ pop(ti,"Miss","#bfe6ff",1); await msg(QB.msg,.55); return; }
+    const guardDef=ms.guard?Math.floor(def(t)*.8):0, puff=ms.counter?6:0;
+    hurtMember(t,Math.max(1,Math.floor(rnd(M.atk,M.atk*2)*atkMul)-def(t)-ms.def-guardDef-puff));
+    await msg(QB.msg,.55);
+    if(!up(t)){ await msg(`${nm(t)} is knocked out!`); return; }
+    if(M.poi&&!dp(t).poi&&Math.random()<M.poi){ dp(t).poi=1; await msg(`${nm(t)} is poisoned!`,.6); }
+    if(CI(t)[0]==="frill"&&!f.poi&&Math.random()<.3){ f.poi=1; await msg(`${M.n} got a mouthful of ${nm(t)}. Yuck! It's poisoned.`,.7); }
+    if(ms.counter||(CI(t)[0]==="puff"&&Math.random()<.2)){ const d=Math.max(1,rnd(atk(t),atk(t)*2)-M.def); await hurtFoe(f,d); await msg(`${nm(t)} punches back!`,.55); if(f.dead) await msg(`${M.n} is defeated!`,.5); }
+  }
+
+  // ---------- drawing ----------
+  const tileImg=(ch,v,f)=>D.tile(ch,v,f)||K.A.tile(ch,v,f), FLIP=new Map();
+  function drawMap(){
+    const G2=g(), A=K.A, time=K.time;
+    const px=(P.mv?P.fx+(P.x-P.fx)*P.t:P.x)*16, py=(P.mv?P.fy+(P.y-P.fy)*P.t:P.y)*16, mw=MAP.w*16, mh=MAP.h*16;
+    const ox=Math.round(mw<=W?-(W-mw)/2:clamp(px+8-W/2,0,mw-W)), oy=Math.round(mh<=H?-(H-mh)/2:clamp(py+8-H/2,0,mh-H));
+    G2.fillStyle=MAP.dark?"#1a0f0a":MAP.out?"#1fa39a":"#3b2a55"; G2.fillRect(0,0,W,H);
+    const f=Math.floor(time*2.2)%2;
+    for(let y=Math.max(0,Math.floor(oy/16));y<Math.min(MAP.h,Math.ceil((oy+H)/16)+1);y++)
+      for(let x=Math.max(0,Math.floor(ox/16));x<Math.min(MAP.w,Math.ceil((ox+W)/16)+1);x++){ const t=MAP.rows[y][x], an=t==="g"||D.ANIM.includes(t);
+        G2.drawImage(tileImg(t,(x*7+y*13)%8,an?(f+(x+y))%2:0),x*16-ox,y*16-oy); }
+    const L=[];
+    (MAP.bld||[]).forEach(b=>L.push({y:b.y+b.h-1,d:()=>{ const im=A.building(b.k), bx=b.x*16-ox+Math.round((b.w*16-im.width)/2), by=(b.y+b.h)*16-oy-im.height;
+      G2.drawImage(im,bx,by); if(b.label){ const w=A.textW(b.label)+8, cx=b.x*16-ox+b.w*8; box(cx-w/2,by-6,w,12,"#ff6f61","#ffffff"); T(b.label,cx-w/2+4,by-4,"#ffffff","#a8322a"); } }}));
+    ents.forEach(e=>{ if(!vis(e)) return; L.push({y:e.y,d:()=>{ const k=e.d.kind;
+      let im=k==="chest"?D.ent("chest",Q.chest[e.id]?"open":""):k==="lantern"?D.ent("lantern",Q.f.lit?"lit":""):k==="captain"?D.ent("captain"):A.npc(k);
+      if(e.dir===3&&k!=="chest"&&k!=="lantern"&&k!=="sign") im=FLIP.get(im)||(FLIP.set(im,A.flip(im)),FLIP.get(im));
+      G2.drawImage(im,e.x*16-ox,e.y*16-oy-(k==="chest"?0:3));
+      if(k==="lantern"&&Q.f.lit){ G2.globalAlpha=.25+Math.sin(time*4)*.08; G2.fillStyle="#fff27a"; G2.beginPath(); G2.arc(e.x*16-ox+8,e.y*16-oy+4,16,0,7); G2.fill(); G2.globalAlpha=1; } }}); });
+    const fr=P.mv?(P.t<.5?P.step:0):0, ld=leader();
+    L.push({y:P.mv?Math.max(P.y,P.fy):P.y,d:()=>{ G2.drawImage(icon(ld,P.dir===2),Math.round(px-ox)-4,Math.round(py-oy)-10+(P.mv?-fr:0)); }});
+    L.sort((a,b)=>a.y-b.y).forEach(e=>e.d());
+    if(MAP.dark){ const cx=px-ox+8, cy=py-oy+6, gr=G2.createRadialGradient(cx,cy,24,cx,cy,120); gr.addColorStop(0,"rgba(10,4,20,0)"); gr.addColorStop(1,"rgba(10,4,20,.72)"); G2.fillStyle=gr; G2.fillRect(0,0,W,H); }
+    else if(MID==="deep"&&!Q.f.lit){ G2.fillStyle="rgba(20,30,90,.16)"; G2.fillRect(0,0,W,H); }
+    if(MAP.out){ G2.globalAlpha=.06; G2.fillStyle="#ffffff"; for(let i=0;i<5;i++){ const x=((i*67+time*9)%(W+60))-30; for(let y=0;y<H;y+=2) G2.fillRect(Math.round(x+Math.sin(y*.05+time+i)*6+y*.3),y,6,2); } G2.globalAlpha=1; }
+    if(banner){ banner.a+=1/60; const s=banner.a<.3?banner.a/.3:banner.a>2.2?Math.max(0,1-(banner.a-2.2)/.3):1; if(banner.a>2.5) banner=null;
+      else { const w=K.A.textW(banner.t)+16; box(4,Math.round(-20+24*s),w,16); T(banner.t,12,Math.round(-20+24*s)+4); } }
+  }
+
+  function drawBattle(dt){
+    const G2=g(), A=K.A, time=K.time;
+    if(QB.dark){ for(let y=0;y<104;y+=4){ G2.fillStyle=A.mix("#3a2418","#120a08",y/104); G2.fillRect(0,y,W,4); } G2.fillStyle="#5d3a24"; G2.fillRect(0,80,W,24); for(let x=0;x<W;x+=16){ G2.fillStyle="#4d3226"; G2.fillRect(x,80,1,24); } }
+    else { for(let y=0;y<104;y+=4){ G2.fillStyle=A.mix("#3fa9e0","#1b4f9c",y/104); G2.fillRect(0,y,W,4); }
+      G2.globalAlpha=.12; G2.fillStyle="#ffffff"; for(let i=0;i<4;i++){ const x=(i*70+time*6)%300-30; G2.beginPath(); G2.moveTo(x,0); G2.lineTo(x+18,0); G2.lineTo(x-20,104); G2.lineTo(x-34,104); G2.fill(); } G2.globalAlpha=1;
+      G2.fillStyle="#ffe9b8"; G2.fillRect(0,84,W,20); for(let x=0;x<W;x+=8){ G2.fillStyle="#f9d792"; G2.fillRect(x+(x*7)%5,88+(x%3)*4,2,1); } }
+    const u=K.ui(), tgt=u&&u.kind==="qtgt"&&u.items[u.cur]?u.items[u.cur].f:null, blink=Math.floor(time*6)%2;
+    for(const f of QB.foes){ if(f.fade>=1) continue; f.fl=Math.max(0,f.fl-dt); if(f.fl>0&&Math.floor(time*24)%2) continue;
+      const im=D.mon(f.id), bob=Math.round(Math.sin(time*2.5+f.x*.1)*1);
+      if(f.fade>0){ G2.globalAlpha=1-f.fade; G2.drawImage(im,f.x+f.lx,f.y+bob+Math.round(f.fade*6)); G2.globalAlpha=1; } else G2.drawImage(im,f.x+f.lx,f.y+bob);
+      if(f===tgt&&blink) T(">",f.x-6,f.y+im.height/2-4,"#ffd84d","#7a3d00"); }
+    team().forEach((m,i)=>{ QB.shake[i]=Math.max(0,QB.shake[i]-dt); const fwd=(QB.cur===i||QB.act===i)?-14:0, sx=QB.shake[i]>0?Math.round(Math.sin(time*70)*2):0;
+      const d=dp(m), low=up(m)&&d.hp<mhp(m)/4, ms=QB.ms[i]||{};
+      if(!up(m)||ms.hide) G2.globalAlpha=up(m)?.5:.3;
+      G2.drawImage(icon(m,1),200+fwd+sx,py(i)+(low?2:0)+(up(m)&&!low?Math.round(Math.sin(time*3+i)):0)); G2.globalAlpha=1;
+      if(d.poi&&up(m)){ G2.fillStyle="#9be35a"; G2.fillRect(222+fwd,py(i)+4+Math.round(Math.sin(time*4+i)*2),2,2); }
+      if((ms.def>0||ms.guard||ms.counter)&&up(m)){ G2.strokeStyle="rgba(191,230,255,.7)"; G2.strokeRect(198+fwd,py(i)-1,28,26); } });
+    QB.parts=QB.parts.filter(p=>(p.life-=dt)>0); QB.parts.forEach(p=>{ p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=40*dt; G2.fillStyle=Math.floor(p.life*10)%2?p.c:"#ffffff"; G2.fillRect(Math.round(p.x),Math.round(p.y),2,2); });
+    QB.pops=QB.pops.filter(p=>(p.t+=dt)<.9); QB.pops.forEach(p=>{ const w=A.textW(p.s); T(p.s,Math.round(p.x-w/2),Math.round(p.y-Math.min(p.t,.25)*40),p.c,"#1a1030"); });
+    if(QB.msg){ const w=Math.min(W-8,A.textW(QB.msg)+16); box(W/2-w/2,2,w,15); T(QB.msg,W/2-w/2+8,5); }
+    // bottom: foe names, team HP/MP
+    box(2,106,108,52); const cnt={}; aliveFoes().forEach(f=>cnt[f.id]=(cnt[f.id]||0)+1);
+    Object.keys(cnt).slice(0,4).forEach((id,i)=>{ T(D.MON[id].n,10,111+i*11); if(cnt[id]>1) T("x"+cnt[id],92,111+i*11,"#ffd84d"); });
+    box(110,106,128,52);
+    team().forEach((m,i)=>{ const y=111+i*11, on=QB.cur===i, d=dp(m); if(on) T(">",113,y,"#ffd84d","#7a3d00");
+      let n=nm(m); while(A.textW(n)>48) n=n.slice(0,-1); const hs=up(m)?`${d.hp}/${mhp(m)}`:"KO";
+      T(n,120,y,up(m)?(on?"#ffd84d":"#ffffff"):"#ff8f8f"); T(hs,210-A.textW(hs),y,up(m)&&d.hp<mhp(m)/4?"#ffcf3d":up(m)?"#ffffff":"#ff8f8f");
+      T(String(d.mp),214,y,"#7be0ff"); if(d.poi&&up(m)) T("P",230,y,"#9be35a"); });
+  }
+
+  function drawTitle(){ const G2=g(), A=K.A, time=K.time;
+    for(let y=0;y<H;y+=4){ G2.fillStyle=A.mix("#1b4f9c","#0b1a40",y/H); G2.fillRect(0,y,W,4); }
+    for(let i=0;i<18;i++){ const k=(time*.12+i*.057)%1; G2.fillStyle="rgba(191,230,255,.55)"; G2.fillRect(Math.round((i*41)%W+Math.sin(time+i)*4),Math.round(H-k*H),2,2); }
+    G2.globalAlpha=.35+Math.sin(time*2)*.1; G2.fillStyle="#fff27a"; G2.beginPath(); G2.arc(W/2,58,30,0,7); G2.fill(); G2.globalAlpha=1;
+    G2.drawImage(D.ent("lantern","lit"),W/2-8,50);
+    K.bigC("LANTERN",W/2+1,9,3,"#0b1a40",null); K.bigC("LANTERN",W/2,8,3,"#ffd84d","#a8322a");
+    K.bigC("DEEP",W/2+1,82,3,"#0b1a40",null); K.bigC("DEEP",W/2,81,3,"#7be0ff","#1d2c78");
+    const n=team().length; team().forEach((m,i)=>G2.drawImage(icon(m),W/2-n*14+i*28+2,112+Math.round(Math.sin(time*2+i)*2)));
+    if(Math.floor(time*2)%2) T("Press Z",W/2-A.textW("Press Z")/2,142,"#ffffff","#0b1a40");
+  }
+  function drawPanels(cur,dis){ const G2=g(), time=K.time;
+    team().forEach((m,i)=>{ const y=2+i*39, d=dp(m); box(2,y,160,38,undefined,i===cur?"#ffd84d":undefined);
+      if(!up(m)) G2.globalAlpha=.4; G2.drawImage(icon(m),5,y+7+(i===cur?Math.round(Math.sin(time*6)):0)); G2.globalAlpha=1;
+      T(nm(m),32,y+5,dis&&dis[i]&&dis[i].dis?"#7f93c0":i===cur?"#ffd84d":"#ffffff"); T("Lv "+m.lv,124,y+5);
+      T(cname(m),32,y+16,tier(m)?"#ffd84d":"#bfe6ff"); if(!up(m)) T("KO",136,y+27,"#ff8f8f"); else if(d.poi) T("POI",136,y+27,"#9be35a");
+      T(`HP ${d.hp}/${mhp(m)}`,32,y+27,up(m)&&d.hp<mhp(m)/4?"#ffcf3d":"#ffffff"); T(`MP ${d.mp}`,96,y+27,"#7be0ff"); });
+  }
+  function draw(dt){ if(!Q) return;
+    if(mode==="title") return drawTitle();
+    if(mode==="battle"&&QB) return drawBattle(dt);
+    if(MAP) drawMap();
+  }
+  function list(u,x,y,w,fmt,st){ st=st||12; const n=u.items.length; box(x,y,w,12+n*st);
+    u.items.forEach((it,i)=>{ T(it.t,x+14,y+6+i*st,it.dis?"#7f93c0":undefined); if(fmt) fmt(it,x,y+6+i*st); if(i===u.cur) T(">",x+5,y+6+i*st,"#ffd84d","#7a3d00"); }); }
+  function descBox(s){ box(2,122,W-4,36); K.A.wrap(s,224).slice(0,2).forEach((l,i)=>T(l,10,128+i*12)); }
+  function drawUi(u){ const A=K.A, G2=g(), time=K.time;
+    if(u.kind==="qcmd") list(u,2,106,108,null,10);
+    if(u.kind==="qtgt"&&QB&&u.items[u.cur]){ const n=u.items[u.cur].t, w=A.textW(n)+16; box(W/2-w/2,2,w,15); T(n,W/2-w/2+8,5,"#ffd84d"); }
+    if(u.kind==="qally"){
+      if(mode==="battle"){ const y=111+u.cur*11; T(">",113,y,Math.floor(time*6)%2?"#7be0ff":"#ffffff","#0b1a40"); if(u.prompt){ QB.msg=u.prompt; } }
+      else { drawPanels(u.cur,u.items); if(u.prompt){ box(166,2,72,44); A.wrap(u.prompt,60).slice(0,3).forEach((l,i)=>T(l,172,7+i*11)); }
+        box(166,134,72,22); const s=Q.gold+" G"; T(s,232-A.textW(s),140,"#ffd84d"); } }
+    if(u.kind==="qmain"){ drawPanels(-1); list(u,166,2,72); box(166,134,72,22); const s=Q.gold+" G"; T(s,232-A.textW(s),140,"#ffd84d"); }
+    if(u.kind==="qskill"){ const m=u.m; list(u,4,4,160,(it,x,y)=>{ const s=D.SK[it.id]; T(s.mp?s.mp+" MP":"free",x+120,y,"#7be0ff"); });
+      box(166,4,70,20); T(`MP ${dp(m).mp}/${mmp(m)}`,172,10,"#7be0ff"); descBox(D.SK[u.items[u.cur].id].d); }
+    if(u.kind==="qitem"){ list(u,4,4,160,(it,x,y)=>T("x"+it.n,x+134,y,"#ffd84d")); descBox(u.items[u.cur].d); }
+    if(u.kind==="qshop"){ const st=u.items.length>7?10:12; box(4,4,170,22+u.items.length*st); T(u.title,12,8,"#ffd84d");
+      u.items.forEach((it,i)=>{ const y=22+i*st; T(it.t,22,y); const p=it.p+" G"; T(p,166-A.textW(p),y,"#ffd84d"); if(i===u.cur) T(">",12,y,"#ffd84d","#7a3d00"); });
+      box(176,4,62,20); const s=Q.gold+" G"; T(s,232-A.textW(s),10,"#ffd84d"); if(u.items[u.cur]) descBox(u.items[u.cur].d); }
+    if(u.kind==="qstat"){ const m=u.m, c=C(m), d=dp(m), ev=TD().SPECIES[m.sp].evo; box(4,4,232,152); G2.drawImage(K.A.critter(m.sp),8,4,40,40);
+      T(nm(m),52,8,"#ffd84d"); T(`Lv ${m.lv}`,196,8); T(cname(m),52,19,tier(m)?"#ffd84d":"#bfe6ff");
+      T(`XP ${m.xp}  next ${K.xpAt(m.lv+1)}`,52,30,"#bfe6ff"); if(ev) T(`Molts at Lv ${ev.lv}`,150,30,"#bfe6ff");
+      [["HP",`${d.hp}/${mhp(m)}`],["MP",`${d.mp}/${mmp(m)}`],["Strength",str(m)],["Agility",agi(m)],["Intellect",intl(m)],["Attack",atk(m)],["Defense",def(m)],["Hits",hits(m)]]
+        .forEach(([k,v],i)=>{ T(k,12,44+i*10); T(String(v),66,44+i*10); });
+      T("Weapon",110,44,"#bfe6ff"); T(d.w?G(d.w).n:"none",110,54); T("Armor",110,66,"#bfe6ff"); T(d.a?G(d.a).n:"none",110,76);
+      T("Skills",110,88,"#bfe6ff"); A.wrap(skills(m).map(id=>D.SK[id].n).join(", ")||"none",120).slice(0,3).forEach((l,i)=>T(l,110,98+i*10));
+      A.wrap(c.perk,220).slice(0,2).forEach((l,i)=>T(l,12,130+i*10,"#ffd84d")); }
+    if(u.kind==="qcard"){ for(let y=0;y<H;y+=4){ G2.fillStyle=A.mix("#ffd84d","#2b6fd0",y/H*1.4>1?1:y/H*1.4); G2.fillRect(0,y,W,4); }
+      G2.drawImage(D.ent("lantern","lit"),W/2-8,8); K.bigC(u.lines[0],W/2,30,2,"#ffffff","#a8322a"); u.lines.slice(1).forEach((l,i)=>T(l,W/2-A.textW(l)/2,56+i*12,"#ffffff","#0b1a40")); }
+  }
+
+  // ---------- debug (TIDE.dbg.deep) ----------
+  const dbg={ Q:()=>Q, QB:()=>QB, mode:()=>mode, where:()=>({map:MID,x:P.x,y:P.y}), dp, skills, cname,
+    warp:(m,x,y)=>place(m,x,y,0), win:()=>{ if(QB) QB.foes.forEach(f=>{ f.hp=0; f.dead=1; f.fade=1; }); },
+    fight:form=>K.run(()=>battle(form)), rest:()=>team().forEach(rest),
+    lvl:n=>team().forEach(m=>{ m.lv=n; m.xp=K.xpAt(n); rest(m); }) };
+
+  return {attach:k=>{ K=k; }, enter, resume, sync, update, draw, drawUi, className:m=>cname(m), busy:()=>!!QB||mode!=="map", dbg};
 })();
 
 </script>
 <script>
 // ---------- PRAWN: engine (probe slot "PRAWN") ----------
-// A small original creature-befriending RPG: you're a young cleaner shrimp in the Coral Sea.
-// Art: tide-art.js · data + story: tide-data.js. Saved per computer in localStorage "tagtool.tide".
+// PRAWN probe panel: a small pixel sim of a young cleaner shrimp and critter companions in the Coral Sea.
+// Art: tide-art.js · data + scripts: tide-data.js. Saved per computer in localStorage "tagtool.tide".
 // Tag tie-in: app.js calls TIDE.award("print",[item #s]); each item # pays once a day into the drift crate
-// by the player's home (Bubble Snacks, Kelp Tonics) and unlocks perks at tag milestones. No XP from tags.
+// by the shrimp's home (Bubble Snacks, Kelp Tonics) and unlocks perks at tag milestones. No XP from tags.
 var TIDE=(function(){
   const A=TIDEART, D=TIDEDATA, W=240, H=160, KEY="tagtool.tide", VER=1, SPEED=5;
   const SOLID="T#ouwkmXSELPC~";
@@ -3772,9 +4768,11 @@ var TIDE=(function(){
   // ---------- save ----------
   function fresh(){ return {v:VER,name:"",map:"home",x:6,y:2,dir:2,team:[],box:[],bag:{snack:0,tonic:0},flags:{},seen:{},caught:{},
     heal:["home",6,3],tags:0,crate:{snack:0,tonic:0},perks:{},newPerks:[],day:null,started:0}; }
-  function load(){ try{ const s=JSON.parse(localStorage.getItem(KEY)||"null"); if(s&&s.v===VER) return Object.assign(fresh(),s); }catch(e){} return fresh(); }
-  const st=()=>S||(S=load());   // award() can run before the game was ever opened
-  let depth=0;   // story scripts in flight: saving mid-event could store half a cutscene, so it waits until they finish
+  function load(){ try{ const s=JSON.parse(localStorage.getItem(KEY)||"null"); if(s&&s.v===VER){ const o=Object.assign(fresh(),s);
+      if(o.team.length>D.TEAM_MAX) o.box.push(...o.team.splice(D.TEAM_MAX));   // older saves had room for 6
+      return o; } }catch(e){} return fresh(); }
+  const st=()=>S||(S=load());   // award() can run before the panel was ever opened
+  let depth=0;   // scripts in flight: saving mid-event could store half a cutscene, so it waits until they finish
   function save(){ if(depth>0) return; try{ if(S) localStorage.setItem(KEY,JSON.stringify(S)); }catch(e){} }
 
   // ---------- tag tool hook: print only, each item # once per day ----------
@@ -3806,7 +4804,7 @@ var TIDE=(function(){
     if(pet){ if(e.key==="Escape"){ e.preventDefault(); e.stopPropagation(); pet.close(); } return; }   // pet screen has its own keys
     e.stopPropagation(); if(!e.ctrlKey&&!e.metaKey) e.preventDefault();
     if(nameBuf){ if(e.key==="Enter"){ nameBuf.done=1; } else if(e.key==="Backspace") nameBuf.s=nameBuf.s.slice(0,-1);
-      else if(e.key.length===1&&/[A-Za-z0-9 '\-]/.test(e.key)&&nameBuf.s.length<10) nameBuf.s+=e.key; return; }
+      else if(e.key.length===1&&/[A-Za-z0-9 '\-]/.test(e.key)&&nameBuf.s.length<(nameBuf.max||10)) nameBuf.s+=e.key; return; }
     const b=KMAP[e.key]; if(!b) return; if(!held[b]) queue.push(b); held[b]=performance.now();
   }
   function ku(e){ if(pet) return; const b=KMAP[e.key]; if(b) held[b]=0; }
@@ -3846,31 +4844,33 @@ var TIDE=(function(){
     if(u.kind==="cmd"||u.kind==="moves"){ const cols=2;
       if(take("left")&&u.cur%2) u.cur--; if(take("right")&&u.cur%2===0&&u.cur+1<n) u.cur++;
       if(take("up")&&u.cur>=2) u.cur-=2; if(take("down")&&u.cur+2<n) u.cur+=2;
-    } else { if(take("up")) u.cur=(u.cur+n-1)%n; if(take("down")) u.cur=(u.cur+1)%n; }
+    } else { if(take("up")||(u.lr&&take("left"))) u.cur=(u.cur+n-1)%n; if(take("down")||(u.lr&&take("right"))) u.cur=(u.cur+1)%n; }
     if(take("A")&&n&&!(u.items[u.cur]&&u.items[u.cur].dis)) done(u.cur);
     else if(take("B")&&u.cancel!==false) done(-1);
   }
 
-  // ---------- engine API for story events ----------
+  // ---------- engine API for script events ----------
   async function run(fn){ busy++; depth++; try{ await fn(E); }catch(e){ console.error("[Tide]",e); if(dbg.on) throw e; }
-    finally{ busy=Math.max(0,busy-1); depth=Math.max(0,depth-1); if(!depth&&scene==="world"){ S.map=MID; S.x=P.x; S.y=P.y; S.dir=P.dir; } save(); } }
+    finally{ busy=Math.max(0,busy-1); depth=Math.max(0,depth-1); if(!depth&&scene==="world"){ S.map=MID; S.x=P.x; S.y=P.y; S.dir=P.dir; }
+      if(!depth&&scene==="deep"&&hasDeep()) DEEP.sync(); save(); } }
   const E={
     say,ask,yes, f:k=>S.flags[k], set:(k,v)=>{ S.flags[k]=v===undefined?1:v; },
     give:(it,n)=>{ S.bag[it]=(S.bag[it]||0)+n; },
     heal:async(anim)=>{ healAll(); if(anim){ for(let i=0;i<3;i++){ fx.push({k:"spark",x:W/2+(i-1)*24,y:70,t:0}); await wait(.25); } } },
     setHeal:(m,x,y)=>{ S.heal=[m,x,y]; },
-    addMon:(sp,lv)=>{ const m=mkMon(sp,lv); S.seen[sp]=1; S.caught[sp]=1; if(S.team.length<6) S.team.push(m); else S.box.push(m); },
+    addMon:(sp,lv)=>{ const m=mkMon(sp,lv); S.seen[sp]=1; S.caught[sp]=1; if(S.team.length<D.TEAM_MAX) S.team.push(m); else S.box.push(m); },
     showMon:id=>{ popMon=id; },
     battle:def=>battle(def), trainer:id=>trainerBattle(npcRt(id)),
     npcWalk:(id,path)=>npcWalk(id,path), faceNpc:id=>{ const n=npcRt(id); if(n) n.dir=faceTo(n.x,n.y,P.x,P.y); },
-    push:(dx,dy)=>stepPlayer(dx,dy), askName, pet:openPet, crate:crateEv, chapterEnd,
+    push:(dx,dy)=>stepPlayer(dx,dy), askName, pet:openPet, crate:crateEv, chapterEnd, deep:enterDeep,
     jingle:big=>{ for(let i=0;i<(big?8:4);i++) fx.push({k:"spark",x:40+Math.random()*160,y:20+Math.random()*80,t:-i*.1}); }
   };
 
   // ---------- maps ----------
   let MAP=null, MID="", npcs=[];
   const P={x:0,y:0,dir:0,mv:0,t:0,fx:0,fy:0,step:0,turnT:0};
-  function loadMap(id){ MID=id; const m=D.MAPS[id]; MAP={...m,id,w:m.rows[0].length,h:m.rows.length};
+  const F={x:0,y:0,fx:0,fy:0,left:0,map:""};   // the critter that follows you (flag fol on a team critter)
+  function loadMap(id){ MID=id; F.map=""; const m=D.MAPS[id]; MAP={...m,id,w:m.rows[0].length,h:m.rows.length};
     npcs=(m.npcs||[]).map(d=>({d,id:d.id,x:d.x,y:d.y,dir:d.dir||0,ox:0,oy:0,bang:0})); }
   const npcVis=n=>{ const d=n.d; if(d.hide&&S.flags[d.hide]) return false; if(d.show&&!S.flags[d.show]) return false; if(d.item&&S.flags["item_"+d.id]) return false; return true; };
   const npcRt=id=>npcs.find(n=>n.id===id);
@@ -3888,7 +4888,8 @@ var TIDE=(function(){
     if(MAP.enter&&D.EV[MAP.enter]) await run(D.EV[MAP.enter]);
   }
 
-  function stepPlayer(dx,dy){ P.fx=P.x; P.fy=P.y; P.x+=dx; P.y+=dy; P.mv=1; P.t=0;
+  function stepPlayer(dx,dy){ if(F.map!==MID){ F.map=MID; F.x=P.x; F.y=P.y; } F.fx=F.x; F.fy=F.y; F.x=P.x; F.y=P.y; if(dx) F.left=dx<0;
+    P.fx=P.x; P.fy=P.y; P.x+=dx; P.y+=dy; P.mv=1; P.t=0;
     return tween(1/SPEED,k=>{ P.t=k; }).then(()=>{ P.mv=0; P.step^=1; }); }
 
   async function npcWalk(id,path){ const n=npcRt(id); if(!n) return;
@@ -3942,7 +4943,7 @@ var TIDE=(function(){
     busy++; stepPlayer(dx,dy).then(()=>{ busy--; onStep(); });
   }
 
-  // ---------- battle ----------
+  // ---------- encounter rounds ----------
   let B=null;
   const stageMul=s=>s>=0?(2+s)/2:2/(2-s);
   async function battle(def){
@@ -4032,12 +5033,27 @@ var TIDE=(function(){
     const f=foe(), ids=Object.keys(B.used).map(Number).filter(i=>S.team[i]&&alive(S.team[i]));
     if(!ids.length) return;
     let xp=Math.floor(SP(f.sp).xp*f.lv/6*(B.wild?1:1.5)*(S.perks.pearl?1.2:1)); xp=Math.max(1,Math.floor(xp/ids.length));
-    for(const i of ids){ const m=S.team[i]; m.xp+=xp; await say(`${nm(m)} gained ${xp} XP!`);
-      while(m.lv<50&&m.xp>=xpAt(m.lv+1)){ const oh=stat(m,"hp"); m.lv++; m.hp+=stat(m,"hp")-oh; if(i===B.mi) B.dm=m.hp;
-        E.jingle(); await say(`${nm(m)} grew to Lv ${m.lv}!`);
-        for(const [L,id] of SP(m.sp).learn) if(L===m.lv&&!m.mv.includes(id)){
-          if(m.mv.length<4){ m.mv.push(id); await say(`${nm(m)} learned ${MV(id).n}!`); }
-          else { const old=m.mv.shift(); m.mv.push(id); await say(`${nm(m)} forgot ${MV(old).n} and learned ${MV(id).n}!`); } } } }
+    for(const i of ids) await growMon(S.team[i],xp);
+  }
+  // one owner for XP, levels and molts: PRAWN rounds and Lantern Deep (src/deep.js) both call these
+  async function learnMove(m,id){ if(m.mv.includes(id)) return;
+    if(m.mv.length<4){ m.mv.push(id); await say(`${nm(m)} learned ${MV(id).n}!`); }
+    else { const old=m.mv.shift(); m.mv.push(id); await say(`${nm(m)} forgot ${MV(old).n} and learned ${MV(id).n}!`); } }
+  async function growMon(m,xp,quiet){
+    m.xp+=xp; if(!quiet) await say(`${nm(m)} gained ${xp} XP!`);
+    while(m.lv<50&&m.xp>=xpAt(m.lv+1)){ const oh=stat(m,"hp"); m.lv++; m.hp+=stat(m,"hp")-oh; if(B&&me()===m) B.dm=m.hp;
+      E.jingle(); await say(`${nm(m)} grew to Lv ${m.lv}!`);
+      for(const [L,id] of SP(m.sp).learn) if(L===m.lv) await learnMove(m,id); }
+    const ev=SP(m.sp).evo; if(ev&&m.lv>=ev.lv) await moltMon(m);
+  }
+  async function moltMon(m){
+    const ev=SP(m.sp).evo; if(!ev) return false; const from=nm(m), oh=stat(m,"hp"), cls=hasDeep()?DEEP.className(m):"";
+    await say(`What? ${from} is molting!`); for(let i=0;i<6;i++){ E.jingle(i%2); await wait(.2); }
+    m.sp=ev.to; m.hp=Math.max(1,Math.round(m.hp*stat(m,"hp")/oh)); S.seen[m.sp]=1; S.caught[m.sp]=1; if(B&&me()===m) B.dm=m.hp;
+    await say(`${from} molted into ${nm(m)}!`);
+    if(cls&&S.deep) await say(`Its calling changed: the ${cls} is now a ${DEEP.className(m)}!`);
+    for(const [L,id] of SP(m.sp).learn) if(L<=m.lv) await learnMove(m,id);
+    return true;
   }
   async function befriend(){
     if(!B.wild){ await say("You can't befriend another trainer's critter!"); return false; }
@@ -4052,7 +5068,7 @@ var TIDE=(function(){
     await wait(.3); E.jingle(1);
     await say(`Yay! ${sp.n} became your friend!`);
     S.seen[f.sp]=1; S.caught[f.sp]=1;
-    if(S.team.length<6) S.team.push(f); else { S.box.push(f); await say(`Your team is full, so ${sp.n} swam home to the tide pool by your burrow.`); }
+    if(S.team.length<D.TEAM_MAX) S.team.push(f); else { S.box.push(f); await say(`Your team is full, so ${sp.n} swam home to the tide pool by your burrow. (Swap it in from TEAM.)`); }
     B.used[S.team.indexOf(f)]=0; delete B.used[S.team.indexOf(f)];
     return true;
   }
@@ -4086,9 +5102,14 @@ var TIDE=(function(){
       if(i<0||o==="CLOSE") return;
       if(o==="TEAM"){ if(!S.team.length){ await say("You don't have any critters yet!"); continue; }
         const j=await teamMenu("Your team",true,false); if(j<0) continue;
-        const c=await ask(`${nm(S.team[j])}`,["Summary","Make leader","Cancel"]);
-        if(c===0) await menu("info",{sum:S.team[j]});
-        if(c===1&&j>0){ const [m]=S.team.splice(j,1); S.team.unshift(m); await say(`${nm(m)} is leading the team now!`); } }
+        const m=S.team[j], opts=["Summary","Make leader",m.fol?"Stop following":"Follow me",...(S.box.length?["Swap with pool"]:[]),"Cancel"];
+        const o2=opts[await ask(`${nm(m)}`,opts)];
+        if(o2==="Summary") await menu("info",{sum:m});
+        if(o2==="Make leader"&&j>0){ S.team.splice(j,1); S.team.unshift(m); await say(`${nm(m)} is leading the team now!`); }
+        if(o2==="Follow me"){ S.team.forEach(x=>delete x.fol); m.fol=1; await say(`${nm(m)} swims along behind you!`); }
+        if(o2==="Stop following"){ delete m.fol; await say(`${nm(m)} settles back into your team.`); }
+        if(o2==="Swap with pool"){ const k=await menu("list",{items:S.box.map(x=>({t:`${nm(x)} Lv${x.lv}`}))}); if(k<0) continue;
+          const p2=S.box[k]; S.box[k]=m; S.team[j]=p2; if(m.fol){ delete m.fol; p2.fol=1; } await say(`${nm(p2)} joins the team. ${nm(m)} swims off to the tide pool.`); } }
       if(o==="BAG") await bagMenu(false);
       if(o==="PET"){ if(!(await openPet())) await say("Your pet tank isn't here right now."); }
       if(o==="JOURNAL") await menu("info",{journal:1});
@@ -4106,10 +5127,28 @@ var TIDE=(function(){
     for(const id of np){ const p=D.PERKS.find(x=>x.id===id); E.jingle(1); await say(`Something shiny is tucked in the corner... a ${p.n}!\n${p.d}`); }
     S.newPerks=[]; save();
   }
-  function askName(){ nameBuf={s:"",done:0}; return until(()=>nameBuf.done).then(()=>{ S.name=nameBuf.s.trim()||"Shrimpy"; nameBuf=null; }); }
+  function getName(label,max){ nameBuf={s:"",done:0,label,max}; return until(()=>nameBuf.done).then(()=>{ const s=nameBuf.s.trim(); nameBuf=null; return s; }); }
+  function askName(){ return getName("Your name:").then(s=>{ S.name=s||"Shrimpy"; }); }
+  function nameBox(){ if(!nameBuf) return; box(60,40,120,40,"#fffaf0","#ffb13b"); T(nameBuf.label||"Your name:",68,46,A.INK,"#d9d2ea");
+    T(nameBuf.s+(Math.floor(time*2)%2?"_":""),68,60,A.INK,"#d9d2ea"); T("Type, then press Enter",68,70,"#8a7fa6",null); }
+
+  // ---------- Lantern Deep: the second panel mode behind the Tidegate (src/deep*.js) ----------
+  const hasDeep=()=>typeof DEEP!=="undefined";
+  async function enterDeep(){
+    if(!hasDeep()){ await say("The swirl is still. Nothing happens."); await stepPlayer(0,-1); return; }
+    if(!S.team.length){ await say("The swirl tugs at your feelers... It's way too big out there to go alone. Find a critter partner first!"); await stepPlayer(0,-1); return; }
+    if(!(await yes("A shimmering swirl hums at the end of the path. Something old and big waits on the other side. Swim through?"))){ await stepPlayer(0,-1); return; }
+    S.map="town"; S.x=P.x; S.y=P.y-1; S.dir=1;   // where you come back out
+    await DEEP.enter();
+  }
+  const deepKit=()=>({A,W,H,get g(){ return g; },get time(){ return time; },get S(){ return S; },held,take,
+    say,ask,yes,menu,tween,wait,until,box,T,bigC,hpBar,getName,save,run:fn=>run(fn),ui:()=>ui,jingle:E.jingle,
+    grow:(m,xp)=>growMon(m,xp,true),molt:m=>moltMon(m),xpAt,
+    fade:(sec,to)=>tween(sec,k=>{ fade=to?k:1-k; }),fadeKind:k=>{ fadeKind=k; },setScene:s=>{ scene=s; },
+    toTown:(x,y,dir)=>{ loadMap("town"); P.x=S.x=x; P.y=S.y=y; P.dir=S.dir=dir; P.mv=0; S.map="town"; scene="world"; banner={t:MAP.name,a:0}; }});
   async function chapterEnd(){ save(); await menu("info",{card:1}); }
 
-  // ---------- pet tank: the old EXPress Prawn pet game (src/prawn*.js) shown inside this one ----------
+  // ---------- pet tank: the older EXPress Prawn module (src/prawn*.js) shown inside this one ----------
   let pet=null;
   function openPet(){ return new Promise(res=>{
     if(typeof PRAWN==="undefined"||!PRAWN.G||!PRAWN.G.ui){ res(false); return; }
@@ -4123,17 +5162,19 @@ var TIDE=(function(){
     back.onclick=()=>pet&&pet.close();
   }); }
 
-  // ---------- title / new game ----------
+  // ---------- title / fresh start ----------
   let title={cur:0};
   function titleUpdate(){
     const can=!!S.started, opts=can?["CONTINUE","NEW GAME"]:["NEW GAME"];
     title.opts=opts; if(take("up")||take("down")) title.cur=(title.cur+1)%opts.length;
     if(!take("A")) return; const o=opts[title.cur%opts.length];
-    if(o==="CONTINUE") run(async()=>{ await tween(.3,k=>fade=k); loadMap(S.map); P.x=S.x; P.y=S.y; P.dir=S.dir; scene="world"; await tween(.3,k=>fade=1-k);
+    if(o==="CONTINUE") run(async()=>{ await tween(.3,k=>fade=k);
+      if(S.deep&&S.deep.on&&hasDeep()){ scene="deep"; DEEP.resume(); await tween(.3,k=>fade=1-k); return; }
+      loadMap(S.map); P.x=S.x; P.y=S.y; P.dir=S.dir; scene="world"; await tween(.3,k=>fade=1-k);
       if(MAP.enter&&D.EV[MAP.enter]) await D.EV[MAP.enter](E); });
     else run(async()=>{
       if(can&&!(await yes("Start a new adventure? Your old save will be replaced. (Tag gifts and perks are kept.)"))) return;
-      const keep={tags:S.tags,crate:S.crate,perks:S.perks,newPerks:S.newPerks,day:S.day};
+      const keep={tags:S.tags,crate:S.crate,perks:S.perks,newPerks:S.newPerks,day:S.day};   // Lantern Deep progress goes too: its team was this team
       S=Object.assign(fresh(),keep); S.started=1;
       await tween(.3,k=>fade=k); scene="intro"; await tween(.3,k=>fade=1-k);
       await D.EV.intro(E);
@@ -4143,8 +5184,11 @@ var TIDE=(function(){
   }
 
   // ---------- drawing ----------
-  const box=(x,y,w,h,bg,bd)=>{ g.fillStyle=bd||"#5fb3e8"; g.fillRect(x+1,y,w-2,h); g.fillRect(x,y+1,w,h-2); g.fillStyle=bg||"#ffffff"; g.fillRect(x+2,y+2,w-4,h-4); g.fillRect(x+1,y+3,w-2,h-6); };
-  const T=(s,x,y,c,sh)=>A.text(g,s,x,y,c||A.INK,sh===undefined?"#d9d2ea":sh);
+  // window skin: PRAWN's bright white boxes, or Lantern Deep's deep-blue ones while scene==="deep"
+  const SKINS={prawn:{bg:"#ffffff",bd:"#5fb3e8",ink:A.INK,sh:"#d9d2ea"},deep:{bg:"#1d4fa8",bd:"#ffffff",ink:"#ffffff",sh:"#0b1a40"}};
+  let SK=SKINS.prawn;
+  const box=(x,y,w,h,bg,bd)=>{ g.fillStyle=bd||SK.bd; g.fillRect(x+1,y,w-2,h); g.fillRect(x,y+1,w,h-2); g.fillStyle=bg||SK.bg; g.fillRect(x+2,y+2,w-4,h-4); g.fillRect(x+1,y+3,w-2,h-6); };
+  const T=(s,x,y,c,sh)=>A.text(g,s,x,y,c||SK.ink,sh===undefined?SK.sh:sh);
   const big=(s,x,y,sc,c,sh)=>{ const w=A.textW(s)+2, o=document.createElement("canvas"); o.width=w; o.height=10; const og=o.getContext("2d"); A.text(og,s,0,0,c,sh); g.drawImage(o,Math.round(x-w*sc/2),y,w*sc,10*sc); };
   const BIG={}; function bigC(s,x,y,sc,c,sh){ const k=s+c+sh; let o=BIG[k]; if(!o){ o=document.createElement("canvas"); o.width=A.textW(s)+2; o.height=10; A.text(o.getContext("2d"),s,0,0,c,sh); BIG[k]=o; }
     g.drawImage(o,Math.round(x-o.width*sc/2),y,o.width*sc,10*sc); }
@@ -4161,7 +5205,7 @@ var TIDE=(function(){
     const f=Math.floor(time*2.2)%2;
     for(let y=Math.max(0,Math.floor(oy/16));y<Math.min(MAP.h,Math.ceil((oy+H)/16)+1);y++)
       for(let x=Math.max(0,Math.floor(ox/16));x<Math.min(MAP.w,Math.ceil((ox+W)/16)+1);x++){ const t=MAP.rows[y][x];
-        g.drawImage(A.tile(t,(x*7+y*13)%8,t==="g"?(f+(x+y))%2:0),x*16-ox,y*16-oy); }
+        g.drawImage(A.tile(t,(x*7+y*13)%8,t==="g"||t==="V"?(f+(x+y))%2:0),x*16-ox,y*16-oy); }
     const ents=[];
     (MAP.bld||[]).forEach(b=>ents.push({y:b.y+b.h-1,d:()=>{ const im=A.building(b.k); g.drawImage(im,b.x*16-ox+Math.round((b.w*16-im.width)/2),(b.y+b.h)*16-oy-im.height); }}));
     npcs.forEach(n=>{ if(!npcVis(n)) return; ents.push({y:n.y+(n.oy?-.01:0),d:()=>{ const im=sprDir(A.npc(n.d.kind,n.d.opt),n.dir);
@@ -4169,6 +5213,10 @@ var TIDE=(function(){
       g.drawImage(im,n.x*16+n.ox-ox,n.y*16+n.oy-oy-3+bob);
       if(n.bang){ box(n.x*16-ox+3,n.y*16-oy-17,10,12,"#ffffff","#ff5f6d"); T("!",n.x*16-ox+7,n.y*16-oy-15,"#ff5f6d",null); }
       if(n.d.kind==="crate"&&(S.crate.snack||S.crate.tonic||S.newPerks.length)&&Math.floor(time*3)%2){ g.fillStyle="#ffffff"; g.fillRect(n.x*16-ox+12,n.y*16-oy-2,1,3); g.fillRect(n.x*16-ox+11,n.y*16-oy-1,3,1); } }}); });
+    const fm=S.team.find(m=>m.fol);
+    if(fm&&F.map===MID&&(P.mv||F.x!==P.x||F.y!==P.y)){ const fx=(P.mv?F.fx+(F.x-F.fx)*P.t:F.x)*16, fy=(P.mv?F.fy+(F.y-F.fy)*P.t:F.y)*16;
+      ents.push({y:(P.mv?Math.max(F.y,F.fy):F.y)-.01,d:()=>{ const im=F.left?sprDir(A.icon(fm.sp),3):A.icon(fm.sp);
+        g.drawImage(im,Math.round(fx-ox)-4,Math.round(fy-oy)-10+Math.round(Math.sin(time*4))); }}); }
     const fr=P.mv?(P.t<.5?P.step:0):0;
     ents.push({y:P.mv?Math.max(P.y,P.fy):P.y,d:()=>{ const hx=Math.round(px-ox), hy=Math.round(py-oy)-3;
       g.drawImage(A.hero(P.dir,fr,S.perks.gold),hx,hy);
@@ -4226,21 +5274,21 @@ var TIDE=(function(){
     else T("Arrows swim · Z talk · X back · C menu".replace(/·/g,"-"),6,150,"#ffffff","#1d5e9e");
   }
   function drawIntro(){ for(let y=0;y<H;y+=4){ g.fillStyle=A.mix("#3fb6ff","#1d5e9e",y/H); g.fillRect(0,y,W,4); }
-    const im=A.npc("prof"); g.drawImage(im,0,0,16,16,96,30,48,48); g.drawImage(A.hero(0,0,S.perks.gold),112,86);
-    if(nameBuf){ box(60,40,120,40,"#fffaf0","#ffb13b"); T("Your name:",68,46); T(nameBuf.s+(Math.floor(time*2)%2?"_":""),68,60); T("Type, then press Enter",68,70,"#8a7fa6",null); } }
+    const im=A.npc("prof"); g.drawImage(im,0,0,16,16,96,30,48,48); g.drawImage(A.hero(0,0,S.perks.gold),112,86); }
 
   function drawDlg(){
     if(!dlg) return; const p=dlg.pg[dlg.pi]; let left=Math.floor(dlg.ch);
-    box(2,112,W-4,46,"#ffffff","#5fb3e8");
+    box(2,112,W-4,46);
     if(dlg.who){ const w=A.textW(dlg.who)+10; box(6,104,w,12,"#fff7e0","#ffb13b"); T(dlg.who,11,106,A.INK,null); }
     p.forEach((ln,i)=>{ const s=ln.slice(0,Math.max(0,left)); left-=ln.length+1; T(s,10,120+i*14); });
     const len=p.join(" ").length, last=dlg.pi===dlg.pg.length-1;
     if(dlg.ch>=len&&!(dlg.opts&&last)&&Math.floor(time*3)%2) T("▼",W-14,146,"#ff6fb5",null);
     if(dlg.opts&&last&&dlg.ch>=len){ const w=Math.max(...dlg.opts.map(o=>A.textW(o)))+22, h=dlg.opts.length*12+8, x=W-w-4, y=110-h;
-      box(x,y,w,h,"#ffffff","#5fb3e8"); dlg.opts.forEach((o,i)=>{ T(o,x+14,y+6+i*12); if(i===dlg.cur) T(">",x+6,y+6+i*12,"#ff6fb5",null); }); }
+      box(x,y,w,h); dlg.opts.forEach((o,i)=>{ T(o,x+14,y+6+i*12); if(i===dlg.cur) T(">",x+6,y+6+i*12,"#ff6fb5",null); }); }
   }
   function drawUi(){
     const u=ui; if(!u) return;
+    if(u.kind[0]==="q"&&hasDeep()) return DEEP.drawUi(u);
     if(u.kind==="list"){ const w=Math.max(...u.items.map(it=>A.textW(it.t)))+26, h=u.items.length*13+10, x=W-w-4; box(x,4,w,h); u.items.forEach((it,i)=>{ T(it.t,x+14,10+i*13); if(i===u.cur) T(">",x+6,10+i*13,"#ff6fb5",null); }); }
     if(u.kind==="cmd"){ box(2,112,W-4,46,"#ffffff","#4b3f66"); A.wrap(u.prompt,110).forEach((l,i)=>T(l,10,122+i*12)); box(128,112,110,46,"#fffaf0","#ffb13b");
       u.items.forEach((it,i)=>{ const x=142+(i%2)*50, y=122+Math.floor(i/2)*16; T(it.t,x,y); if(i===u.cur) T(">",x-8,y,"#ff6fb5",null); }); }
@@ -4258,18 +5306,20 @@ var TIDE=(function(){
     if(u.kind==="info"&&u.sum){ const m=u.sum, sp=SP(m.sp); box(4,4,W-8,H-8,"#fffaf0","#ffb13b"); g.drawImage(A.critter(m.sp),12,14);
       T(sp.n,66,12); T("Lv "+m.lv,170,12); g.fillStyle=D.TYPES[sp.t].c; g.fillRect(66,24,38,10); A.text(g,D.TYPES[sp.t].n.toUpperCase(),69,25,"#ffffff",null);
       [["HP",`${m.hp}/${stat(m,"hp")}`],["Attack",stat(m,"atk")],["Defense",stat(m,"def")],["Speed",stat(m,"spd")]].forEach(([k,v],i)=>{ T(k,66,40+i*11); T(String(v),140,40+i*11); });
+      if(hasDeep()&&S.deep) T(DEEP.className(m),110,26,"#6a5f86",null);
       T("Moves:",12,88,"#ff6fb5",null); m.mv.forEach((id,i)=>T(MV(id).n,12+(i%2)*110,100+Math.floor(i/2)*11));
       A.wrap(sp.d,220).forEach((l,i)=>T(l,12,126+i*11,"#6a5f86",null)); }
     if(u.kind==="info"&&u.journal){ box(4,4,W-8,H-8,"#fffaf0","#ffb13b"); const ids=Object.keys(D.SPECIES), c=ids.filter(i=>S.caught[i]).length, s=ids.filter(i=>S.seen[i]).length;
       T(`TIDE JOURNAL   Seen ${s}   Friends ${c}`,12,10,"#ff6fb5",null);
-      ids.forEach((id,i)=>{ const x=14+(i%5)*44, y=26+Math.floor(i/5)*64; box(x,y,40,40,S.caught[id]?"#e8fbff":"#f1ecf7","#c9c0de");
-        if(S.seen[id]){ const im=A.critter(id); if(!S.caught[id]) g.globalAlpha=.35; g.drawImage(im,x-4,y-4); g.globalAlpha=1; const n=SP(id).n; T(n,x+20-A.textW(n)/2,y+43,A.INK,null); }
-        else T("?",x+18,y+16,"#c9c0de",null); }); }
+      ids.forEach((id,i)=>{ const x=12+(i%6)*37, y=22+Math.floor(i/6)*44; box(x,y,34,40,S.caught[id]?"#e8fbff":"#f1ecf7","#c9c0de");   // 18 forms: 6 x 3, no room for names
+        if(S.seen[id]){ const im=A.critter(id); if(!S.caught[id]) g.globalAlpha=.35; g.drawImage(im,x+1,y+4,32,32); g.globalAlpha=1; }
+        else T("?",x+15,y+14,"#c9c0de",null); }); }
     if(u.kind==="info"&&u.card){ for(let y=0;y<H;y+=4){ g.fillStyle=A.mix("#ffb3d9","#7fd3ff",y/H); g.fillRect(0,y,W,4); }
       bigC("CHAPTER 1",W/2,14,2,"#ffffff","#ff4f8b"); bigC("COMPLETE!",W/2,36,2,"#ffffff","#ff4f8b");
       const fr=Object.keys(S.caught).length; [`Pearl Badge won!`,`Critter friends: ${fr}`,`Tags printed at the shop: ${S.tags}`,"",
         "Team Trawl is gathering by the Sunken Ship...","Chapter 2 is coming soon!","","Press Z to keep exploring"].forEach((l,i)=>T(l,W/2-A.textW(l)/2,58+i*10,A.INK,"#ffffff"));
-      Object.keys(D.SPECIES).forEach((id,i)=>{ if(S.seen[id]) g.drawImage(A.icon(id),Math.round(3+i*26),H-24+Math.round(Math.sin(time*3+i)*2)); }); }
+      const sn=Object.keys(D.SPECIES).filter(id=>S.seen[id]), st=Math.min(26,(W-28)/Math.max(1,sn.length-1));
+      sn.forEach((id,i)=>g.drawImage(A.icon(id),Math.round(3+i*st),H-24+Math.round(Math.sin(time*3+i)*2))); }
   }
   function drawFx(dt){ fx=fx.filter(p=>(p.t+=dt)<.8); fx.forEach(p=>{ if(p.t<0) return; const s=Math.round(2+p.t*8), a=1-p.t/.8; g.globalAlpha=a; g.fillStyle=Math.floor(p.t*12)%2?"#ffe14d":"#ffffff";
       g.fillRect(p.x-s,p.y,s*2+1,1); g.fillRect(p.x,p.y-s,1,s*2+1); g.fillRect(p.x-1,p.y-1,3,3); g.globalAlpha=1; }); }
@@ -4286,11 +5336,13 @@ var TIDE=(function(){
       for(const a of anims.slice()){ if(a.c){ if(a.c()){ anims.splice(anims.indexOf(a),1); a.res(); } continue; }
         a.t+=dt; const k=Math.min(1,a.t/a.d); a.fn(k); if(k>=1){ anims.splice(anims.indexOf(a),1); a.res(); } }
       if(ui) uiUpdate(); else if(dlg) dlgUpdate(dt);
-      else if(!busy&&!nameBuf){ if(scene==="world") worldUpdate(dt); else if(scene==="title") titleUpdate(); }
+      else if(!busy&&!nameBuf){ if(scene==="world") worldUpdate(dt); else if(scene==="title") titleUpdate(); else if(scene==="deep"&&hasDeep()) DEEP.update(dt); }
       queue.length=0;
-      if(scene==="title") drawTitle(); else if(scene==="intro") drawIntro(); else if(scene==="battle"&&B) drawBattle(dt); else if(MAP) drawWorld();
+      SK=scene==="deep"?SKINS.deep:SKINS.prawn;
+      if(scene==="title") drawTitle(); else if(scene==="intro") drawIntro(); else if(scene==="battle"&&B) drawBattle(dt);
+      else if(scene==="deep"&&hasDeep()) DEEP.draw(dt); else if(MAP) drawWorld();
       popDraw(); drawFx(dt);
-      if(!(ui&&(ui.kind==="cmd"||ui.kind==="moves"))) drawDlg(); drawUi(); drawFade();
+      if(!(ui&&(ui.kind==="cmd"||ui.kind==="moves"))) drawDlg(); drawUi(); nameBox(); drawFade();
     }catch(e){ console.error("[Tide]",e); if(dbg.on) throw e; }
   }
   function fit(){ if(!cv||!host) return; const s=Math.max(1,Math.floor(Math.min(host.clientWidth/W,(host.clientHeight-8)/H)));
@@ -4303,13 +5355,15 @@ var TIDE=(function(){
     h.innerHTML=""; cv=document.createElement("canvas"); cv.width=W; cv.height=H;
     cv.style.cssText="image-rendering:pixelated;image-rendering:crisp-edges;display:block;box-shadow:0 0 40px rgba(80,200,255,.25);border-radius:4px";
     h.appendChild(cv); g=cv.getContext("2d"); g.imageSmoothingEnabled=false; fit();
+    if(hasDeep()) DEEP.attach(deepKit());
     window.addEventListener("keydown",kd,true); window.addEventListener("keyup",ku,true); window.addEventListener("resize",fit);
-    const iv=setInterval(()=>{ if(scene==="world"&&!B) save(); },30000);
+    const iv=setInterval(()=>{ if((scene==="world"||scene==="deep")&&!B) save(); },30000);
     lastT=performance.now(); raf=requestAnimationFrame(frame);
     return ()=>{ if(pet) pet.close(); cancelAnimationFrame(raf); clearInterval(iv); window.removeEventListener("keydown",kd,true); window.removeEventListener("keyup",ku,true);
       window.removeEventListener("resize",fit);
-      if(depth>0||B||scene!=="world"){ depth=0; S=load(); }          // closed mid-event: keep the last clean save
-      else { S.map=MID; S.x=P.x; S.y=P.y; S.dir=P.dir; save(); }
+      const inDeep=scene==="deep"&&hasDeep();
+      if(depth>0||B||(scene!=="world"&&!inDeep)){ depth=0; S=load(); }          // closed mid-event: keep the last clean save
+      else { if(inDeep) DEEP.sync(); else { S.map=MID; S.x=P.x; S.y=P.y; S.dir=P.dir; } save(); }
       anims=[]; open=false; };
   }
 
@@ -4318,9 +5372,12 @@ var TIDE=(function(){
     S:()=>S, warp:(m,x,y)=>{ loadMap(m); P.x=S.x=x; P.y=S.y=y; S.map=m; scene="world"; },
     flag:(k,v)=>{ S.flags[k]=v===undefined?1:v; }, give:(k,n)=>{ S.bag[k]=(S.bag[k]||0)+n; },
     team:(list)=>{ S.team=list.map(([sp,lv])=>mkMon(sp,lv)); }, win:()=>{ if(B) B.foes.forEach(f=>f.hp=0); }, me:()=>B&&me(), foe:()=>B&&foe(),
-    wild:(sp,lv)=>run(()=>battle({wild:mkMon(sp,lv||3)})), state:()=>({anims:anims.length,fade,nameBuf:!!nameBuf,scene,busy,dlg:!!dlg,ui:ui&&ui.kind,map:MID,x:P.x,y:P.y,B:!!B}),
+    wild:(sp,lv)=>run(()=>battle({wild:mkMon(sp,lv||3)})),
+    state:()=>Object.assign({anims:anims.length,fade,nameBuf:!!nameBuf,scene,busy,dlg:!!dlg,ui:ui&&ui.kind,map:MID,x:P.x,y:P.y,B:!!B},
+      scene==="deep"&&hasDeep()?Object.assign(DEEP.dbg.where(),{qmode:DEEP.dbg.mode()}):{}),
+    deep:hasDeep()?DEEP.dbg:null,
     reset:()=>{ S=fresh(); save(); }, heal:()=>healAll(), depth:()=>depth,
-    // drive the game without rAF (hidden tabs throttle it). Async so story continuations run between frames.
+    // drive the panel without rAF (hidden tabs throttle it). Async so script continuations run between frames.
     step:async()=>{ tick(1/60); for(let k=0;k<6;k++) await 0; },
     tick:async(sec)=>{ for(let i=0;i<(sec||1)*60;i++) await dbg.step(); },
     press:async(...bs)=>{ for(const k of bs){ queue.push(k); await dbg.step(); await dbg.tick(.05); } },
@@ -4345,7 +5402,7 @@ var TIDE=(function(){
   // Entries: {label, run(host)}. run() may be async and returns a stop function.
   // While one runs it owns the keys, except Shift+Esc (back to list) and Alt+Enter (close).
   const slots=[];
-  if(typeof TIDE!=="undefined"&&TIDE.slot) slots.push(TIDE.slot);      // PRAWN (src/tide.js); the old pet game opens inside it
+  if(typeof TIDE!=="undefined"&&TIDE.slot) slots.push(TIDE.slot);      // PRAWN (src/tide.js); the older pet module opens inside it
 
   function menu(){
     P.stop=null; P.view.innerHTML="";
