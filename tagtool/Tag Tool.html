@@ -7,7 +7,7 @@
 <script>
 // ---- self-update: checks the public mirror when online, keeps the newest build on this computer ----
 // Newer build saved earlier -> run that instead of this file. Add ?local to the address to skip it.
-var TT_BUILD=1795233137891;
+var TT_BUILD=1795236364518;
 (function(){
   var REMOTE="https://raw.githubusercontent.com/blsxf/express-pawn-tools/main/tagtool/", KEY="tagtool.update";
   function db(){ return new Promise(function(res,rej){ var r=indexedDB.open("tagtool",1);
@@ -458,6 +458,9 @@ button.xp-row{cursor:pointer}button.xp-row:hover{border-color:#2f6aa5}.xp-row.on
 .field label{display:block;font-size:12px;font-weight:600;color:var(--ink3);margin-bottom:4px}
 .field input{width:100%;height:38px;border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:0 10px;font-size:15px}
 .field input:focus{outline:0;border-color:var(--acc)}
+.field textarea{width:100%;border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:8px 10px;font:inherit;font-size:15px;color:inherit;resize:vertical}
+.field textarea:focus{outline:0;border-color:var(--acc)}
+.hpAll{display:flex;align-items:center;gap:8px;font-size:13px;margin:4px 0 8px}#hpPin{width:100%;height:36px;border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:0 10px;color:inherit}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .raw{font-size:12px;color:var(--ink3);margin:-2px 0 12px;word-break:break-word}
 .sides{display:flex;flex-direction:column;align-items:center;gap:6px;margin:0 auto 16px}
@@ -510,6 +513,7 @@ button.xp-row{cursor:pointer}button.xp-row:hover{border-color:#2f6aa5}.xp-row.on
     <button class="chip" id="flip" title="Show the back of the tags">Show backs</button>
     <button class="chip" id="add" data-ui="add" data-ui-name="Add button">+ Add</button>
   </div>
+  <button class="chip" id="helpBtn" title="Something wrong? Say it in plain words">Help</button>
   <button class="chip" id="theme" title="Light / dark"></button>
 </header>
 
@@ -1406,8 +1410,10 @@ function itemWhat(item,mfr,model,category,tools,out){
 // read from Bravo's own saved report (.prnx). Columns can be in any order; any other column
 // (Status, Type, Action, Barcode Image…) is kept apart and ignored. Barcode / Location / Serial Number /
 // Date to Inventory feed the barcode label printed on the back (t.label).
+// item #s the last report priced at $0.01 (not priced yet, no tag): the Help box explains them (help.js)
+let PENNY=new Set();
 function parseRows(lines){
-  let cols=null; const out=[];
+  let cols=null; const out=[]; PENNY=new Set();
   const NAMES={Manufacturer:"mfr",Model:"model",Number:"number",Category:"category",Description:"desc",Caliber:"caliber",Cost:"cost",Price:"price",
     Location:"location",Barcode:"barcode","Serial Number":"serial","Date to Inventory":"date",     // these four: the printed barcode label
     Quality:"quality"};                                         // NEW / VERY GOOD / GOOD... (NEW guns: "NEW Glock")
@@ -1431,7 +1437,7 @@ function parseRows(lines){
     const m = j([...parts.caliber,...parts.cost,...parts.price]).match(/^(.*?)\s*\$([\d,]+\.\d\d)\s*\$([\d,]+\.\d\d)\s*$/);
     const cost = m ? money(m[2]) : money(j(parts.cost)), price = m ? money(m[3]) : money(j(parts.price));
     if(!isFinite(cost) && !isFinite(price)) continue;
-    if(price===0.01) continue;                                  // penny price = not priced yet; no tag
+    if(price===0.01){ PENNY.add(number); continue; }            // penny price = not priced yet; no tag
     out.push({mfr:j(parts.mfr), model:j(parts.model), number, category:j(parts.category), desc:j(parts.desc),
               caliberRaw:m?m[1].trim():j(parts.caliber), quality:j(parts.quality), price:isFinite(price)?price:0, cost,
               label:{barcode:j(parts.barcode).replace(/\s/g,""), location:j(parts.location), serial:j(parts.serial), date:j(parts.date), gun:j(parts.gun), desc:j(parts.desc)}});
@@ -1545,15 +1551,23 @@ const hex2rgb = h => { h=h.replace("#",""); return [0,2,4].map(i=>parseInt(h.sub
 const C = {}; for(const k in CONFIG.colors) C[k]=hex2rgb(CONFIG.colors[k]);
 
 // ---- money, layaway ----
-function layaway(price){
+// over: a total the shop set by hand (Edit panel "Layaway total"); down and monthly are figured from it
+function layaway(price,over){
   const L=CONFIG.layaway;
   const raw=Math.round(price*(1+L.markupPercent/100)*100)/100;
-  const total=Math.ceil(raw/L.roundUpTo)*L.roundUpTo;
+  const total=over>0?Math.round(over):Math.ceil(raw/L.roundUpTo)*L.roundUpTo;
   const down=Math.ceil(total*L.downPercent/100);
   const monthly=Math.ceil((total-down)/L.months);
   return {total, down, monthly};
 }
 const fmt$ = n => "$"+Math.round(n).toLocaleString("en-US");
+// a tag's layaway: the hand-set total counts only at the price it was set for (re-priced item -> back to the rule)
+function layOver(t){ const o=money(t.layTotal), p=money(t.layFor);
+  return o>0&&(!isFinite(p)||Math.round(p*100)===Math.round((t.price||0)*100))?o:0; }
+const layOf = t => layaway(t.price||0,layOver(t));
+// soft check: a hand-set total above the rule's total is probably a typo (the shop only rounds down)
+function layNote(t){ const o=layOver(t), r=layaway(t.price||0).total;
+  return o>r?"Layaway total "+fmt$(o)+" is above the usual "+fmt$(r)+" — typo?":""; }
 
 // ---- graphics adapters: same drawing code goes to screen and to PDF ----
 function canvasG(ctx){
@@ -1937,7 +1951,7 @@ function drawGunFront(g,x,y,t,s){
   g.role("price"); g.fitText(fmt$(t.price||0),x+W/2,yPrice+ph/2,W-3*pad,ph*.82);
   // big navy "LAYAWAY ON BACK!" band pinned to the bottom (11-19-2026): makes customers ask to see
   // the item, and the back closes it. layout.front.payments > 0 adds a "$20 Down | $7/mo" row under it.
-  const l=layaway(t.price||0);
+  const l=layOf(t);
   g.rect(x,yLay,W,lb,C.navy);
   g.role("hook"); g.fitText(W_.frontLayaway||W_.layaway,x+W/2,yLay+lb/2+1,W-2.8*pad,lb*.7,C.white);
   if(pr>0){ g.rect(x,yPay,W,pr,C.white);
@@ -1987,7 +2001,7 @@ function drawGunBack(g,x0,y0,t,s0){
   g.role("bg"); g.rect(x0,y0,s0.W,s0.H,C.white); g.role("");
   const x=x0+m, y=y0+m, s={...s0,W:s0.W-2*m,H:s0.H-2*m};
   const {W,H,k,pad}=tagBox(s), cx=x+W/2, B=LAY.backText||1;   // B: back text size (CONFIG.layout.backText)
-  const l=layaway(t.price||0), extras=String(t.extras||"").trim().replace(/^w\s*\/\s*/i,"");   // guns and General Merchandise alike
+  const l=layOf(t), extras=String(t.extras||"").trim().replace(/^w\s*\/\s*/i,"");   // guns and General Merchandise alike
   // sticker spot: from the tag's own bottom edge (the sticker goes on by hand after cutting)
   const zone=Math.min(LAY.barcodeH*72-m,H*.5);
   const lw=Math.max(1.5,s0.W*.009), xa=x0-BL, xb=x0+s0.W+BL, K=[0,0,0];
@@ -2100,7 +2114,7 @@ function drawLogo(g,x,y,w,h){                                       // stand-in 
 }
 // TV and monitor: logo | title (+ details line), Layaway / Down / Monthly with red "Sales Tax Paid!", yellow Our Price
 function drawScreenFront(g,x,y,t0,s,kind){
-  const {W,H}=tagBox(s), t=elecText(t0,kind), l=layaway(t.price||0), sub=!!t.specs;
+  const {W,H}=tagBox(s), t=elecText(t0,kind), l=layOf(t), sub=!!t.specs;
   g.role("bg"); g.rect(x,y,W,H,C.white);
   const hT=H*(sub?.14:.21), hS=sub?H*.075:0, hr=H*(sub?.185:.19), y1=y+hT+hS, yY=y1+3*hr, hY=y+H-yY;
   const xL=x+W*.27, xR=x+W*.785;
@@ -2125,7 +2139,7 @@ function drawMonitorFront(g,x,y,t,s){ drawScreenFront(g,x,y,t,s,"monitor"); }
 // Computer: title + item #, navy "SERVICED BY A CERTIFIED COMPUTER TECHNICIAN", layaway | specs grid,
 // yellow Out the Door Price, logo / ! SALES TAX PAID ! / logo
 function drawComputerFront(g,x,y,t0,s){
-  const {W,H}=tagBox(s), t=elecText(t0,"computer"), l=layaway(t.price||0);
+  const {W,H}=tagBox(s), t=elecText(t0,"computer"), l=layOf(t);
   g.role("bg"); g.rect(x,y,W,H,C.white);
   const R=[.13,.1,.1,.1,.1,.1,.1,.14,.13].map(v=>v*H), Y=[y]; R.forEach(h=>Y.push(Y[Y.length-1]+h));
   const xB=x+W*.175, xC=x+W*.36, xD=x+W*.535, xE=x+W, ch=R[2];
@@ -2185,7 +2199,9 @@ const SH = { dir:null, ok:false, data:null };
 // samples: picture of the tag a fixed tag type (TVs, Computers...) should look like {id:tag type, name, data:data URL, t}
 // kb: knowledge base, "what it is" per Bravo maker + model {key:{what,t}} (fixes.js)
 // printed: what's already been tagged {item #: {p:price printed, t}} -> the tool works out which tags are needed
-const blankData = () => ({ v:1, rules:[], items:{}, tagTypes:[], samples:[], kb:{}, printed:{} });
+// tickets: Help box problems it couldn't fix {id,t,text,item,pic,checks,build,pc,status} (help.js)
+// helpPhrases: phrases a manager taught the Help box {id,t,phrase,fix}
+const blankData = () => ({ v:1, rules:[], items:{}, tagTypes:[], samples:[], kb:{}, printed:{}, tickets:[], helpPhrases:[] });
 
 // small key-value store in the browser to remember the folder
 function idb(){ return new Promise((res,rej)=>{ const r=indexedDB.open("tagtool",1);
@@ -2198,6 +2214,7 @@ function mergeData(a,b){
   const out=blankData();
   const byId=(x,y)=>{ const m=new Map(); [...(x||[]),...(y||[])].forEach(r=>{ const o=m.get(r.id); if(!o||(r.t||0)>(o.t||0)) m.set(r.id,r); }); return [...m.values()]; };
   out.rules=byId(a.rules,b.rules); out.tagTypes=byId(a.tagTypes,b.tagTypes); out.samples=byId(a.samples,b.samples);
+  out.tickets=byId(a.tickets,b.tickets); out.helpPhrases=byId(a.helpPhrases,b.helpPhrases);
   for(const src of [a.items||{},b.items||{}]) for(const n in src) for(const k in src[n]){
     const cur=(out.items[n]||{})[k], v=src[n][k];
     if(!cur||(v.t||0)>(cur.t||0)){ out.items[n]=out.items[n]||{}; out.items[n][k]=v; } }
@@ -2439,7 +2456,8 @@ async function handleFile(file,auto){
 }
 function loadLines(lines,quiet){
   lastLines=lines; const list=TYPE.parse(lines); list.forEach(t=>{ t.kind=autoKind(t); if(skipCat(t)&&t.kind===CONFIG.otherTagType) t.include=false; useAccessories(t); applyKB(t); });
-  list.forEach(t=>t._bp=t.price);                                // Bravo's price, before any fix: what "already tagged" is checked against
+  // _bp: Bravo's price, before any fix (what "already tagged" is checked against); layTotal/layFor: hand-set layaway total + the price it was set at (item fix)
+  list.forEach(t=>{ t._bp=t.price; t.layTotal=""; t.layFor=""; });
   tags=applyFixes(list); skips={}; $("q").value="";             // a tag type changed on the Edit panel is remembered by item #
   if(!tags.length){ $("emptyMsg").textContent="No items found in that file."; view(); return; }
   needAll(); onlyNeed=hasHistory();
@@ -2484,7 +2502,7 @@ function markAllTagged(){
 
 function newTag(){
   if(!TYPE) return toast("No tag templates loaded yet",true);
-  const t={include:true,price:0,cost:NaN,number:"",raw:"",hand:true,kind:kindOf(CONFIG.defaultTagType).id}; TYPE.fields.forEach(f=>t[f[0]]=""); tags.push(t);
+  const t={include:true,price:0,cost:NaN,number:"",raw:"",hand:true,layTotal:"",layFor:"",kind:kindOf(CONFIG.defaultTagType).id}; TYPE.fields.forEach(f=>t[f[0]]=""); tags.push(t);
   view(); openEditor(tags.length-1); prawn("new");
 }
 
@@ -2605,25 +2623,33 @@ function openEditor(i){
         TYPE.fields.filter(x=>s.extrasFront?x[0]!=="caliber":x[0]!=="what"&&x[0]!=="notes").map(x=>f(x[0],x[1],t[x[0]]||"")).join(""))(design(s))}
       ${kbBox(t,s)}
       <div class="row2">${f("price","Price",t.price||"",1)}${f("cost","Cost",isFinite(t.cost)?t.cost:"",1)}</div>
+      <div class="field"><label>Layaway total</label><input data-k="layTotal" value="${esc(layOver(t)||"")}" inputmode="decimal" placeholder="${esc(fmt$(layaway(t.price||0).total))} (usual)"></div>
+      <div class="raw" id="edLay"></div>
       ${f("number","Item #",t.number||"")}
       ${t.category?`<div class="raw">Bravo category: ${esc(t.category)}</div>`:""}
       ${t.raw?`<div class="raw">Bravo: ${esc(t.raw)}</div>`:""}
     </div>
-    <div class="foot"><button class="btn" id="edInc"></button>${t.hand?'<button class="btn" id="edDel">Delete</button>':""}<button class="btn primary grow" id="edDone">Done</button></div>`);
+    <div class="foot"><button class="btn" id="edInc"></button>${t.hand?'<button class="btn" id="edDel">Delete</button>':""}<button class="btn" id="edHelp" title="Something wrong with this tag?">Help</button><button class="btn primary grow" id="edDone">Done</button></div>`);
   // preview scale: same for every tag type, so the drawer shows real relative size
   const maxW=Math.max(...usedKinds().map(x=>settings(x.id).W)), maxH=Math.max(...usedKinds().map(x=>settings(x.id).H));
   const k=Math.min(384/maxW,(two?200:300)/maxH);
   const draw=()=>{ paint($("edFront"),t,k,false); if(two) paint($("edBack"),t,k,true); };
   const inc=()=>{ $("edInc").textContent=t.include?"Skip":"Print"; };
-  draw(); inc();
+  // layaway line under the box: what prints, and the soft "!" when the total is above the rule's
+  const lay=()=>{ const l=layOf(t), n=layNote(t), was=money(t.layTotal)>0&&!layOver(t);
+    $("edLay").innerHTML=(n?"<b>! "+esc(n)+"</b><br>":"")+(was?esc("The "+fmt$(money(t.layTotal))+" total was set for $"+t.layFor+"; new price uses the usual total")+"<br>":"")
+      +esc("Prints: "+fmt$(l.total)+" · Down "+fmt$(l.down)+" · "+fmt$(l.monthly)+"/mo"+(layOver(t)?"":" (blank = usual ×1.10)"));
+    const ph=document.querySelector('#drawer input[data-k="layTotal"]'); if(ph) ph.placeholder=fmt$(layaway(t.price||0).total)+" (usual)"; };
+  draw(); inc(); lay();
   $("drawer").querySelectorAll("[data-kind]").forEach(b=>b.onclick=()=>{
     if(t.kind===b.dataset.kind) return; t.kind=b.dataset.kind; rememberEdit(t,"kind"); if(!t.extras) useAccessories(t); view(); openEditor(i); });
   $("drawer").querySelectorAll("input[data-k]").forEach(inp=>inp.oninput=()=>{
     const k=inp.dataset.k, v=inp.value;
     if(k==="price"){ const m=money(v); t.price=isFinite(m)?m:0; }
     else if(k==="cost"){ const m=money(v); t.cost=isFinite(m)?m:NaN; }
+    else if(k==="layTotal"){ const m=money(v); t.layTotal=m>0?String(Math.round(m)):""; t.layFor=m>0?String(t.price||0):""; rememberEdit(t,"layTotal"); rememberEdit(t,"layFor"); }
     else { t[k]=v; rememberEdit(t,k); }
-    checkOne(t); draw(); redrawCard(i);
+    checkOne(t); draw(); lay(); redrawCard(i);
     const c=cards().find(c=>c._i===i); if(c){ c.classList.toggle("warn",!!t._warn); c.classList.toggle("check",!t._warn&&!!t._check); }
   });
   const kbDo=what=>{ t.what=what; kbSet(t,what); checkAll(); view(); openEditor(i); };   // every tag of this model
@@ -2632,6 +2658,7 @@ function openEditor(i){
   if($("kbOk")) $("kbOk").onclick=()=>{ t.checked="1"; rememberEdit(t,"checked"); checkAll(); view(); openEditor(i); };   // remembered by item #
   $("edInc").onclick=()=>{ t.include=!t.include; inc(); const c=cards().find(c=>c._i===i); if(c) c.classList.toggle("off",!t.include); updateBar(); buildGridHeadsOnly(); };
   if($("edDel")) $("edDel").onclick=()=>{ tags.splice(i,1); closeDrawer(); view(); };
+  $("edHelp").onclick=()=>openHelp(i);
   $("edX").onclick=closeDrawer; $("edDone").onclick=()=>{ prawn("edit"); closeDrawer(); };
   const first=$("drawer").querySelector("input"); if(first) setTimeout(()=>first.focus(),50);
 }
@@ -2701,7 +2728,7 @@ function kbBox(t,s){
 // still prints, gets a "!" on screen, and is named when you print.
 // skipped when nothing that changes the fit (size, text, price) changed since the last check
 const CHECKED=new WeakMap();
-function checkOne(t){ const s=settings(t.kind); t._check=kbCheck(t,s); const key=JSON.stringify([s.W,s.H,s.extrasFront,s.design,s.bigTop,TYPE.fields.map(f=>t[f[0]]),t.price]);
+function checkOne(t){ const s=settings(t.kind); t._check=kbCheck(t,s)||layNote(t); const key=JSON.stringify([s.W,s.H,s.extrasFront,s.design,s.bigTop,TYPE.fields.map(f=>t[f[0]]),t.price,layOver(t)]);
   if(CHECKED.get(t)===key) return; CHECKED.set(t,key);
   const r=fitTag(TYPE,t,s); t._warn=r.left.length?r.left:null; }
 function checkAll(){ tags.forEach(checkOne); }
@@ -2715,6 +2742,8 @@ function checkPrint(){
     ? "Small text on "+plural(rep.left.length,"tag")+": "+rep.left.slice(0,2).map(x=>name(x.t)).join(", ")+(rep.left.length>2?"…":"")+" · "+printTip()
     : "✓ Checked "+plural(rep.tags,"tag")+(rep.fixed.length?" · "+rep.fixed.length+" fixed to fit":"")+" · "+printTip();
   if(ask.length) rep.msg="Check "+plural(ask.length,"tag")+" (what it is): "+ask.slice(0,2).map(name).join(", ")+(ask.length>2?"…":"")+" · "+rep.msg;
+  const lay=tags.filter(t=>t.include&&layNote(t));                    // hand-set layaway total above the rule: likely a typo
+  if(lay.length) rep.msg="Check "+plural(lay.length,"tag")+" (layaway total above usual): "+lay.slice(0,2).map(name).join(", ")+(lay.length>2?"…":"")+" · "+rep.msg;
   if(/Firefox\//.test(navigator.userAgent)) rep.msg="Use Edge or Chrome to print — Firefox won't turn on two-sided by itself.";
   return rep;
 }
@@ -2979,6 +3008,7 @@ async function runCmd(line){
       'fields                                    field names for this tag type',
       'status / folder                           shared folder: show / pick',
       'export / import                           backup file / load a backup',
+      ...(typeof HELP_CMDS!=="undefined"?HELP_CMDS:[]),
       'clear, exit' ].forEach(x=>cprint(x));
   } else if(cmd==="fix"){
     const arrow=a.indexOf("->"); const ifAt=a.findIndex((x,i)=>i>arrow&&x.toLowerCase()==="if");
@@ -3009,6 +3039,7 @@ async function runCmd(line){
   } else if(cmd==="import"){ $("conFile").click();
   } else if(cmd==="clear"){ $("conOut").innerHTML="";
   } else if(cmd==="exit"||cmd==="quit"){ closeConsole();
+  } else if(typeof helpCmd==="function"&&await helpCmd(cmd,a)){   // Help box tickets (help.js)
   } else cprint('Unknown command. Type "help".',"bad");
 }
 $("conIn").addEventListener("keydown",e=>{
@@ -3028,6 +3059,194 @@ $("console").addEventListener("click",e=>{ if(e.target.id==="console") closeCons
 document.addEventListener("keydown",e=>{
   if(e.ctrlKey&&e.shiftKey&&e.key.toLowerCase()==="f"){ e.preventDefault(); CON.open?closeConsole():openConsole(); }
 });
+
+</script>
+<script>
+// ===== HELP BOX (11-20-2026): staff type the problem in plain words, the tool picks a fix it already has =====
+// Offline and in-house only: a keyword matcher over a fixed list of fixes (HELP_FIXES) plus phrases a manager taught it
+// (shared helpPhrases). It shows a before/after and asks "Fix it?". Staff fixes touch that one item (remembered by item #);
+// with the manager PIN, a name fix can go to every item (a rule). Anything it can't fix becomes a ticket in
+// "Tag Tool Data.json" for the manager console: tickets / ticket / done / ignore / copy / teach. No outside AI, no network.
+
+const HW = s => " "+String(s||"").toLowerCase().replace(/[’']/g,"").replace(/\.(?!\d)|(?<!\d)\./g," ").replace(/[^a-z0-9$.#]+/g," ").trim()+" ";   // a period stays only inside a number (4.5)
+const hasW = (s,re) => re.test(s);
+// which box on the Edit panel the words point at
+const HELP_FIELDS=[["layTotal",/ (layaway|lay away|down payment|monthly|per month|payments?) /],["extras",/ (extras|comes with|case|mags?|magazines?|charger|cords?|controllers?|remote|box) /],
+  ["caliber",/ (caliber|cal|gauge|ga|9mm|mm) /],["what",/ (what it is|what is it|item name|type of item) /],["brand",/ (brand|make|maker|manufacturer|company) /],
+  ["model",/ (model|name) /],["notes",/ (notes?|condition|new|used) /]];
+const helpField=s=>{ const f=HELP_FIELDS.find(([,re])=>re.test(s)); return f&&f[0]; };
+const fieldName=k=>({layTotal:"Layaway total",extras:"Comes with",caliber:"Caliber",what:"What it is",brand:"Make",model:"Model",notes:"Notes / condition"}[k]||k);
+// tag type named in the words ("should be a long gun")
+const helpKind=s=>kinds().find(k=>{ const n=HW(k.name).trim(), one=n.replace(/s$/,""); return s.includes(" "+n+" ")||s.includes(" "+one+" "); });
+
+// the fixed list. score(s,c) > 0 = it fits; plan(c) = what it would do: {say, after?(copy), apply?(), rules?[] (store-wide)}
+const HELP_FIXES=[
+  { id:"shorten", label:"Make a long line fit", needsItem:true,
+    score:s=>hasW(s,/ (too (long|small|tiny|big)|cut off|cutoff|doesnt fit|wont fit|dont fit|squished|squish|crammed|hard to read|cant read|small (text|print|letters)|tiny|shrink|shorten|overlap|runs? off) /)?3:0,
+    plan(c){ const t=c.t, after={...t}, rules=[], named=helpField(c.s), keys=["model","brand"].includes(named)?[named]:["model","brand"];
+      for(const k of keys){ const v=String(t[k]||""); let o=v;
+        for(const [a,b] of SHORTEN){ const re=new RegExp("\\b"+reEsc(a)+"\\b","gi"); if(re.test(o)) o=o.replace(re,b); }
+        if(o!==v){ after[k]=o; rules.push({field:k,find:v,replace:o}); } }   // store-wide = this whole name only (like console "learn"), never "Smith & Wesson" everywhere
+      const ch=keys.filter(k=>after[k]!==t[k]);
+      if(!ch.length) return {say:"The tool has no shorter name for this tag. Fix it opens Edit at the "+fieldName(keys[0])+" box so you can type a shorter one.",
+        apply:()=>helpOpenField(c.i,keys[0])};
+      return {say:"Shorten "+ch.map(k=>'"'+t[k]+'" → "'+after[k]+'"').join(", ")+" on this tag.", after, rules,
+        apply:()=>{ ch.forEach(k=>{ t[k]=after[k]; rememberEdit(t,k); }); } }; } },
+  { id:"kind", label:"Change the tag type", needsItem:true,
+    score:(s,c)=>{ const k=helpKind(s); return k&&(!c.t||k.id!==kindOf(c.t.kind).id)&&hasW(s,/ (wrong|should|supposed|needs?|isnt|not a|is a|size|type|kind) /)?4:hasW(s,/ wrong (size|tag type|kind of tag|tag) /)?2:0; },
+    plan(c){ const k=helpKind(c.s);
+      if(!k) return {say:"Fix it opens Edit: tap the right tag type at the top (Handguns, Long Guns…).",apply:()=>openEditor(c.i)};
+      const t=c.t; return {say:"Make this a "+k.name+" tag (it's "+kindOf(t.kind).name+" now).", after:{...t,kind:k.id},
+        apply:()=>{ t.kind=k.id; rememberEdit(t,"kind"); if(!t.extras) useAccessories(t); } }; } },
+  { id:"field", label:"Fix a word on the tag", needsItem:true,
+    score:s=>helpField(s)&&hasW(s,/ (wrong|misspell|misspelled|spelled|spelling|typo|should (say|be)|says|change|fix|missing|left off|not right|incorrect|add) /)?2.5:0,
+    plan(c){ const k=helpField(c.s); return {say:"Fix it opens Edit at the "+fieldName(k)+" box. Type it the way it should print"+(k==="layTotal"?" (blank = usual ×1.10).":"; it's remembered for this item."),
+      apply:()=>helpOpenField(c.i,k)}; } },
+  { id:"lineup", label:"Line up the backs",
+    score:s=>hasW(s,/ backs? /)&&hasW(s,/ (line|lined|lining|crooked|off|shifted|misaligned|not straight|upside|wrong spot|dont match|doesnt match|lopsided|offset) /)?4:0,
+    plan:()=>({say:"Backs not behind their fronts is the printer. Fix it opens Line up backs: print the test sheet and type the two numbers.",apply:()=>openLineup()}) },
+  { id:"missing", label:"Explain a missing tag",
+    score:s=>hasW(s,/ (missing|not (showing|there|listed|on (the )?(screen|list))|no tag|cant find|where is|wheres|didnt (print|show)|isnt (there|showing|listed)|disappeared|gone|skipped) /)?3:0,
+    plan:c=>helpMissing(c) },
+  { id:"price", label:"Wrong price",
+    score:s=>hasW(s,/ (price|priced|pricing|cost) /)&&!hasW(s,/ (layaway|down|monthly) /)&&hasW(s,/ (wrong|off|old|incorrect|not right|should be|changed|different|mistake) /)?3:0,
+    plan:()=>({say:"Prices come from Bravo. Fix the price in Bravo, save the report again (Report Preview > Save), and open it here. The tag then shows up as a new price."}) },
+];
+const helpFix=id=>HELP_FIXES.find(f=>f.id===id);
+
+// "why isn't item X on screen?"
+function helpMissing(c){
+  if(!c.num) return {say:"Which item? Type its item # in the Item # box and try again.",retry:true};
+  if(PENNY.has(c.num)) return {say:c.num+" is priced $0.01 in Bravo (not priced yet), so it gets no tag. Price it in Bravo, save the report again, and open it here."};
+  const t=c.t; if(!t) return {say:c.num+" isn't in this report. Check it's in stock in Bravo and that the report was saved after it came in, then open the new report."};
+  if(skipCat(t)&&t.kind===CONFIG.otherTagType) return {say:c.num+" is "+(t.category||"jewelry / coins")+": the tool has no tag for that kind of item yet, so it's skipped."};
+  if(!t.include&&!t._need&&hasHistory()) return {say:c.num+" was already tagged at this price"+((SH.data.printed||{})[c.num]?" ("+new Date(SH.data.printed[c.num].t).toLocaleDateString()+")":"")+", so it starts unchecked. Fix it checks it so it prints again.",
+    apply:()=>{ t.include=true; onlyNeed=false; }};
+  if(!t.include) return {say:c.num+" is unchecked. Fix it checks it so it prints.",apply:()=>{ t.include=true; }};
+  return {say:c.num+" is on screen and checked: it prints with the next Print. Use Find to jump to it."};
+}
+function helpOpenField(i,k){ openEditor(i); const el=document.querySelector('#drawer input[data-k="'+k+'"]'); if(el) setTimeout(()=>{ el.focus(); el.select(); el.scrollIntoView({block:"center"}); },80); }
+
+// item # from the words or the box: "C33016383", or the last 4+ digits of one in this report
+function helpItem(s,box){
+  const raw=String(box||"").trim().toUpperCase()||((s.toUpperCase().match(/\b[A-Z]{1,3}\d{5,}\b/)||[])[0])||"";
+  const d=raw||((s.match(/\b\d{4,}\b/)||[])[0])||""; if(!d) return {num:"",i:-1};
+  let i=tags.findIndex(t=>t.number&&t.number.toUpperCase()===d.toUpperCase());
+  if(i<0&&/^\d+$/.test(d)){ const hit=tags.map((t,j)=>j).filter(j=>String(tags[j].number||"").endsWith(d)); if(hit.length===1) i=hit[0];
+    else if(!hit.length){ const p=[...PENNY].filter(n=>n.endsWith(d)); if(p.length===1) return {num:p[0],i:-1}; } }   // $0.01 items aren't in tags
+  return {num:i>=0?tags[i].number:d.toUpperCase(),i};
+}
+// pick the best fix: keyword score + taught phrases (shared, every computer)
+function helpMatch(text,c){
+  const s=HW(text), words=new Set(s.trim().split(" ").filter(w=>w.length>2)), sc={};
+  for(const f of HELP_FIXES){ const v=f.score(s,c); if(v>0&&(!f.needsItem||c.t)) sc[f.id]=v; }
+  for(const p of (SH.data.helpPhrases||[]).filter(p=>!p.deleted)){
+    const pw=new Set(HW(p.phrase).trim().split(" ").filter(w=>w.length>2)); if(!pw.size) continue;
+    const both=[...pw].filter(w=>words.has(w)).length, sim=both/Math.max(pw.size,Math.min(words.size,pw.size*2));
+    const f=helpFix(p.fix); if(sim>=.6&&f&&(!f.needsItem||c.t)) sc[p.fix]=(sc[p.fix]||0)+5*sim; }
+  return Object.entries(sc).sort((a,b)=>b[1]-a[1]).map(([id])=>helpFix(id));
+}
+
+// ---------- the box ----------
+const HELP={i:-1,text:"",num:"",tried:[]};
+function openHelp(i){
+  HELP.i=i??-1; HELP.text=""; HELP.tried=[]; const t=tags[HELP.i]; HELP.num=t?t.number||"":"";
+  openDrawer(`<div class="top"><h3>Help</h3><button class="x" id="hpX">✕</button></div>
+    <div class="body"><div class="field"><label>What's wrong? Say it like you'd tell a coworker</label>
+      <textarea id="hpText" rows="3" placeholder="e.g. the model is cut off · should be a long gun · backs don't line up · where's C33016383?"></textarea></div>
+      <div class="field"><label>Item # ${t?"":"(if it's about one tag)"}</label><input id="hpNum" value="${esc(HELP.num)}" ${t&&t.number?"readonly":""}></div>
+      <div id="hpOut"></div></div>
+    <div class="foot"><button class="btn" id="hpBack" ${t?"":"hidden"}>Back to Edit</button><button class="btn primary grow" id="hpGo">Find a fix</button></div>`);
+  $("hpX").onclick=closeDrawer; if($("hpBack")) $("hpBack").onclick=()=>openEditor(HELP.i);
+  $("hpGo").onclick=helpFind; $("hpText").onkeydown=e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); helpFind(); } };
+  setTimeout(()=>$("hpText").focus(),50);
+}
+// back to the question with the words kept (Find a fix button again)
+function helpRetry(){ const tx=$("hpText").value, n=$("hpNum").value; openHelp(HELP.i); $("hpText").value=tx; if(!$("hpNum").readOnly) $("hpNum").value=n; }
+function helpCtx(){
+  const text=$("hpText").value.trim(), it=HELP.i>=0&&tags[HELP.i]&&!$("hpNum").value.trim()?{num:tags[HELP.i].number,i:HELP.i}:helpItem(text,$("hpNum").value);
+  const i=HELP.i>=0&&(!it.num||tags[HELP.i].number===it.num)?HELP.i:it.i;
+  return {text,s:HW(text),num:it.num,i,t:tags[i]||null};
+}
+function helpFind(){
+  const c=helpCtx(); if(!c.text) return $("hpText").focus();
+  HELP.text=c.text; HELP.tried=[];
+  const m=helpMatch(c.text,c);
+  if(!m.length){
+    const why=c.text&&HELP_FIXES.some(f=>f.needsItem&&f.score(c.s,c)>0)&&!c.t?"Which tag? Type its item # and try again, or ":"";
+    return helpTicket(c,"no match",why+"I don't have a fix for that yet, so I saved it for the manager");   // every no-match is a ticket (the manager can teach the words)
+  }
+  helpOffer(c,m,0);
+}
+// show one fix: what it does, before/after, Fix it? Yes / No (No = next idea, then a ticket)
+function helpOffer(c,m,n){
+  const f=m[n]; if(!f) return helpTicket(c,"no: "+HELP.tried.join(", "));
+  HELP.tried.push(f.id); const p=f.plan({...c});
+  const store=p.rules&&p.rules.length&&CONFIG.managerPin;
+  helpShow(`<div class="kb"><b>${esc(f.label)}</b>${esc(p.say)}</div>
+    ${p.after?'<div class="sides"><span>Now</span><canvas id="hpA"></canvas><span>After</span><canvas id="hpB"></canvas></div>':""}
+    ${store?`<label class="hpAll"><input type="checkbox" id="hpAll"> Every item like this (manager PIN)</label><input id="hpPin" type="password" placeholder="Manager PIN" hidden>`:""}`,
+    p.retry?[["Try again",helpRetry]]:p.apply?[["Fix it",()=>helpApply(c,f,p)],["No",()=>helpOffer(c,m,n+1)]]:[["Got it",()=>{ prawn("edit"); closeDrawer(); }],["Didn't help",()=>helpOffer(c,m,n+1)]]);
+  if(p.after){ const k=Math.min(170/settings(c.t.kind).W,1.2); paint($("hpA"),c.t,k,false); paint($("hpB"),p.after,k,false); }
+  if(store) $("hpAll").onchange=()=>{ $("hpPin").hidden=!$("hpAll").checked; if(!$("hpPin").hidden) $("hpPin").focus(); };
+}
+async function helpApply(c,f,p){
+  const all=$("hpAll")&&$("hpAll").checked;
+  if(all&&($("hpPin").value||"")!==String(CONFIG.managerPin)) return toast("Wrong PIN — or uncheck \"Every item\"",true);   // PIN every time
+  if(all){ await updateShared(d=>p.rules.forEach(r=>d.rules.push({...r,id:newId(),t:Date.now()}))); if(lastLines) loadLines(lastLines,true); }
+  else p.apply();
+  checkAll(); view(); if(!$("drawer").hidden&&$("hpOut")){
+    helpShow(`<p>✓ Done${all?" for every item like this":c.t&&c.t.number?" — remembered for "+esc(c.t.number):""}. Did that fix it?</p>`,
+      [["Yes, fixed",()=>{ prawn("edit"); closeDrawer(); toast("✓ Fixed"); }],["No, still wrong",()=>helpTicket(c,"didn't help: "+f.id)]]); }
+}
+function helpShow(html,btns){
+  $("hpOut").innerHTML=html; const ft=$("drawer").querySelector(".foot");
+  ft.innerHTML=btns.map((b,j)=>`<button class="btn${j?"":" primary grow"}" data-h="${j}">${esc(b[0])}</button>`).join("");
+  ft.querySelectorAll("[data-h]").forEach(b=>b.onclick=()=>btns[+b.dataset.h][1]());
+}
+// ---------- tickets: what the box couldn't fix, for the manager (and Claude) ----------
+const pcName=()=>{ let n=store.get("pc"); if(!n){ n="PC-"+Math.random().toString(36).slice(2,6).toUpperCase(); store.set("pc",n); } return n; };
+function tagPic(t){ try{ const cv=document.createElement("canvas"); paint(cv,t,Math.min(1,240/settings(t.kind).W),false);
+  return cv.toDataURL("image/jpeg",.6); }catch(e){ return ""; } }
+async function helpTicket(c,how,msg){
+  const t=c.t, l=t&&layOf(t);
+  const k={id:newId(),t:Date.now(),at:Date.now(),status:"open",text:c.text,how,item:c.num||"",build:typeof TT_BUILD!=="undefined"?TT_BUILD:0,pc:pcName(),
+    tag:t?{kind:kindOf(t.kind).name,brand:t.brand,model:t.model,caliber:t.caliber,what:t.what,extras:t.extras,notes:t.notes,price:t.price,layaway:l.total,raw:t.raw,category:t.category}:null,
+    checks:t?{small:(t._warn||[]).map(x=>x.role+" "+(x.why||"")).join(", "),check:t._check||"",need:t._need||"",printing:!!t.include}:null,
+    pic:t?tagPic(t):""};
+  await updateShared(d=>{ d.tickets=d.tickets||[]; d.tickets.push(k); });
+  helpShow(`<p>${esc(msg||"Saved for the manager. Thanks — they'll fix it")}${c.num?" ("+esc(c.num)+")":""}.</p>`,
+    how==="no match"?[["Close",closeDrawer],["Try other words",helpRetry]]:[["Close",closeDrawer]]);
+}
+// manager console commands (fixes.js runCmd calls this before "Unknown command")
+const HELP_CMDS=['tickets [all]                             Help box problems it couldn\'t fix',
+  'ticket <#>                                one ticket in full',
+  'done <#> [teach <fix>] / ignore <#>      close a ticket (teach: the box picks <fix> for those words next time)',
+  'copy <#>                                  copy a ticket for Claude (paste it in a chat)',
+  'teach "words" <fix> / helpfixes          teach a phrase / list fix names'];
+let tlist=[];
+const ticketLine=(x,n)=>String(n).padStart(3)+"  "+new Date(x.at||x.t).toLocaleDateString()+"  "+(x.item||"—").padEnd(11)+" "+(x.status!=="open"?"["+x.status+"] ":"")+'"'+String(x.text).slice(0,60)+'"';
+async function helpCmd(cmd,a){
+  const all=()=>(SH.data.tickets||[]).slice().sort((x,y)=>(x.at||x.t)-(y.at||y.t));
+  const pick=()=>{ const x=tlist[+a[1]-1]; if(!x) cprint("No ticket #"+(a[1]||"")+" — type tickets first","bad"); return x; };
+  if(cmd==="tickets"){ tlist=all().filter(x=>a[1]==="all"||x.status==="open");
+    if(!tlist.length) cprint(a[1]==="all"?"No tickets.":"No open tickets.","dim"); else tlist.forEach((x,i)=>cprint(ticketLine(x,i+1))); return true; }
+  if(cmd==="ticket"){ const x=pick(); if(x){ cprint(ticketLine(x,+a[1]));
+    cprint("   how: "+x.how+" · "+x.pc+" · build "+x.build,"dim"); if(x.tag) cprint("   tag: "+JSON.stringify(x.tag),"dim"); if(x.checks) cprint("   checks: "+JSON.stringify(x.checks),"dim"); } return true; }
+  if(cmd==="done"||cmd==="ignore"){ const x=pick(); if(!x) return true;
+    const ti=a.indexOf("teach"), fix=ti>0?a[ti+1]:""; if(ti>0&&!helpFix(fix)){ cprint("No fix named "+fix+" — type helpfixes","bad"); return true; }
+    await updateShared(d=>{ const y=(d.tickets||[]).find(z=>z.id===x.id); if(y){ y.status=cmd==="done"?"done":"ignored"; y.t=Date.now(); y.pic=""; }   // picture dropped once closed (keeps the file small)
+      if(fix) d.helpPhrases.push({id:newId(),t:Date.now(),phrase:x.text,fix}); });
+    cprint((cmd==="done"?"Done":"Ignored")+": #"+a[1]+(fix?" · taught: \""+x.text+"\" → "+fix:""),"ok"); return true; }
+  if(cmd==="copy"){ const x=pick(); if(!x) return true; const {pic,...rest}=x;
+    const txt="Tag Tool Help ticket (from the shop's Help box). Please fix in the repo:\n"+JSON.stringify(rest,null,1)+(pic?"\n(tag picture is in Tag Tool Data.json, tickets, id "+x.id+")":"");
+    try{ await navigator.clipboard.writeText(txt); cprint("Copied ticket #"+a[1]+" — paste it in a Claude chat.","ok"); }catch(e){ cprint(txt); } return true; }
+  if(cmd==="teach"){ const fix=a[2]; if(!a[1]||!helpFix(fix)){ cprint('Use: teach "words staff type" <fix>   (helpfixes lists them)',"bad"); return true; }
+    await updateShared(d=>d.helpPhrases.push({id:newId(),t:Date.now(),phrase:a[1],fix})); cprint('Taught: "'+a[1]+'" → '+fix,"ok"); return true; }
+  if(cmd==="helpfixes"){ HELP_FIXES.forEach(f=>cprint("   "+f.id.padEnd(9)+f.label)); return true; }
+  return false;
+}
+$("helpBtn").onclick=()=>openHelp(editIdx>=0?editIdx:-1);
 
 </script>
 <script>
