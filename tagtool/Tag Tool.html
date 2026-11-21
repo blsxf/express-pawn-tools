@@ -7,7 +7,7 @@
 <script>
 // ---- self-update: checks the public mirror when online, keeps the newest build on this computer ----
 // Newer build saved earlier -> run that instead of this file. Add ?local to the address to skip it.
-var TT_BUILD=1795209068972;
+var TT_BUILD=1795221021300;
 (function(){
   var REMOTE="https://raw.githubusercontent.com/blsxf/express-pawn-tools/main/tagtool/", KEY="tagtool.update";
   function db(){ return new Promise(function(res,rej){ var r=indexedDB.open("tagtool",1);
@@ -187,7 +187,7 @@ const CONFIG = {
   otherTagType: "general",
   // Categories with no tag format yet: they land on General Merchandise but start unchecked (Skip).
   // Matched at the start of the category, so "Jewel" covers Jewelry / Jewelry - Gold.
-  skipCategories: "Computer|Jewel",
+  skipCategories: "Computer|Jewel|.*\\b(Ring|Gold|Silver|Diamond|Pendant|Earring|Chain|Bracelet|Necklace|Charm|Coin|Proof Set|Bullion|Platinum|Wedding)s?\\b",   // jewelry + coins: no tag format yet
 
   // Game consoles we take in.  First match wins, so keep the specific ones (Lite, Pro, Digital) above the general.
   //  match: words in Bravo's make/model/description.  kit: what a complete one comes with ("2 Controllers" = two).
@@ -349,6 +349,8 @@ main{flex:1;padding:16px 16px 90px;display:flex;flex-direction:column}
 .card canvas{display:block;background:#fff;border-radius:2px}
 .card .tick{position:absolute;top:-8px;right:-8px;width:26px;height:26px;border-radius:50%;border:2px solid var(--bg);background:var(--yellow);color:var(--onyellow);display:flex;align-items:center;justify-content:center;font-size:14px;padding:0}
 .card .tick svg{stroke-width:3.2}
+.card .need{position:absolute;bottom:-9px;left:-6px;padding:2px 7px;border-radius:6px;background:#0F2A5C;border:1px solid #FFD400;color:#fff;font-size:12px;font-weight:700;pointer-events:auto;box-shadow:var(--shadow)}
+.card .need.price{background:#C8102E;border-color:#fff}
 .card.off{opacity:.25}
 .card.check::after{content:"?";position:absolute;top:-8px;left:-8px;width:26px;height:26px;border-radius:50%;border:2px solid var(--bg);background:#7fb2ff;color:#1a1a1a;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center}
 .kb{border:1px solid #7fb2ff;border-radius:10px;padding:10px 12px;margin:0 0 12px}.kb b{display:block;margin-bottom:6px}.kb a{color:#7fb2ff}
@@ -500,7 +502,9 @@ button.xp-row{cursor:pointer}button.xp-row:hover{border-color:#2f6aa5}.xp-row.on
   <div class="tt"><button id="ttBtn" title="Tag types and sizes"><b id="ttName" hidden></b><span>Sizes</span><i>▾</i></button><div id="ttMenu" hidden></div></div>
   <div id="tools" hidden>
     <div class="search" data-ui="search" data-ui-name="Search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input id="q" placeholder="Find"></div>
+    <button class="chip" id="needOnly" title="Items already tagged at this price" hidden>Show all</button>
     <button class="chip" id="toggleAll" data-ui="selall" data-ui-name="Check all / none">Uncheck all</button>
+    <button class="chip" id="markAll" title="Mark every item in this report as already tagged" hidden>Mark all tagged</button>
     <button class="chip" id="flip" title="Show the back of the tags">Show backs</button>
     <button class="chip" id="add" data-ui="add" data-ui-name="Add button">+ Add</button>
   </div>
@@ -1413,7 +1417,7 @@ function parseRows(lines){
       parts[col.key].push(c.str);
     }
     const number = parts.number.join("").trim();
-    if(!/^[A-Z]{0,3}\d{5,}$/.test(number)) continue;
+    if(!/^[A-Z]{0,3}\d{5,}$/.test(number)&&!/^(?=.*\d{3})[A-Z0-9]+(?:-[A-Z0-9]+)+$/.test(number)) continue;   // C33016383; also G-I-1176, I-507, 2104954-4
     const j = a => a.join(" ").replace(/\s+/g," ").replace(/\s*…/g,"…").trim();
     // caliber, cost and price run together when Bravo squeezes them ("9MM $100.00 $150.00")
     const m = j([...parts.caliber,...parts.cost,...parts.price]).match(/^(.*?)\s*\$([\d,]+\.\d\d)\s*\$([\d,]+\.\d\d)\s*$/);
@@ -2172,7 +2176,8 @@ const DATA_FILE = "Tag Tool Data.json";
 const SH = { dir:null, ok:false, data:null };
 // samples: picture of the tag a fixed tag type (TVs, Computers...) should look like {id:tag type, name, data:data URL, t}
 // kb: knowledge base, "what it is" per Bravo maker + model {key:{what,t}} (fixes.js)
-const blankData = () => ({ v:1, rules:[], items:{}, tagTypes:[], samples:[], kb:{} });
+// printed: what's already been tagged {item #: {p:price printed, t}} -> the tool works out which tags are needed
+const blankData = () => ({ v:1, rules:[], items:{}, tagTypes:[], samples:[], kb:{}, printed:{} });
 
 // small key-value store in the browser to remember the folder
 function idb(){ return new Promise((res,rej)=>{ const r=indexedDB.open("tagtool",1);
@@ -2189,6 +2194,7 @@ function mergeData(a,b){
     const cur=(out.items[n]||{})[k], v=src[n][k];
     if(!cur||(v.t||0)>(cur.t||0)){ out.items[n]=out.items[n]||{}; out.items[n][k]=v; } }
   for(const src of [a.kb||{},b.kb||{}]) for(const k in src){ const cur=out.kb[k], v=src[k]; if(!cur||(v.t||0)>(cur.t||0)) out.kb[k]=v; }
+  for(const src of [a.printed||{},b.printed||{}]) for(const k in src){ const cur=out.printed[k], v=src[k]; if(!cur||(v.t||0)>(cur.t||0)) out.printed[k]=v; }
   return out;
 }
 const cache={ get(){ try{ return Object.assign(blankData(),JSON.parse(localStorage.getItem("tagtool.shared"))||{}); }catch(e){ return blankData(); } },
@@ -2414,18 +2420,42 @@ async function handleFile(file){
   if(!file) return; if(!TYPE) return toast("No tag templates loaded yet",true);
   if(!/\.prnx$/i.test(file.name)){ toast("Needs Bravo's saved report (.prnx): Save in Bravo's Report Preview",true); return; }
   $("drop").classList.add("busy"); $("dropBig").textContent="Reading…"; $("dropSmall").textContent=file.name;
-  try{ if(typeof DecompressionStream==="undefined") throw 0; loadLines(await readPrnxLines(file)); }
+  try{ if(typeof DecompressionStream==="undefined") throw 0; loadLines(await readPrnxLines(file)); loadedAt=Math.max(loadedAt,file.lastModified||0); }
   catch(e){ tags=[]; view(); $("emptyMsg").textContent="Couldn't read that file."; }
   finally{ $("drop").classList.remove("busy"); $("dropBig").textContent="Drop Bravo report"; $("dropSmall").textContent="or click to pick it"; }
 }
 function loadLines(lines,quiet){
   lastLines=lines; const list=TYPE.parse(lines); list.forEach(t=>{ t.kind=autoKind(t); if(skipCat(t)&&t.kind===CONFIG.otherTagType) t.include=false; useAccessories(t); applyKB(t); });
+  list.forEach(t=>t._bp=t.price);                                // Bravo's price, before any fix: what "already tagged" is checked against
   tags=applyFixes(list); skips={}; $("q").value="";             // a tag type changed on the Edit panel is remembered by item #
   if(!tags.length){ $("emptyMsg").textContent="No items found in that file."; view(); return; }
+  needAll(); onlyNeed=hasHistory();
   $("emptyMsg").textContent=""; view(); window.scrollTo({top:0}); if(!quiet) prawn("load",tags.map(t=>t.number||t.raw||""));
   kbResearch(tags);                                              // unknown models: ask Reverb in the background (once a day each)
-  if(!quiet) toast("✓ "+kinds().map(k=>[ofKind(tags,k.id).length,k.name]).filter(x=>x[0]).map(x=>x[0]+" "+x[1]).join(" · "));
+  if(!quiet) toast(hasHistory()?needMsg():"✓ "+kinds().map(k=>[ofKind(tags,k.id).length,k.name]).filter(x=>x[0]).map(x=>x[0]+" "+x[1]).join(" · ")+" · First time: print what you need, or Mark all tagged");
 }
+
+// ---------- which tags are needed: checked against what's been printed (shared, by item #) ----------
+// No tag yet -> "new"; tagged at a different price -> "price"; tagged at this price -> not needed (starts unchecked).
+let onlyNeed=false;
+const hasHistory=()=>Object.keys(SH.data.printed||{}).length>0;
+function needOf(t){ const p=t.number&&!t.hand&&(SH.data.printed||{})[t.number];
+  t._was=p?p.p:null; return !t.number||t.hand?"":!p?"new":Math.round(p.p*100)!==Math.round((t._bp??t.price)*100)?"price":""; }
+function needAll(){ const h=hasHistory();
+  tags.forEach(t=>{ t._need=skipCat(t)&&t.kind===CONFIG.otherTagType?"":needOf(t); if(h&&!t._need&&!t.hand) t.include=false; }); }   // jewelry etc.: no tag format yet
+function needMsg(){ const a=tags.filter(t=>t._need==="new"&&t.include).length, b=tags.filter(t=>t._need==="price"&&t.include).length;
+  return a+b?"✓ "+plural(a+b,"tag")+" needed"+(a&&b?": "+a+" new · "+b+" new price"+(b>1?"s":""):b?" (new price"+(b>1?"s":"")+")":""):"✓ All tagged — nothing new in this report"; }
+// remember what got printed (every computer sees it)
+// keep: stay checked (Save PDF: fronts and backs may be saved one after the other)
+function markPrinted(list,keep){ const now=Date.now(), l=list.filter(t=>t.number&&!t.hand); if(!l.length) return;
+  updateShared(d=>{ d.printed=d.printed||{}; l.forEach(t=>d.printed[t.number]={p:t._bp??t.price,t:now}); });
+  l.forEach(t=>{ t._need=""; if(!keep) t.include=false; t._was=null; }); }
+function markAllTagged(){
+  const l=tags.filter(t=>t.number&&!t.hand);
+  if(!l.length||!confirm("Mark all "+l.length+" items in this report as already tagged?\n\nFrom now on only new items and new prices get tags.")) return;
+  markPrinted(l); onlyNeed=true; view(); toast("✓ "+plural(l.length,"item")+" marked as tagged");
+}
+
 function newTag(){
   if(!TYPE) return toast("No tag templates loaded yet",true);
   const t={include:true,price:0,cost:NaN,number:"",raw:"",hand:true,kind:kindOf(CONFIG.defaultTagType).id}; TYPE.fields.forEach(f=>t[f[0]]=""); tags.push(t);
@@ -2437,6 +2467,8 @@ function view(){
   const has=tags.length>0;
   $("empty").hidden=has; $("tagsView").hidden=$("tools").hidden=$("bar").hidden=!has;
   $("flip").textContent=showBack?"Show fronts":"Show backs"; $("flip").classList.toggle("on",showBack);
+  const nAll=tags.filter(t=>!t._need&&!t.include).length; $("needOnly").hidden=!hasHistory()||!nAll;
+  $("needOnly").textContent=onlyNeed?"Show all ("+nAll+" tagged)":"Hide tagged"; $("markAll").hidden=!has||hasHistory()&&!tags.some(t=>t._need);
   if(has&&TYPE){ checkAll(); buildGrid(); updateBar(); }
 }
 
@@ -2463,25 +2495,28 @@ function buildGrid(){
     const s=settings(kd.id), idx=tags.map((t,i)=>i).filter(i=>kindOf(tags[i].kind).id===kd.id);
     if(!idx.length) continue;
     const per=layoutGrid(s).per, n=idx.filter(i=>tags[i].include).length;
-    const head=document.createElement("div"); head.className="grp";
+    const head=document.createElement("div"); head.className="grp"; head.dataset.k=kd.id;
     head.innerHTML=`${esc(kd.name)}<small>${esc(plural(n,"tag"))} · ${esc(plural(Math.ceil((n+s.skip)/per)||0,"sheet"))} · ${per} per sheet</small>`;
     const wrap=document.createElement("div"); wrap.className="cards";
     grid.appendChild(head); grid.appendChild(wrap);
     idx.forEach(i=>{ const t=tags[i];
-      if(q&&!Object.values(t).join(" ").toLowerCase().includes(q)) return; shown++;
+      if(q&&!Object.values(t).join(" ").toLowerCase().includes(q)) return;
+      if(!q&&onlyNeed&&!t._need&&!t.include) return; shown++;
       const c=document.createElement("div"); c.className="card"+(t.include?"":" off")+(t._warn?" warn":t._check?" check":""); c._i=i;
       if(t._warn) c.title="Some text on this tag prints small — click to fix it"; else if(t._check) c.title=t._check+" — click to check it";
       c.style.width=s.W*k+"px"; c.style.height=s.H*k+"px";
-      c.innerHTML='<button class="tick" title="Print this tag?"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></button>';
+      c.innerHTML='<button class="tick" title="Print this tag?"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></button>'
+        +(t._need==="new"&&hasHistory()?'<b class="need">No tag yet</b>':t._need==="price"?'<b class="need price" title="Tagged at $'+esc(t._was)+'">New price</b>':"");
       c.querySelector(".tick").onclick=e=>{ e.stopPropagation(); t.include=!t.include; c.classList.toggle("off",!t.include); updateBar(); buildGridHeadsOnly(); };
       c.onclick=()=>openEditor(i);
       wrap.appendChild(c); obs.observe(c);
     });
+    if(!wrap.children.length&&onlyNeed&&!q){ head.remove(); wrap.remove(); }   // "Hide tagged": no empty groups
   }
   $("noMatch").hidden=shown>0||!tags.length;
 }
 function buildGridHeadsOnly(){
-  $("grid").querySelectorAll(".grp").forEach((h,j)=>{ const kd=kinds().filter(x=>ofKind(tags,x.id).length)[j]; if(!kd) return;
+  $("grid").querySelectorAll(".grp").forEach(h=>{ const kd=kinds().find(x=>x.id===h.dataset.k); if(!kd) return;
     const s=settings(kd.id), per=layoutGrid(s).per, n=ofKind(sel(),kd.id).length;
     h.querySelector("small").textContent=plural(n,"tag")+" · "+plural(Math.ceil((n+s.skip)/per)||0,"sheet")+" · "+per+" per sheet"; });
 }
@@ -2593,21 +2628,25 @@ let printing=false;
 async function printHere(build,name,msg){
   if(printing) return; printing=true; $("print").disabled=true;
   toast("Getting the print ready…");
-  try{ await FONT_READY; await printSheets(build,()=>toast(msg)); }
+  let ok=false;
+  try{ await FONT_READY; await printSheets(build,()=>toast(msg)); ok=true; }
   catch(e){ try{ saveFile(name,build(pdfTarget()).output("arraybuffer"),"application/pdf"); toast("Couldn't open the print box — saved the PDF to Downloads instead",true); }
     catch(e2){ toast("Error: "+(e2.message||e2),true); } }
   finally{ printing=false; if(TYPE&&tags.length) updateBar(); }
+  return ok;
 }
 function doPrint(){
   if(!sel().length||printing) return;
   const rep=checkPrint(); if(!rep) return;
   const groups=printGroups(), n=nudge();
-  prawn("print",sel().map(t=>t.number||t.raw||"")); printHere(T=>drawSheets(T,TYPE,groups,"both",n),fname("pdf"),rep.msg);
+  const list=sel(); prawn("print",list.map(t=>t.number||t.raw||""));
+  printHere(T=>drawSheets(T,TYPE,groups,"both",n),fname("pdf"),rep.msg).then(ok=>{ if(ok){ markPrinted(list); view(); } });
 }
 function savePdf(sides){
   if(!checkPrint()) return;
   try{ saveFile(fname("pdf",sides==="both"?"":sides+"s"),buildPdf(TYPE,printGroups(),sides,nudge()).output("arraybuffer"),"application/pdf");
-    prawn("print",sel().map(t=>t.number||t.raw||"")); toast(sides==="both"?"Saved to Downloads · "+printTip()+" · Actual size":"Saved to Downloads"); }
+    const list=sel(); prawn("print",list.map(t=>t.number||t.raw||"")); markPrinted(list,true); view();
+    toast(sides==="both"?"Saved to Downloads · "+printTip()+" · Actual size":"Saved to Downloads"); }
   catch(e){ toast("Couldn't save: "+(e.message||e),true); }
 }
 $("print").onclick=doPrint;
@@ -2680,6 +2719,23 @@ function openLineup(){
 }
 $("lineup").onclick=openLineup;
 
+// ---------- newest Bravo report in the shared folder: opens by itself ----------
+// Save the report from Bravo into the shared folder (next to Tag Tool.html); the tool picks the newest .prnx.
+let loadedAt=0;
+async function newestReport(){
+  if(!SH.ok||!SH.dir.values) return null; let best=null;
+  try{ for await(const h of SH.dir.values()){ if(h.kind!=="file"||!/\.prnx$/i.test(h.name)) continue;
+    const f=await h.getFile(); if(!best||f.lastModified>best.lastModified) best=f; } }catch(e){ return null; }
+  return best;
+}
+async function loadNewest(first){
+  if(printing||!TYPE||!$("drawer").hidden) return;
+  const f=await newestReport(); if(!f||f.lastModified<=loadedAt) return;
+  if(!first&&!tags.length&&!loadedAt) return;                       // not loaded yet and not just opened: wait for the next open
+  await handleFile(f);
+}
+window.addEventListener("focus",()=>setTimeout(()=>loadNewest(false),400));   // a newer report saved while the tool was open
+
 // ---------- drag a report anywhere ----------
 let dragDepth=0;
 const hasFiles=e=>e.dataTransfer&&[...e.dataTransfer.types].includes("Files");
@@ -2696,6 +2752,8 @@ $("addFirst").onclick=$("add").onclick=newTag;
 $("q").oninput=()=>buildGrid();
 window.addEventListener("resize",()=>{ clearTimeout(window._rz); window._rz=setTimeout(()=>{ if(tags.length) buildGrid(); },200); });
 const visible=()=>cards().map(c=>tags[c._i]);
+$("needOnly").onclick=()=>{ onlyNeed=!onlyNeed; view(); };
+$("markAll").onclick=markAllTagged;
 $("toggleAll").onclick=()=>{ const v=visible(), on=!v.every(t=>t.include); v.forEach(t=>t.include=on); buildGrid(); updateBar(); };
 document.addEventListener("keydown",e=>{
   if(e.key==="Escape"){ closeDrawer(); $("ttMenu").hidden=true; $("saveMenu").hidden=true; }
@@ -2704,7 +2762,7 @@ document.addEventListener("keydown",e=>{
 
 // ---------- start ----------
 $("shareBtn").onclick=()=>{ if(SH.ok) toast("Shared folder: "+SH.dir.name); else connectShared(); };
-initShared();
+initShared().then(()=>loadNewest(true));
 useSub();
 // "Tag Tool Settings.js" next to this page (see page.html): say so if it has a mistake
 if(SETTINGS.state==="bad") toast("Tag Tool Settings.js has a typo, so the tool is using its normal settings. Fix it in Notepad, save, and reload.",true);
