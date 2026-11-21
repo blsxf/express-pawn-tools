@@ -7,7 +7,7 @@
 <script>
 // ---- self-update: checks the public mirror when online, keeps the newest build on this computer ----
 // Newer build saved earlier -> run that instead of this file. Add ?local to the address to skip it.
-var TT_BUILD=1795225940734;
+var TT_BUILD=1795233137891;
 (function(){
   var REMOTE="https://raw.githubusercontent.com/blsxf/express-pawn-tools/main/tagtool/", KEY="tagtool.update";
   function db(){ return new Promise(function(res,rej){ var r=indexedDB.open("tagtool",1);
@@ -1258,9 +1258,15 @@ const ITEM_SPECS=[
   // jewelry: only when the item is clearly jewelry (JEWEL), so "4K TV" isn't karat and "5G" isn't grams
   [/\b(10|14|18|22|24)\s?K(?:T|ARAT)?\b/,(x,s)=>x[1]+"K "+(/\bTT\b|TWO[- ]TONE|TRI[- ]COLOR/.test(s)?"Two-Tone Gold":/\bWG\b|WHITE GOLD/.test(s)?"White Gold":/\bRG\b|ROSE GOLD/.test(s)?"Rose Gold":/\bYG\b|YELLOW/.test(s)?"Yellow Gold":"Gold"),"J"],
   [/\bSTERLING\b|\b925\b/,()=>"Sterling Silver","J"],[/\bPLATINUM\b|\bPLAT\b/,()=>"Platinum","J"],
-  [/\b(\d?\.\d{1,2}|\d)\s?(?:CTW|CT\.?\s?T\.?W\.?|CARATS?|CT)\b/,x=>x[1]+" ctw","J"],
+  // carats: fractions too ("1/2 CTW" was read as "2 ctw" = 4x the diamond), ".33CTW" with no leading 0
+  [/(?<![\d./])(\d\s\d\/\d{1,2}|\d{1,2}\/\d{1,2}|\d?\.\d{1,2}|\d)\s?(?:CTW|CT\.?\s?T\.?W\.?|CARATS?|CT)\b/,x=>x[1].replace(/^\./,"0.")+" ctw","J"],
+  // bullion: troy ounces + fineness ("1 OZT SILVER COIN", "1/10 OZ GOLD EAGLE", ".999 FINE")
+  [/(?<![\d./])(\d{1,2}\/\d{1,2}|\d?\.\d{1,2}|\d{1,3})\s?(?:OZT|TROY OZ|OZ)\b/,x=>x[1].replace(/^\./,"0.")+" oz","J"],
+  [/(?<![\d])\.(999|9999|900)\b(?!\s*CT)/,x=>"."+x[1]+" Fine","J"],
   [/\b(\d{1,3}(?:\.\d{1,2})?)\s?(?:G|GR|GRAMS?)\b/,x=>x[1]+"g","J"],[/\b(\d{1,2}(?:\.\d{1,2})?)\s?DWT\b/,x=>x[1]+" dwt","J"],
-  [/\bSIZE\s?(\d{1,2}(?:\.5)?)\b|\bSZ\s?(\d{1,2}(?:\.5)?)\b/,x=>"Size "+(x[1]||x[2]),"J"],
+  [/\bSIZE\s?(\d{1,2}(?:\.[25]5?)?)\b|\bSZ\s?(\d{1,2}(?:\.[25]5?)?)\b/,x=>"Size "+(x[1]||x[2]),"J"],
+  // ring size written first, Bravo jewelry style ("6 18KT YG 4.7G"): only 3-16 before a karat mark, so "10K"/"14KT" isn't a size
+  [/^\s(1[0-6]|[3-9])(\.25|\.5|\.75)?\s+(?=(?:10|14|18|22|24)\s?K)/,x=>"Size "+x[1]+(x[2]||""),"J"],
   // electronics / tools / music: screen, resolution, battery, engine, air, channels
   [/\b(\d{2,3})\s?(?:"|IN(?:CH)?)(?=\s|$)/,x=>x[1]+'"'],[/\b([48]K)\b(?!\s*(?:GOLD|YG|WG|RG))/,x=>x[1]],[/\b(1080|1440|2160)P\b/,x=>x[1]+"p"],[/\b(\d{2,3})\s?HZ\b/,x=>x[1]+"Hz"],
   [/\b(\d{1,2}(?:\.\d)?)\s?AH\b/,x=>x[1]+"Ah"],[/\b(12|18|20|24|36|40|56|60|80|82|120)\s?V(?:OLTS?)?(?:\s?MAX)?\b/,x=>x[1]+"V","num"],
@@ -1269,7 +1275,7 @@ const ITEM_SPECS=[
 ];
 // Jewelry only on real evidence: a karat / sterling / ctw / dwt mark, a "Jewel..." category, or a jewelry word together
 // with a metal or stone. Colour words alone ("S21 SILVER", "PS4 PLATINUM HEADSET") and Ring the doorbell brand don't count.
-const JMARK=/\b(?:10|14|18|22|24)\s?K(?:T|ARAT)?\b|\bSTERLING\b|\b925\b|\bCTW\b|\bDWT\b|\bJEWEL/;
+const JMARK=/\b(?:10|14|18|22|24)\s?K(?:T|ARAT)?\b|\bSTERLING\b|\b925\b|\bCTW\b|\bDWT\b|\bJEWEL|\bOZT\b|\bTROY\b|\.999|(?:\d|\b)OZ\b(?=.*\b(?:COIN|EAGLE|BULLION|ROUND|BAR|MAPLE ?LEAF|BUFFALO|KRUGERRAND)\b)|\b(?:COIN|EAGLE|BULLION|ROUND|BAR|MAPLE ?LEAF|BUFFALO|KRUGERRAND)\b.*(?:\d|\b)OZ\b/;
 const JNOUN=/\b(?:RING|NECKLACE|CHAIN|BRACELET|EARRINGS?|PENDANT|BANGLE|ANKLET|BROOCH|CHARM|GRILLZ?)\b/;
 const NOT_JEWEL=/\b(?:DOORBELL|CAMERA|CAM|SECURITY|ALARM|SAW|BLADE|HEADSET|PHONE|CONSOLE|SCOPE|CHAINSAW|BIKE)\b/;
 const isJewel=s=>JMARK.test(s)||(JNOUN.test(s)&&/\b(?:GOLD|SILVER|PLATINUM|DIAMONDS?|GEMSTONE|PEARLS?)\b/.test(s)&&!NOT_JEWEL.test(s));
