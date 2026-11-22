@@ -7,7 +7,7 @@
 <script>
 // ---- self-update: checks the public mirror when online, keeps the newest build on this computer ----
 // Newer build saved earlier -> run that instead of this file. Add ?local to the address to skip it.
-var TT_BUILD=1795326871347;
+var TT_BUILD=1795367172205;
 (function(){
   var REMOTE="https://raw.githubusercontent.com/blsxf/express-pawn-tools/main/tagtool/", KEY="tagtool.update";
   function db(){ return new Promise(function(res,rej){ var r=indexedDB.open("tagtool",1);
@@ -147,7 +147,7 @@ const CONFIG = {
   // reward = tokens per approved kind.
   // freePerWeek: free tokens each week, given at sign-in (weeks nobody signs in don't pile up).
   // Tokens show only inside that panel.
-  tokens: { minutesPerToken: 30, freePerWeek: 1, reward: { suggestion: 1, ticket: 1, fix: 1, sample: 2 } },
+  tokens: { minutesPerToken: 30, freePerWeek: 1, reward: { suggestion: 0.1, ticket: 0.1, fix: 0.1, sample: 0.2, design: 0.2, fact: 0.1, phrase: 0.1 } },
   // Built-in name fixes for every computer, e.g.
   //   {field:"model", find:"Spear Rifle", replace:"Spear"}
   //   {field:"model", find:"G19", replace:"19", ifField:"brand", ifValue:"Glock"}
@@ -161,7 +161,7 @@ const CONFIG = {
     guns: {
       name:  "Guns",
       twoSided: true,
-      fields: [["brand","Make"],["model","Model"],["what","What it is"],["notes","Notes"],["caliber","Caliber"],["extras","Comes with (back)"],["quality","Condition (NEW: red \"NEW!\" before the maker, guns + suppressors)"]],   // what / notes: General Merchandise only
+      fields: [["brand","Make"],["model","Model"],["what","What it is"],["notes","Notes"],["caliber","Caliber"],["extras","Comes with (back)"],["quality","Condition (NEW: red \"NEW!\" before the maker, guns + suppressors; never on pawn / buy items)"]],   // what / notes: General Merchandise only
       rows:   [["brand",36,.74,false],["model",28,.68,true],["caliber",24,.78,false]],
       sizes: [
         {label:'4 per sheet (big)', w:4.1, h:3.62, orient:"landscape"},
@@ -351,7 +351,7 @@ main{flex:1;padding:16px 16px 90px;display:flex;flex-direction:column}
 #drop.busy .ic svg{animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 #emptyMsg{color:var(--bad);font-size:14px;min-height:1.2em}
-#privWarn{color:var(--bad);font-size:14px;font-weight:600;margin:0 0 10px}
+#privWarn,#typeWarn{color:var(--bad);font-size:14px;font-weight:600;margin:0 0 10px}
 .link{background:none;border:0;padding:2px;color:var(--ink3);text-decoration:underline;text-underline-offset:3px;font-size:14px}
 .link:hover{color:var(--ink)}
 #grid{display:flex;flex-direction:column}
@@ -483,6 +483,7 @@ button.xp-row{cursor:pointer}button.xp-row:hover{border-color:#2f6aa5}.xp-row.on
 .field label{display:block;font-size:12px;font-weight:600;color:var(--ink3);margin-bottom:4px}
 .field input{width:100%;height:38px;border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:0 10px;font-size:15px}
 .field input:focus{outline:0;border-color:var(--acc)}
+.field input.bad{border-color:var(--bad)}.field .claim{color:var(--bad);margin:4px 0 0}
 .field textarea{width:100%;border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:8px 10px;font:inherit;font-size:15px;color:inherit;resize:vertical}
 .field textarea:focus{outline:0;border-color:var(--acc)}
 .hpAll{display:flex;align-items:center;gap:8px;font-size:13px;margin:4px 0 8px}#hpPin{width:100%;height:36px;border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:0 10px;color:inherit}
@@ -610,6 +611,7 @@ button.xp-row{cursor:pointer}button.xp-row:hover{border-color:#2f6aa5}.xp-row.on
 
 <main>
   <div id="privWarn" hidden></div>
+  <div id="typeWarn" hidden></div>
   <section id="empty">
     <div id="drop">
       <div class="ic"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
@@ -1071,7 +1073,8 @@ const BRAND_MAP = {
 // brands that sometimes appear as the first word of the model (importer listed as maker)
 const MODEL_BRANDS = {"CANIK":"Canik"};
 const ACRONYMS = new Set(("MCX LT XD XDS XDM SKS BPS SXP MOS EZ TS FDE UFX BLK WSM LCP LCR RS RXM RXP II III IV VI M&P CC RF PA SA SC MC AR RR PG CF " +
-  "JBL KRK EVH ESP PRS MXR TCL AOC MSI DJI ASUS RCA GPS EOS YHM BMAG NATO ACP LR SF TP SP DA SAO DAO HD SBR SBS OD ODG FS LE PC CO2 SS CA EC EC9S XL XR CS USA TRP").split(" "));
+  "JBL KRK EVH ESP PRS MXR TCL AOC MSI DJI ASUS RCA GPS EOS YHM BMAG NATO ACP LR SF TP SP DA SAO DAO HD SBR SBS OD ODG FS LE PC CO2 SS CA EC EC9S XL XR CS USA TRP " +
+  "PRC RUM SPC SAUM").split(" "));   // cartridges: 6.5 PRC, 300 RUM, 6.8 SPC, 7mm SAUM
 const SMALL_TITLE = new Set(["HI","MAX","GUN","PRO","GEN","AIR","ONE","TAC","OPS","MAG","OF","IN","ON","TO","A","AN","OR","BY","FOR","AND","THE","WITH"]);
 
 function titleWord(w){
@@ -1140,11 +1143,12 @@ const CAL_RULES = [
   [/^380/, ".380 ACP"], [/^32 ACP/, ".32 ACP"], [/^25 ACP/, ".25 ACP"],
   [/^22 S\/L\/LR/, ".22 S/L/LR"], [/^22 ?(WMR|MAG)/, ".22 WMR"], [/^22 ?(LONG RIFLE|LR|L\b|\(22L)/, ".22 LR"], [/^22LR/, ".22 LR"],
   [/^17 (SUPER MAG|WSM)/, ".17 WSM"], [/^17 HMR/, ".17 HMR"],
-  [/^243(?!\s*WSSM)/, ".243 Win"], [/^270(?!\s*(?:WSM|WBY|WEATHERBY))/, ".270 Win"], [/^44 MAG/, ".44 Magnum"], [/^350 LEGEND/, ".350 Legend"],
+  [/^243(?!\s*WSSM)/, ".243 Win"], [/^270(?!\s*(?:WSM|WBY|WEATHERBY))/, ".270 Win"], [/^44 (?:REM )?MAG/, ".44 Magnum"], [/^350 LEGEND/, ".350 Legend"],
 ];
 function cleanCaliber(raw){
   const u = raw.replace(/…/g,"").replace(/\s*\([^)]*$/,"").toUpperCase().replace(/\s+/g," ").trim();   // "45 ACP (4…" -> "45 ACP"
-  for(const [re,out] of CAL_RULES) if(re.test(u)) return out;
+  const p=(u.match(/\s\+P(\+?)(?=\s|$)/)||[])[0];          // "38 SPL +P": the +P / +P+ load is part of the spec
+  for(const [re,out] of CAL_RULES) if(re.test(u)) return p&&!out.includes("+P")?out+" "+p.trim():out;
   return titleCase(u);
 }
 const money = s => parseFloat(String(s).replace(/[$,]/g,""));
@@ -1322,12 +1326,15 @@ function parseAccessories(desc,model,category,price){
 // Skipped when Bravo's model already says it ("150PC SOCKET SET" model) so the tag never repeats itself.
 // Add words here as new items come in: [match, printed].
 const ITEM_WORDS=[
-  [/\bVINTAGE\b|\bVTG\b/,"Vintage"],[/\bANTIQUE\b/,"Antique"],[/\bNIB\b|\bNEW IN (?:THE )?BOX\b|\bBRAND NEW\b/,"New in Box"],
+  // no "New in Box" (NEW rule, xf 11-22-2026): these notes print on General Merchandise, which is never NEW, pawn/buy or not
+  [/\bVINTAGE\b|\bVTG\b/,"Vintage"],[/\bANTIQUE\b/,"Antique"],
   [/\b(?:FACTORY )?SEALED\b/,"Sealed"],[/\bOPEN[- ]BOX\b/,"Open Box"],[/\bREFURB(?:ISHED)?\b/,"Refurbished"],
   [/\bLEFT[- ]?HAND(?:ED)?\b|\bLEFTY\b|\bLH\b/,"Left-Handed"],[/\bLIMITED EDITION\b|\bLTD ED(?:ITION|\.)?\b/,"Limited Edition"],
   [/\bSIGNED\b|\bAUTOGRAPHED\b/,"Signed"],[/\bDIAMONDS?\b/,"Diamond"],[/\bDIA\b/,"Diamond",{test:s=>isJewel(s)}],   // DIA alone: jewelry only ("12 IN DIA BLADE" = diameter)[/\bCUSTOM SHOP\b/,"Custom Shop"],[/\bMADE IN (?:THE )?USA\b|\bUSA MADE\b/,"Made in USA"],
-  [/\bMADE IN JAPAN\b|\bMIJ\b|\bJAPAN\s*$/,"Made in Japan"],[/\bMADE IN MEXICO\b|\bMIM\b/,"Made in Mexico"],
+  // MIM alone = Made in Mexico only on music gear (on gun parts it means metal-injection-molded)
+  [/\bMADE IN JAPAN\b|\bMIJ\b|\bJAPAN\s*$/,"Made in Japan"],[/\bMADE IN MEXICO\b/,"Made in Mexico"],[/\bMIM\b/,"Made in Mexico",{test:(s,c)=>MUSIC_CAT.test(c)}],
 ];
+const MUSIC_CAT=/GUITAR|BASS|AMP|MUSIC|INSTRUMENT|PEDAL|STRAT|TELE/i;
 const NWORD={TWO:2,THREE:3,FOUR:4,FIVE:5,SIX:6,SEVEN:7,EIGHT:8,TEN:10,TWELVE:12};
 function itemCount(s){
   const n=v=>NWORD[v]||+v, N="(\\d{1,3}|"+Object.keys(NWORD).join("|")+")"; let x;
@@ -1342,7 +1349,7 @@ function itemCount(s){
 }
 function itemNotes(item,model,noCount,category){
   const s=" "+String(item||"").toUpperCase().replace(/…|\.\.\.$/g,"")+" ", mo=" "+String(model||"").toUpperCase()+" ";
-  const words=[...new Set(ITEM_WORDS.filter(([re,,ctx])=>re.test(s)&&!re.test(mo)&&(!ctx||ctx.test(s))).map(w=>w[1]))];
+  const words=[...new Set(ITEM_WORDS.filter(([re,,ctx])=>re.test(s)&&!re.test(mo)&&(!ctx||ctx.test(s,String(category||"")))).map(w=>w[1]))];
   const c=!noCount&&itemCount(s), had=c&&itemCount(mo);
   let set="";
   if(c&&c.n>=2&&!(had&&had.n===c.n))
@@ -1533,6 +1540,10 @@ function stripPrivate(lines){
   }
   return {lines:out, dropped:[...dropped]};
 }
+// NEW rule (xf, 11-22-2026): anything taken in from people on pawn or buy is sold as used, whatever Quality says. Bravo's Type
+// column says how an item came in; PAWN / BUY there = never NEW. TODO(Tuesday): xf checks the Type wording on stock the shop
+// buys in new (the two Derya 22LR pistols); then NEW only on that Type (+ UPC / I- / G-I- numbers), not by Category.
+const usedIntake=t=>/\b(?:PAWN|PAWNS|PAWNED|BUY|BUYS|BOUGHT)\b/i.test(String(((t&&t.more)||{}).intake||""));
 // UPC-A (12) / EAN-13 (13) with a good check digit -> 13 digits; anything else -> ""
 function ean13Of(s){ const d=String(s||"").replace(/\s/g,""); if(!/^(\d{12}|\d{13})$/.test(d)) return "";
   const e=d.padStart(13,"0"), sum=[...e.slice(0,12)].reduce((a,c,i)=>a+(+c)*(i%2?3:1),0); return (10-sum%10)%10===+e[12]?e:""; }
@@ -1549,12 +1560,13 @@ const COLS={Manufacturer:"mfr",Model:"model",Number:"number",Category:"category"
   Location:"location",Barcode:"barcode",SerialNumber:"serial",DateToInventory:"date",     // these four: the printed barcode label
   Quality:"quality",                                            // NEW / VERY GOOD / GOOD... (NEW guns: "NEW Glock")
   // kept on the item (t.more), not printed yet (11-21-2026): jewelry tags will use the jewelry ones. All optional.
+  Type:"intake",                                                // how it came in: OUT OF PAWN, EXPIRED BUY... (NEW rule, usedIntake)
   UPC:"upc",Store:"store",Quantity:"qty",SKUNumber:"sku",InventoryAge:"age",
   TotalJewelryWeight:"jwWeight",MetalWeight:"metalWeight",MetalTypeColor:"metalType",MetalType:"metalType",MetalColor:"metalColor",
   MetalPurity:"metalPurity",TotalDiamondSize:"diamondSize",TotalStoneSize:"stoneSize",
   AuthenticDiamondJewelry:"authDiamond",AuthenticStoneJewelry:"authStone"};
 const COLKEY=Object.fromEntries(Object.entries(COLS).map(([h,k])=>[hdrKey(h),k]));
-const MORE=["upc","store","qty","sku","age","jwWeight","metalWeight","metalType","metalColor","metalPurity","diamondSize","stoneSize","authDiamond","authStone"];
+const MORE=["intake","upc","store","qty","sku","age","jwWeight","metalWeight","metalType","metalColor","metalPurity","diamondSize","stoneSize","authDiamond","authStone"];
 function parseRows(lines){
   let cols=null; const out=[]; PENNY=new Set();
   for(const line of lines){
@@ -1706,6 +1718,8 @@ function layOver(t){ const o=money(t.layTotal), p=money(t.layFor);
   return o>0&&(!isFinite(p)||Math.round(p*100)===Math.round((t.price||0)*100))?o:0; }
 const layOf = t => layaway(t.price||0,layOver(t));
 // soft check: a hand-set total above the rule's total, or below the price itself, is probably a typo (the shop only rounds down)
+// no price (Bravo's Price cell blank or unreadable): the tag would print $0 and $0 layaway
+const priceNote = t => (+t.price||0)>0?"":"No price: this tag would print $0 — fix the price in Bravo or on the Edit panel";
 function layNote(t){ const o=layOver(t), r=layaway(t.price||0).total, p=t.price||0;
   return o>r?"Layaway total "+fmt$(o)+" is above the usual "+fmt$(r)+" — typo?":o&&o<p?"Layaway total "+fmt$(o)+" is below the price "+fmtP(p)+" — typo?":""; }
 
@@ -2065,7 +2079,7 @@ function drawGunFront(g,x,y,t,s){
   let type=TYPES.guns;
   // new guns and suppressors (Bravo Quality "NEW", or NIB in the description): red "NEW!" before the maker (11-20-2026).
   // The shop's only new stock, so General Merchandise never gets it.
-  const isNew=isNewItem(t)&&(!s.extrasFront||/SUPPRESSOR/i.test((t.what||"")+" "+(t.category||"")));
+  const isNew=isNewItem(t)&&!usedIntake(t)&&(!s.extrasFront||/SUPPRESSOR/i.test((t.what||"")+" "+(t.category||"")));
   // 11-20-2026: model row = model + what it is ("KPM8420T Powered Mixer"); this row = notes (Vintage, 4-12x40...).
   // What it comes with goes on the back, like the gun tags (shop's call, 11-20-2026).
   if(s.extrasFront){ const wt=String(t.what||"").trim(), ww=v=>!wt||String(v||"").toLowerCase().includes(wt.toLowerCase())?v:[v,wt].filter(x=>String(x||"").trim()).join(" ");   // never twice
@@ -2346,7 +2360,12 @@ const SH = { dir:null, ok:false, data:null };
 //         the balance is never stored, it's worked out from this log, so two computers saving at once can't pay twice)
 // mgr: managers {profile id: {star, pin: salted hash of the 4-digit console PIN, t}} (players.js). Kept apart from profiles so a
 //      sign-in (which re-saves the profile) on a computer with an old copy can't undo a star or a PIN.
-const blankData = () => ({ v:1, rules:[], items:{}, tagTypes:[], samples:[], kb:{}, printed:{}, tickets:[], helpPhrases:[], profiles:[], tokens:[], mgr:{} });
+// designs: Taginator tag designs {id,t,by,cat: Bravo Category,size,bigTop,facts}, a tag type once a manager approves (taginator.js).
+// tgPhrases / tgMiss / tgHits: Taginator taught phrases, requests it couldn't place, understood-vs-missed counts (taginator.js).
+//      A delete in these four is a tombstone {id,t,deleted:true}, kept forever: it beats a live copy whatever the times, so another
+//      computer (or a wrong clock) can never bring it back.
+const blankData = () => ({ v:1, rules:[], items:{}, tagTypes:[], samples:[], kb:{}, printed:{}, tickets:[], helpPhrases:[], profiles:[], tokens:[], mgr:{},
+  tgPhrases:[], tgMiss:[], tgHits:[], designs:[] });
 
 // small key-value store in the browser to remember the folder
 function idb(){ return new Promise((res,rej)=>{ const r=indexedDB.open("tagtool",1);
@@ -2361,6 +2380,9 @@ function mergeData(a,b){
   out.rules=byId(a.rules,b.rules); out.tagTypes=byId(a.tagTypes,b.tagTypes); out.samples=byId(a.samples,b.samples);
   out.tickets=byId(a.tickets,b.tickets); out.helpPhrases=byId(a.helpPhrases,b.helpPhrases);
   out.profiles=byId(a.profiles,b.profiles); out.tokens=byId(a.tokens,b.tokens);
+  const keepDel=(x,y)=>{ const m=new Map(); [...(x||[]),...(y||[])].forEach(r=>{ if(!r||!r.id) return; const o=m.get(r.id);   // tombstones win, then newest
+    if(!o||(r.deleted&&!o.deleted)||(!!r.deleted===!!o.deleted&&(r.t||0)>(o.t||0))) m.set(r.id,r); }); return [...m.values()]; };
+  out.tgPhrases=keepDel(a.tgPhrases,b.tgPhrases); out.tgMiss=keepDel(a.tgMiss,b.tgMiss); out.tgHits=keepDel(a.tgHits,b.tgHits); out.designs=keepDel(a.designs,b.designs);
   for(const src of [a.items||{},b.items||{}]) for(const n in src) for(const k in src[n]){
     const cur=(out.items[n]||{})[k], v=src[n][k];
     if(!cur||(v.t||0)>(cur.t||0)){ out.items[n]=out.items[n]||{}; out.items[n][k]=v; } }
@@ -2527,13 +2549,15 @@ async function sampleData(f){
   c.width=Math.round(b.width*k); c.height=Math.round(b.height*k); const x=c.getContext("2d");
   x.fillStyle="#fff"; x.fillRect(0,0,c.width,c.height); x.drawImage(b,0,0,c.width,c.height); return c.toDataURL("image/jpeg",.85);
 }
-const kinds=()=>TYPE?subs().filter(x=>x.cat===TYPE.id):[];
-const kindOf=id=>{ const l=kinds(); return l.find(x=>x.id===id)||l.find(x=>x.id===CONFIG.defaultTagType)||l[0]; };
+// + Taginator designs (taginator.js tgKinds; kept out of subs() so the Sizes menu never saves them as tag types)
+const kinds=()=>TYPE?subs().filter(x=>x.cat===TYPE.id).concat(typeof tgKinds==="function"?tgKinds().filter(x=>x.cat===TYPE.id):[]):[];
+// a Taginator design that's gone (deleted / rejected) draws as General Merchandise, never as a gun tag
+const kindOf=id=>{ const l=kinds(); return l.find(x=>x.id===id)||/^tg/.test(id||"")&&l.find(x=>x.id===CONFIG.otherTagType)||l.find(x=>x.id===CONFIG.defaultTagType)||l[0]; };
 // Pistol -> Handguns, Rifle / Shotgun -> Long Guns; any other category -> CONFIG.otherTagType
 // (General Merchandise); no category at all (old gun-only report) -> CONFIG.defaultTagType
 function autoKind(t){
   const c=String(t.category||"").trim();
-  if(c) for(const k of kinds()) if(k.categories&&new RegExp("^("+k.categories+")$","i").test(c)) return k.id;
+  if(c) for(const k of kinds()) if(k.categories&&!(k.tg&&!k.ok)&&new RegExp("^("+k.categories+")$","i").test(c)) return k.id;   // Taginator designs: approved only
   return kindOf(c&&CONFIG.otherTagType||CONFIG.defaultTagType).id;
 }
 // General Merchandise: "Comes with" read from the whole description (bag, 2 batteries, charger...)
@@ -2618,7 +2642,7 @@ async function handleFile(file,auto){
   finally{ reading=false; $("drop").classList.remove("busy"); $("dropBig").textContent="Drop Bravo report"; $("dropSmall").textContent="or click to pick it"; }
 }
 function loadLines(lines,quiet){
-  lastLines=lines; const list=TYPE.parse(lines); list.forEach(t=>{ t.kind=autoKind(t); if(skipCat(t)&&t.kind===CONFIG.otherTagType) t.include=false; useAccessories(t); applyKB(t); });
+  lastLines=lines; const list=TYPE.parse(lines); list.forEach(t=>{ t.kind=autoKind(t); if(skipCat(t)&&t.kind===CONFIG.otherTagType) t.include=false; useAccessories(t); applyKB(t); if(typeof tgApply==="function") tgApply(t); });
   // _bp: Bravo's price, before any fix (what "already tagged" is checked against); layTotal/layFor: hand-set layaway total + the price it was set at (item fix)
   list.forEach(t=>{ t._bp=t.price; t.layTotal=""; t.layFor=""; });
   tags=applyFixes(list); skips={}; $("q").value="";             // a tag type changed on the Edit panel is remembered by item #
@@ -2626,6 +2650,7 @@ function loadLines(lines,quiet){
   needAll(); onlyNeed=hasHistory();
   $("emptyMsg").textContent=""; view(); window.scrollTo({top:0}); if(!quiet) prawn("load",tags.map(t=>t.number||t.raw||""));
   kbResearch(tags);                                              // unknown models: ask Reverb in the background (once a day each)
+  if(typeof tgShow==="function") tgShow();                       // Taginator waiting on the report (it checks it's still open)
   if(!quiet) toast(hasHistory()?needMsg():"✓ "+kinds().map(k=>[ofKind(tags,k.id).length,k.name]).filter(x=>x[0]).map(x=>x[0]+" "+x[1]).join(" · ")+" · First time: print what you need, or Mark all tagged");
 }
 // same report again after a store-wide fix (Help box, console): keeps tags added by hand, check marks and start spots
@@ -2681,6 +2706,12 @@ function view(){
   const has=tags.length>0;
   $("privWarn").hidden=!privCols.length;
   $("privWarn").textContent=privCols.length?"This report has customer/vendor columns ("+privCols.join(", ")+"). The Tag Tool ignored them; please remove them from the saved Custom report in Bravo.":"";
+  // NEW rule: red NEW! with Bravo's Type blank or missing = the tool can't tell it wasn't pawned or bought (xf 11-22-2026: warn, don't block)
+  const noType=tags.filter(t=>t.include&&!t.hand&&isNewItem(t)&&!String((t.more||{}).intake||"").trim()
+    &&(!kindOf(t.kind).extrasOnFront||/SUPPRESSOR/i.test((t.what||"")+" "+(t.category||""))));
+  $("typeWarn").hidden=!noType.length;
+  $("typeWarn").textContent=noType.length?plural(noType.length,"tag")+" will print NEW! but Bravo's Type is blank"+(tags.some(t=>(t.more||{}).intake)?"":" (no Type column in this report)")
+    +": check "+noType.slice(0,3).map(t=>t.number).join(", ")+(noType.length>3?"…":"")+" weren't pawned or bought. Pawned / bought items are never NEW: set Condition on the Edit panel.":"";
   $("empty").hidden=has; $("tagsView").hidden=$("tools").hidden=$("bar").hidden=!has;
   $("flip").textContent=showBack?"Show fronts":"Show backs"; $("flip").classList.toggle("on",showBack);
   const nAll=tags.filter(t=>!t._need&&!t.include).length; $("needOnly").hidden=!hasHistory()||!nAll;
@@ -2788,7 +2819,7 @@ function openEditor(i){
   const f=(k,l,v,mode)=>`<div class="field"><label>${esc(l)}</label><input data-k="${k}" value="${esc(v)}" ${mode?'inputmode="decimal"':""}></div>`;
   openDrawer(`<div class="top"><h3>${t.hand&&!t.price?"New tag":"Edit tag"}</h3><button class="x" id="edX">✕</button></div>
     <div class="body">
-      <div class="kindrow">${kinds().map(x=>`<button class="chip${x.id===kd.id?" on":""}" data-kind="${esc(x.id)}">${esc(x.name)}</button>`).join("")}</div>
+      <div class="kindrow">${kinds().filter(x=>!x.tg).map(x=>`<button class="chip${x.id===kd.id?" on":""}" data-kind="${esc(x.id)}">${esc(x.name)}</button>`).join("")}</div>
       ${(sm=>sm&&/^data:image/.test(sm.data)?`<div class="raw">New sample for ${esc(kd.name)}: the tag below gets rebuilt to match it</div><img class="edsample" src="${sm.data}" alt="">`:"")(needsDesign(kd)&&sampleOf(kd.id))}
       <div class="sides">${two?"<span>Front</span>":""}<canvas id="edFront"></canvas>${two?'<span>Back</span><canvas id="edBack"></canvas>':""}</div>
       ${(D=>D.fields?D.fields.map(x=>f(x[0],x[1],t[x[0]]||D.def(t)[x[0]]||"")).join(""):   // electronics: their own boxes
@@ -2820,6 +2851,12 @@ function openEditor(i){
     if(k==="price"){ const m=money(v); t.price=isFinite(m)?m:0; }
     else if(k==="cost"){ const m=money(v); t.cost=isFinite(m)?m:NaN; }
     else if(k==="layTotal"){ const m=money(v); t.layTotal=m>0?String(Math.round(m)):""; t.layFor=m>0?String(t.price||0):""; rememberEdit(t,"layTotal"); rememberEdit(t,"layFor"); }
+    else if(k!=="number"){ // blocked wording (taginator.js claimCheck): not saved, reason under the box; Bravo's own words don't count
+      if(!("_was" in inp)) inp._was=inp.defaultValue;                                // what the box showed (incl. design defaults)
+      const no=claimCheck(v,{gun:tgGun(t),used:usedIntake(t),brands:tgBrands(t),max:200},inp._was); inp.classList.toggle("bad",!!no);
+      let m=inp.parentNode.querySelector(".claim"); if(!m&&no){ m=document.createElement("div"); m.className="raw claim"; inp.parentNode.appendChild(m); }
+      if(m) m.textContent=no; if(no) return;
+      t[k]=v; rememberEdit(t,k); }
     else { t[k]=v; rememberEdit(t,k); }
     checkOne(t); draw(); lay(); redrawCard(i);
     const c=cards().find(c=>c._i===i); if(c){ c.classList.toggle("warn",!!t._warn); c.classList.toggle("check",!t._warn&&!!t._check); }
@@ -2900,7 +2937,7 @@ function kbBox(t,s){
 // still prints, gets a "!" on screen, and is named when you print.
 // skipped when nothing that changes the fit (size, text, price) changed since the last check
 const CHECKED=new WeakMap();
-function checkOne(t){ const s=settings(t.kind); t._check=kbCheck(t,s)||layNote(t); const key=JSON.stringify([s.W,s.H,s.extrasFront,s.design,s.bigTop,TYPE.fields.map(f=>t[f[0]]),(design(s).fields||[]).map(f=>t[f[0]]),t.price,layOver(t)]);   // + electronics boxes (Title, CPU...)
+function checkOne(t){ const s=settings(t.kind); t._check=priceNote(t)||kbCheck(t,s)||layNote(t); const key=JSON.stringify([s.W,s.H,s.extrasFront,s.design,s.bigTop,TYPE.fields.map(f=>t[f[0]]),(design(s).fields||[]).map(f=>t[f[0]]),t.price,layOver(t)]);   // + electronics boxes (Title, CPU...)
   if(CHECKED.get(t)===key) return; CHECKED.set(t,key);
   const r=fitTag(TYPE,t,s); t._warn=r.left.length?r.left:null; }
 function checkAll(){ tags.forEach(checkOne); }
@@ -2916,6 +2953,8 @@ function checkPrint(){
   if(ask.length) rep.msg="Check "+plural(ask.length,"tag")+" (what it is): "+ask.slice(0,2).map(name).join(", ")+(ask.length>2?"…":"")+" · "+rep.msg;
   const lay=tags.filter(t=>t.include&&layNote(t));                    // hand-set layaway total above the rule or below the price: likely a typo
   if(lay.length) rep.msg="Check "+plural(lay.length,"tag")+" (layaway total typo?): "+lay.slice(0,2).map(name).join(", ")+(lay.length>2?"…":"")+" · "+rep.msg;
+  const nop=tags.filter(t=>t.include&&priceNote(t));                  // no price: would print $0
+  if(nop.length) rep.msg="Check "+plural(nop.length,"tag")+" (no price, prints $0): "+nop.slice(0,2).map(name).join(", ")+(nop.length>2?"…":"")+" · "+rep.msg;
   if(/Firefox\//.test(navigator.userAgent)) rep.msg="Use Edge or Chrome to print — Firefox won't turn on two-sided by itself.";
   return rep;
 }
@@ -3197,6 +3236,7 @@ async function runCmd(line){
       'export / import                           backup file / load a backup',
       ...(typeof HELP_CMDS!=="undefined"?HELP_CMDS:[]),
       ...(typeof PL!=="undefined"&&PL?PL.CMDS:[]),
+      ...(typeof TG_CMDS!=="undefined"?TG_CMDS:[]),
       'clear, exit' ].forEach(x=>cprint(x));
   } else if(cmd==="fix"){
     const arrow=a.indexOf("->"); const ifAt=a.findIndex((x,i)=>i>arrow&&x.toLowerCase()==="if");
@@ -3229,6 +3269,7 @@ async function runCmd(line){
   } else if(cmd==="exit"||cmd==="quit"){ closeConsole();
   } else if(typeof PL!=="undefined"&&PL&&await PL.cmd(cmd,a)){   // tokens (players.js)
   } else if(typeof helpCmd==="function"&&await helpCmd(cmd,a)){   // Help box tickets (help.js)
+  } else if(typeof tgCmd==="function"&&(await tgCmd(cmd,a)||await tgDesignCmd(cmd,a))){   // Taginator: teaching, hit rate, designs (taginator.js)
   } else cprint('Unknown command. Type "help".',"bad");
 }
 $("conIn").addEventListener("keydown",e=>{
@@ -3327,13 +3368,15 @@ function helpItem(s,box){
   return {num:i>=0?tags[i].number:d.toUpperCase(),i};
 }
 // pick the best fix: keyword score + taught phrases (shared, every computer)
+// how close typed words are to a taught phrase, 0..1 (words of 3+ letters). Also the Taginator matcher's (taginator.js)
+function helpSim(text,phrase){
+  const ws=s=>new Set(HW(s).trim().split(" ").filter(w=>w.length>2)), words=ws(text), pw=ws(phrase); if(!pw.size) return 0;
+  return [...pw].filter(w=>words.has(w)).length/Math.max(pw.size,Math.min(words.size,pw.size*2)); }
 function helpMatch(text,c){
-  const s=HW(text), words=new Set(s.trim().split(" ").filter(w=>w.length>2)), sc={};
+  const s=HW(text), sc={};
   for(const f of HELP_FIXES){ const v=f.score(s,c); if(v>0&&(!f.needsItem||c.t)) sc[f.id]=v; }
   for(const p of (SH.data.helpPhrases||[]).filter(p=>!p.deleted)){
-    const pw=new Set(HW(p.phrase).trim().split(" ").filter(w=>w.length>2)); if(!pw.size) continue;
-    const both=[...pw].filter(w=>words.has(w)).length, sim=both/Math.max(pw.size,Math.min(words.size,pw.size*2));
-    const f=helpFix(p.fix); if(sim>=.6&&f&&(!f.needsItem||c.t)) sc[p.fix]=(sc[p.fix]||0)+5*sim; }
+    const sim=helpSim(text,p.phrase), f=helpFix(p.fix); if(sim>=.6&&f&&(!f.needsItem||c.t)) sc[p.fix]=(sc[p.fix]||0)+5*sim; }
   return Object.entries(sc).sort((a,b)=>b[1]-a[1]).map(([id])=>helpFix(id));
 }
 
@@ -3452,6 +3495,355 @@ async function helpCmd(cmd,a){
   return false;
 }
 $("helpBtn").onclick=()=>openHelp(editIdx>=0?editIdx:-1);
+
+</script>
+<script>
+// ===== TAGINATOR (hub tile [2], 11-22-2026): "tell me what you want" -> a tag; questions only for the gaps =====
+// Spec: docs/taginator.md. Fully offline: set words + phrases a manager taught, built on the Help box matcher
+// (help.js HW / helpSim / helpItem) and the report parsers (core.js parseExtras / ean13Of). No outside AI, no network.
+// Shared parts in "Tag Tool Data.json" (merged in shared.js; a delete is a tombstone {id,t,deleted:true}, kept forever):
+//   tgPhrases {id,t,phrase,part,value,by}  part = kind | size | extra | field. Live when the owner (blsxf) taught it, or another
+//             manager approved its token entry (kind "phrase", players.js canDecide): no approving your own.
+//   tgMiss    {id,t,p,text,left,day,taught}  requests with words the matcher couldn't place, for the manager to teach
+//   tgHits    {id:"day|pc",t,day,hit,miss}   understood vs logged, per computer per day (one writer each, so no lost counts)
+
+// ---------- blocked wording: ONE check for every free-text box, taught phrase, design label and the Edit panel ----------
+// Follows the open legal flags in docs/legal.md. Reasons are shown to staff; nothing here is ever offered as a choice.
+const TG_MAX=80;
+const TG_BLOCK=[
+  [/\b(?:sales\s+)?tax[\s-]*(?:paid|free|included)\b|\bno\s+(?:sales\s+)?tax\b/i,"tax wording (\"tax paid\", \"no tax\", \"tax free\")"],
+  [/\bcertified\b/i,"\"certified\""],
+  [/\bguarantee[ds]?\b|\bwarrant(?:y|ies|ied)\b/i,"guarantee / warranty wording"],
+  // any "N day" (xf, 11-22-2026: block it so it can't go wrong live; loosen later if a real need shows up)
+  [/\bloans?\b|\binterest\b|\bfinanc(?:e|es|ed|ing)\b|\b\d+\s*-?\s*days?\b/i,"pawn-loan terms (loan, APR, interest, finance, \"N day\")"],
+  [/\bAPR\b/,"pawn-loan terms (loan, APR, interest, finance, \"N day\")"],          // capitals only: "Apr" is a month
+  [/\bauthentic\b|\bgenuine\b|\bdiamonds?\b|\b(?:karat|carat)s?\b|\b(?:9|10|14|18|22|24)\s?(?:k|kt)\b(?!\s*(?:btu|ohms?|mah|rpm|lumens?))/i,
+   "jewelry claims (authentic, genuine, karat, diamond): only from Bravo's jewelry columns"],                         // not "4K / 8K TV", "10K BTU"
+  [/\bwas\s*\$|\bcompare\s+at\b|\breg\.|\bregular\s+price\b|\bsave\s*\$/i,"a former price (\"Was $X\", \"compare at\", \"reg.\", \"save $\")"]];
+const TG_NEW=/\b(?:like\s+new|brand\s+new|new|nib)\b/i;
+// the NEW rule allows "new" only on guns and suppressors (same test as the tag drawing: types.js isNew), and on gun items
+// (mags, holsters, optics, ammo...) the shop bought in new itself as an FFL = wholesale item #s (xf, 11-22-2026)
+const TG_GUNITEM=/\b(?:magazines?|mags?|holsters?|scopes?|optics?|red\s*dots?|(?:gun|rifle|pistol)\s*sights?|ammo|ammunition|slings?|(?:gun|firearm)\s*(?:parts?|accessor(?:y|ies)|cases?|cleaning|kits?|safes?|locks?)|suppressors?|silencers?)\b/i;
+const tgGun=t=>!!t&&!usedIntake(t)&&(!(typeof kindOf==="function"&&(kindOf(t.kind)||{}).extrasOnFront)||/SUPPRESSOR|SILENCER/i.test((t.what||"")+" "+(t.category||""))
+  ||TG_GUNITEM.test(String(t.category||""))&&tgWholesale(t));
+// a maker's own name never trips the check ("Diamond Archery" on a bow), only as the whole name and never on jewelry / coins.
+// Single-word makers ("Diamond") count only for the item itself; free text with no item gets the report's 2+ word makers.
+function tgBrands(t){
+  const jw=x=>typeof skipCat==="function"&&skipCat(x)&&!/^computer/i.test(String(x.category||"").trim());
+  if(t) return jw(t)?[]:[t.brand,(t.src||{}).mfr,(t._base||{}).brand].filter(x=>String(x||"").trim().length>2);
+  return [...new Set((typeof tags!=="undefined"?tags:[]).filter(x=>!x.hand&&!jw(x))
+    .flatMap(x=>[x.brand,(x.src||{}).mfr]).filter(b=>String(b||"").trim().split(/\s+/).length>=2))]; }
+// every blocked thing in the text: [{word, why}]. ctx.gun = NEW allowed; ctx.brands = maker names to leave alone
+function tgBlocked(text,ctx){
+  let s=String(text||"").replace(/\bexpress\s+pawn\b/ig," "), out=[];                    // the store name never trips it
+  for(const b of (ctx&&ctx.brands)||[]) s=s.replace(new RegExp("(^|[^a-z0-9])"+tgReEsc(String(b).trim()).replace(/\s+/g,"\\s+")+"(?![a-z0-9])","ig"),"$1 ");
+  for(const [re,why] of TG_BLOCK){ const m=s.match(re); if(m&&!out.some(h=>h.why===why)) out.push({word:m[0],why}); }
+  if(!(ctx&&ctx.gun)){ const m=s.match(TG_NEW); if(m) out.push({word:m[0],why:(ctx&&ctx.used?"\"new\" wording: this came in on pawn or buy, so it's sold as used (NEW rule)":"\"new\" wording: only guns, suppressors and gun items bought in new (NEW rule)")}); }
+  return out; }
+// "" = fine, else the reason to show. was = the text before this edit: what was already there (Bravo's own words, an older fix)
+// doesn't count, so staff can still fix the rest of a field. ctx.max = length cap (TG_MAX for free text).
+function claimCheck(text,ctx,was){
+  const s=String(text||""), max=(ctx&&ctx.max)||TG_MAX;
+  if(s.length>max&&s.length>String(was||"").length) return "Too long: "+max+" characters max";
+  const old=new Set(tgBlocked(was,ctx).map(h=>h.why)), h=tgBlocked(s,ctx).find(h=>!old.has(h.why));
+  return h?"Not allowed on tags or signs: "+h.why+" — \""+h.word+"\"":""; }
+
+// ---------- hold period (Ark. Code § 18-27-204, docs/legal.md): warn, never block ----------
+// TODO(hold): revisit once xf confirms whether Bravo already enforces the 15-day hold (docs/taginator.md section 4).
+const TG_HOLD=15;
+// wholesale goods (bought from a retailer / wholesaler) are exempt: I- and G-I- item #s, and items whose # is a UPC
+const tgWholesale=t=>/^(?:G-)?I-/i.test(String(t.number||"").trim())||!!ean13Of(t.number);
+const tgDate=s=>{ const m=String(s||"").match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/)||String(s||"").match(/(\d{4})-(\d{1,2})-(\d{1,2})/); if(!m) return 0;
+  const [y,mo,d]=m[0].includes("/")?[+m[3]<100?2000+ +m[3]:+m[3],+m[1],+m[2]]:[+m[1],+m[2],+m[3]]; return new Date(y,mo-1,d).getTime(); };
+// "" = no warning, else the reason (shown with a tap to dismiss)
+function holdWarn(t,now){
+  if(!t||tgWholesale(t)) return "";
+  const d=tgDate((t.label||{}).date), law="Arkansas holds bought and pawned goods 15 days (Ark. Code § 18-27-204): check the hold has cleared before it goes out.";
+  if(!d) return t.number+" has no Date to Inventory. "+law;
+  const days=Math.floor(((now||Date.now())-d)/864e5);
+  return days<TG_HOLD?t.number+" went to inventory "+days+" day"+(days===1?"":"s")+" ago. "+law:""; }
+
+// ---------- the matcher ----------
+const TG_KIND=[["sign",/ (signs?|poster|closed|hours) /],["tag",/ (tags?|price tag|labels?) /]];
+const TG_PARTS=["kind","size","extra","field"];
+const TG_STOP=new Set("for the and with make want need please can you this that one a an of on to me my i it its item number #".split(" "));
+const tgSizes=()=>((CONFIG.types||{}).guns||{}).sizes||[];
+// "12 per sheet", "12 up", "small", "compact" -> size index (CONFIG.types.guns.sizes); hit = the words that said it
+function tgSizeOf(s){
+  const L=tgSizes(), m=s.match(/ (\d{1,2}) ?(up|per sheet|per page|per|a sheet|on a sheet|sheet) /);
+  if(m){ const i=L.findIndex(z=>new RegExp("^"+m[1]+" ").test(z.label)); if(i>=0) return {i,hit:m[0].trim()}; }
+  for(let i=0;i<L.length;i++){ const w=((L[i].label.match(/\(([a-z ]+)\)/i)||[])[1]||"").toLowerCase().trim();
+    if(w&&/^[a-z]+$/.test(w)&&s.includes(" "+w+" ")) return {i,hit:w}; }
+  return null; }
+// phrases that count right now: not deleted, and taught by the owner or approved by another manager
+function tgLive(d){
+  const ok=new Set((d.tokens||[]).filter(x=>x.kind==="phrase"&&x.status==="approved"&&!x.deleted).map(x=>x.ref));
+  return (d.tgPhrases||[]).filter(p=>p&&!p.deleted&&p.phrase&&(p.by===PLX.OWNER||ok.has(p.id))); }
+// what the words say. o.num = an item # box. Returns {text,kind,num,i,extras,size,fields,taught,blocked,left,understood}
+function tgParse(text,o,d){
+  o=o||{}; d=d||SH.data; const raw=String(text||"").slice(0,300), s=HW(raw), used=new Set(TG_STOP);
+  const r={text:raw,kind:"",num:"",i:-1,extras:"",size:-1,fields:[],taught:[],blocked:"",left:[],understood:false};
+  for(const [k,re] of TG_KIND){ const m=s.match(re); if(m){ r.kind=k; used.add(m[1]); break; } }
+  const it=helpItem(raw,o.num), typed=[];                                              // typed = the words that named the item
+  if(it.num){ r.num=it.num; r.i=it.i; if(!r.kind) r.kind="tag";
+    s.trim().split(" ").forEach(x=>{ const v=x.replace(/^#/,""); if(v.length>=4&&it.num.toLowerCase().endsWith(v)){ used.add(x); typed.push(v); } }); }
+  const sz=tgSizeOf(s); if(sz){ r.size=sz.i; sz.hit.split(" ").forEach(x=>used.add(x)); }
+  const w=raw.match(/(?:^|\s)(?:w\s*\/(?!\s*o\b)|with\b)\s*(.*)$/i);                     // "w/ battery and charger": the rest is extras
+  if(w){ let tail=w[1];                                                                 // ...minus a size or the item # said after it
+    for(const x of [sz&&sz.hit,...typed]) if(x) tail=tail.replace(new RegExp("#?\\b"+tgReEsc(x).replace(/ /g,"\\s*")+"\\b","i"),"");
+    r.extras=parseExtras("W/ "+tail.replace(/[\s,]+$/,"")); HW(w[0]).trim().split(" ").forEach(x=>used.add(x)); }
+  const rest=s.trim().split(" ").filter(x=>!used.has(x)).join(" ");                   // taught phrases name what's left over
+  for(const p of tgLive(d)) if(helpSim(rest,p.phrase)>=.6){
+    if(p.part==="kind") r.kind=p.value; else if(p.part==="size") r.size=+p.value; else if(p.part==="field"){ if(!r.fields.includes(p.value)) r.fields.push(p.value); }
+    else if(p.part==="extra") r.extras=[r.extras,p.value].filter(Boolean).join(", ");
+    r.taught.push(p.id); HW(p.phrase).trim().split(" ").forEach(x=>used.add(x)); }
+  r.blocked=claimCheck(raw,{gun:o.gun,used:o.used,brands:o.brands,max:300});
+  r.left=s.trim().split(" ").filter(x=>x&&x.length>1&&!used.has(x)&&!/^\d{1,3}$/.test(x));
+  r.understood=!r.left.length&&!!(r.kind||r.num||r.extras||r.size>=0||r.taught.length);
+  return r; }
+// count it, and log the words it couldn't place for the manager (console tmiss / tteach)
+function tgLogIn(d,r,p,pc,now){
+  now=now||Date.now(); const day=new Date(now).toISOString().slice(0,10), id=day+"|"+(pc||"pc"), miss=!r.understood;
+  d.tgHits=d.tgHits||[]; let h=d.tgHits.find(x=>x.id===id&&!x.deleted); if(!h){ h={id,day,hit:0,miss:0}; d.tgHits.push(h); }
+  h[miss?"miss":"hit"]++; h.t=now;
+  if(miss) (d.tgMiss=d.tgMiss||[]).push({id:now.toString(36)+Math.random().toString(36).slice(2,6),t:now,p:p||"",text:r.text.slice(0,200),left:r.left.join(" "),day});
+  return miss; }
+// teach: words -> part=value. Returns {err} or {x}. A phrase by anyone but the owner waits for another manager (token kind "phrase").
+function tgTeachIn(d,phrase,part,value,by,now){
+  phrase=String(phrase||"").trim().slice(0,TG_MAX); value=String(value||"").trim(); now=now||Date.now();
+  if(!phrase||!value) return {err:'Use: tteach <# from tmiss> <part> <value>  or  tteach "words" <part> <value>'};
+  if(!TG_PARTS.includes(part)) return {err:"Part is one of: "+TG_PARTS.join(", ")};
+  if(part==="kind"&&!/^(tag|sign)$/.test(value)) return {err:"kind is tag or sign"};
+  if(part==="size"&&!tgSizes()[+value]) return {err:"size is a number: "+tgSizes().map((z,i)=>i+" = "+z.label).join(", ")};
+  const bad=claimCheck(phrase)||claimCheck(value); if(bad) return {err:bad};
+  const x={id:"ph"+now.toString(36)+Math.random().toString(36).slice(2,5),t:now,phrase,part,value,by:by||""};
+  (d.tgPhrases=d.tgPhrases||[]).push(x);
+  if(x.by!==PLX.OWNER) PLX.earnIn(d,x.by,"phrase",x.id,'"'+phrase+'" → '+part+" "+value,now);
+  return {x}; }
+// a manager decided a token entry (players.js console, same save): a rejected phrase becomes a tombstone, so it can't come back
+// even if another computer's copy of the entry later flips it to pending again
+function tgDecided(d,x,ok,now){ if(x&&!ok&&x.kind==="phrase") tgUnteachIn(d,x.ref,now); if(x&&!ok&&x.kind==="design") tgDelDesignIn(d,x.ref,now); }
+// un-teach: the phrase becomes a tombstone; a still-pending token for it is taken back
+function tgUnteachIn(d,id,now){
+  now=now||Date.now(); const i=(d.tgPhrases||[]).findIndex(p=>p.id===id&&!p.deleted); if(i<0) return false;
+  const p=d.tgPhrases[i]; d.tgPhrases[i]={id,t:now,deleted:true}; PLX.unearnIn(d,p.by,"phrase",id,now); return true; }
+
+// ---------- manager console (fixes.js runCmd) ----------
+const TG_CMDS=['tmiss [all]                               Taginator requests it couldn\'t place (to teach)',
+  'tteach <#> <part> <value>                 teach it: part = kind (tag/sign), size (#), extra (word), field (name)',
+  'tteach "words" <part> <value>             same, typed words. Yours wait for another manager (pending/approve)',
+  'tphrases / tuntaught <#>                  taught phrases (live / waiting) / undo one',
+  'thits [days]                              Taginator: understood vs missed per day'];
+let tgList=[];
+async function tgCmd(c,a){
+  const me=typeof PL!=="undefined"&&PL&&PL.me()?PL.me().id:"", d=SH.data;
+  if(c==="tmiss"){ tgList=(d.tgMiss||[]).filter(x=>!x.deleted&&(a[1]==="all"||!x.taught)).sort((x,y)=>y.t-x.t).slice(0,40);
+    if(!tgList.length) cprint("Nothing to teach.","dim");
+    tgList.forEach((x,i)=>cprint(String(i+1).padStart(3)+"  "+x.day+'  "'+x.text.slice(0,60)+'"  (not placed: '+x.left+")"+(x.taught?"  ✓ taught":"")));
+    return true; }
+  if(c==="tteach"){ const n=/^\d+$/.test(a[1]||"")?tgList[+a[1]-1]:null; if(/^\d+$/.test(a[1]||"")&&!n){ cprint("No #"+a[1]+" — type tmiss first","bad"); return true; }
+    const words=n?n.left||n.text:a[1]; let res={};
+    await updateShared(dd=>{ res=tgTeachIn(dd,words,a[2],a.slice(3).join(" "),me); if(res.x&&n){ const m=(dd.tgMiss||[]).find(y=>y.id===n.id); if(m){ m.taught=res.x.id; m.t=Date.now(); } } });
+    if(res.err) cprint(res.err,"bad"); else cprint('Taught: "'+res.x.phrase+'" → '+res.x.part+" "+res.x.value+(res.x.by===PLX.OWNER?"":"  (waiting for another manager: pending / approve)"),"ok");
+    return true; }
+  if(c==="tphrases"){ const live=new Set(tgLive(d).map(p=>p.id)); tgList=(d.tgPhrases||[]).filter(p=>!p.deleted);
+    if(!tgList.length) cprint("No taught phrases yet.","dim");
+    tgList.forEach((p,i)=>cprint(String(i+1).padStart(3)+'  "'+p.phrase+'" → '+p.part+" "+p.value+"  "+(live.has(p.id)?"live":"waiting for another manager"))); return true; }
+  if(c==="tuntaught"){ const p=tgList[+a[1]-1]; if(!p||!p.phrase){ cprint("No #"+(a[1]||"")+" — type tphrases first","bad"); return true; }
+    let done=false; await updateShared(dd=>{ done=tgUnteachIn(dd,p.id); });
+    cprint(done?'Undone: "'+p.phrase+'" (the same words get logged as a miss again)':"Already undone (maybe on another computer)",done?"ok":"bad"); return true; }
+  if(c==="thits"){ const days=+a[1]||14, from=new Date(Date.now()-days*864e5).toISOString().slice(0,10), by={};
+    (d.tgHits||[]).filter(h=>!h.deleted&&h.day>=from).forEach(h=>{ const x=by[h.day]=by[h.day]||{hit:0,miss:0}; x.hit+=h.hit||0; x.miss+=h.miss||0; });
+    const l=Object.entries(by).sort((x,y)=>y[0].localeCompare(x[0])); if(!l.length) cprint("No Taginator requests in the last "+days+" days.","dim");
+    let H=0,M=0; l.forEach(([day,x])=>{ H+=x.hit; M+=x.miss; cprint(day+"  understood "+x.hit+" · missed "+x.miss); });
+    if(l.length) cprint("Total: understood "+H+" · missed "+M+" ("+Math.round(100*H/Math.max(1,H+M))+"%)","ok"); return true; }
+  return false; }
+
+// ---------- designs: saved as data, drawn by the General Merchandise template (no per-design code) ----------
+// A design = {id,t,by,cat: the Bravo Category,size: CONFIG sizes index,bigTop: 0-2,facts: notes-row fields}. It becomes a tag
+// type (app.js kinds) for everyone once another manager approves its token entry (kind "design"); until then only Taginator
+// offers it, to its author. Never remembered as an item's kind: a deleted / rejected design falls back to General Merchandise.
+const TG_FACTS=[["notes","Notes"],["cpu","Processor"],["ram","Memory"],["storage","Storage"],["gpu","Graphics"],["os","System"]];   // printable only
+const tgReEsc=s=>String(s).replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+const tgBase=()=>(CONFIG.tagTypes||[]).find(k=>k.id===CONFIG.otherTagType)||{};
+// jewelry / coins stay their own queue item (xf, 11-22-2026); skipped "Computer…" Categories are fine
+const tgJewel=cat=>typeof skipCat==="function"&&skipCat({category:cat})&&!/^computer/i.test(String(cat||"").trim());
+const tgOkIds=d=>new Set((d.tokens||[]).filter(e=>e.kind==="design"&&e.status==="approved"&&!e.deleted).map(e=>e.id));
+const tgApproved=(d,x,ok)=>(ok||tgOkIds(d)).has("design:"+x.by+":"+x.id);
+// Oldest first (same order on every computer): the first approved design for a Category is its default (autoKind); later ones
+// are variants (xf, 11-22-2026: staff can make any design; with a default already there it goes to a manager as a variant and,
+// approved, is offered next to the default in Taginator; it never replaces the default by itself). A built type beats them all.
+function tgKindsIn(d,draft){ const b=tgBase(), ok=tgOkIds(d), n={};
+  return (d.designs||[]).filter(x=>x&&!x.deleted&&x.cat).sort((x,y)=>(x.t||0)-(y.t||0)||String(x.id).localeCompare(String(y.id))).concat(draft?[draft]:[])
+    .map(x=>{ const c=x.cat.toLowerCase(); n[c]=(n[c]||0)+1; return {x,v:n[c]}; })
+    .map(({x,v})=>({id:x.id,cat:b.cat,group:"Taginator",name:x.cat+(v>1?" · variant "+v:""),size:x.size|0,bigTop:x.bigTop||undefined,extrasOnFront:true,categories:tgReEsc(x.cat),
+      tg:true,ok:x!==draft&&tgApproved(d,x,ok),by:x.by,facts:x.facts||[],key:x.cat.toLowerCase()})); }
+// the draft only counts while Taginator is the thing in the drawer
+const tgOnScreen=()=>TG.open&&typeof document!=="undefined"&&!!document.getElementById("tgIn")&&!document.getElementById("drawer").hidden;
+// kindOf runs per tag per type while the list draws: work the list out once per run of code, fresh after the next await/event
+let tgKCache=null;
+const tgKinds=()=>{ if(tgKCache) return tgKCache; tgKCache=tgKindsIn(SH.data,tgOnScreen()?TG.draft:null); queueMicrotask(()=>{ tgKCache=null; }); return tgKCache; };
+// "" = OK to save, else why not
+function designCheck(x){
+  if(!x||!String(x.cat||"").trim()) return "No Category";
+  if(tgJewel(x.cat)) return "Jewelry and coins aren't in Taginator: their own tag is coming";
+  const bad=(x.facts||[]).find(k=>!TG_FACTS.some(f=>f[0]===k)); if(bad) return "\""+bad+"\" can't go on a tag";
+  if(!tgSizes()[x.size]) return "Pick one of the sizes";
+  return ""; }
+function tgDesignIn(d,x,by,now){
+  const err=designCheck(x); if(err) return {err}; now=now||Date.now();
+  const e={id:"tg"+now.toString(36)+Math.random().toString(36).slice(2,5),t:now,by:by||"",cat:String(x.cat).trim(),size:x.size|0,bigTop:x.bigTop|0,facts:(x.facts||[]).slice()};
+  (d.designs=d.designs||[]).push(e); PLX.earnIn(d,e.by,"design",e.id,(x.variantOf?"Variant tag design for "+e.cat+" (default: "+x.variantOf+")":"Tag design for "+e.cat),now); return {x:e}; }
+function tgDelDesignIn(d,id,now){
+  now=now||Date.now(); const i=(d.designs||[]).findIndex(x=>x.id===id&&!x.deleted); if(i<0) return false;
+  const x=d.designs[i]; d.designs[i]={id,t:now,deleted:true}; PLX.unearnIn(d,x.by,"design",id,now); return true; }
+// the design's facts fill the notes row (loadLines; an Edit-panel fix still wins, it's applied after)
+// Safe to run again (the report's own notes are kept in _tgNotes); skipped when the notes are an Edit-panel fix (that wins).
+function tgApply(t){ const k=typeof kindOf==="function"&&kindOf(t.kind); if(!k||!k.tg||!k.facts||!k.facts.length) return;
+  const fix=t.number&&((SH.data.items||{})[t.number]||{}).notes; if(fix&&!fix.deleted) return;
+  if(!("_tgNotes" in t)) t._tgNotes=t.notes||"";
+  t.notes=k.facts.map(f=>String((f==="notes"?t._tgNotes:t[f])||"").trim()).filter(Boolean).join(" · "); }
+// a tag needs an item # from the loaded report (xf, 11-22-2026): never a hand-made tag; price = Bravo's (_bp), never typed
+function tgItem(num){
+  num=String(num||"").toUpperCase(); if(!num) return {err:"Which item? Type its item #"};
+  if(typeof PENNY!=="undefined"&&PENNY.has(num)) return {err:num+" is priced $0.01 in Bravo (not priced yet), so it gets no tag"};
+  const i=tags.findIndex(t=>!t.hand&&String(t.number||"").toUpperCase()===num);
+  if(i<0) return {err:num+" isn't in the loaded report: tags need an item from the report"};
+  return {i}; }
+const tgPriced=t=>({...t,price:t._bp??t.price});
+// words -> report items: every word in the brand / model / description / category ("dewalt drill")
+function tgFind(words){ const w=words.filter(x=>x.length>2&&!TG_STOP.has(x)); if(!w.length) return [];
+  return tags.map((t,i)=>i).filter(i=>{ const t=tags[i]; if(t.hand||!t.number) return false; const h=HW([t.brand,t.model,t.what,t.category,t.raw,(t.src||{}).desc].join(" "));
+    return w.every(x=>h.includes(" "+x)); }).slice(0,9); }
+
+// ---------- the screen (in the side drawer, like the Edit panel): text box first, questions only for the gaps ----------
+// Steps are worked out from what's known (no fixed path): report -> item -> use the shop's tag? -> facts -> size -> biggest.
+// The text box stays on every step: a number picks that answer, words that match an answer pick it, anything else is a new request.
+const TG={pick:"",open:false,i:-1,mode:"",facts:null,size:-1,big:null,extras:"",holdOk:false,hist:[],missId:"",msg:"",draft:null,opts:[],find:[]};
+const tgMe=()=>typeof PL!=="undefined"&&PL&&PL.me()?PL.me().id:"";
+const tgPc=()=>typeof pcName==="function"?pcName():"pc";
+function openTaginator(){ TG.fresh=true; Object.assign(TG,{pick:"",open:true,i:-1,mode:"",facts:null,size:-1,big:null,extras:"",holdOk:false,hist:[],missId:"",msg:"",draft:null,find:[]}); tgShow(); }
+function closeTaginator(){ TG.open=false; TG.draft=null; closeDrawer(); }
+const tgTag=()=>TG.i>=0?tags[TG.i]:null;
+// the shop's default for this item (built-in type, shop sample type or first approved design), if it has one
+function tgDefault(t){ const k=kindOf(autoKind(t)); return k&&k.id!==CONFIG.otherTagType?k:null; }
+// tags to offer: the default, then approved variants and this person's own saved designs for the Category
+function tgChoices(t){ const d=tgDefault(t), c=String(t.category||"").trim().toLowerCase();
+  return (d?[d]:[]).concat(tgKinds().filter(k=>k.tg&&k.id!=="tg-draft"&&(!d||k.id!==d.id)&&k.key===c&&(k.ok||k.by===tgMe()))); }
+const tgCover=t=>tgChoices(t)[0]||null;
+const tgFactOpts=t=>TG_FACTS.filter(([k])=>String((t||{})[k]||"").trim());
+function tgStep(){
+  if(!tags.length) return "report";
+  if(TG.i<0) return "item";
+  const t=tgTag();
+  if(!TG.mode){ if(tgCover(t)) return "use"; TG.mode="new"; }
+  if(TG.mode==="use") return "done";
+  if(TG.facts===null&&tgFactOpts(t).length) return "facts";
+  if(TG.size<0) return "size";
+  if(TG.big===null) return "big";
+  return "done"; }
+// the kind the preview / list uses: the shop's tag, or the design being made
+function tgKindId(){ const t=tgTag(); if(!t) return "";
+  if(TG.mode==="use"){ const l=tgChoices(t), k=l.find(x=>x.id===TG.pick)||l[0]; return k?k.id:""; }
+  if(TG.mode!=="new") return "";
+  TG.draft={id:"tg-draft",by:tgMe(),cat:String(t.category||"").trim(),size:Math.max(0,TG.size),bigTop:TG.big|0,facts:TG.facts||[]};
+  tgKCache=null; return "tg-draft"; }
+function tgPreviewTag(){ const t=tgTag(), kid=tgKindId(), p={...tgPriced(t),kind:kid,fit:null};
+  if(TG.extras) p.extras=TG.extras; tgApply(p); return p; }
+function tgQuestion(step,t){
+  if(step==="report") return ["Open the Bravo report first",[["Open the report",()=>$("file").click()]]];   // loadLines calls tgShow when it's read
+  if(step==="item") return [TG.find.length?"Which one?":"Which item? Type its item # or words from its description in the box",
+    TG.find.map(i=>[tags[i].number+" · "+[tags[i].brand,tags[i].model,tags[i].what].filter(Boolean).join(" "),()=>tgPick(i)])];
+  if(step==="use"){ const l=tgChoices(t), use=id=>{ TG.hist.push(["mode",TG.mode]); TG.pick=id; TG.mode="use"; TG.msg=""; tgShow(); };
+    return ["Which tag for "+(t.category||"this item")+"?",l.map((k,i)=>["Use "+k.name+(i===0&&tgDefault(t)?" (shop default)":k.ok?"":" (your saved design, waiting for a manager)"),()=>use(k.id)])
+      .concat([["Make a new design"+(l.length?" (goes to a manager as a variant)":""),()=>tgSet("mode","new")]])]; }
+  if(step==="facts"){ const on=TG.facts||[]; return ["What should the notes line show? (tap to add or remove)",
+    tgFactOpts(t).map(([k,l])=>[(on.includes(k)?"✓ ":"")+l+": "+String(t[k]).slice(0,40),()=>{ TG.facts=on.includes(k)?on.filter(x=>x!==k):on.concat(k); tgShow(); }])
+      .concat([["Done",()=>tgSet("facts",on)]])]; }
+  if(step==="size") return ["Which size?",tgSizes().map((z,i)=>[z.label,()=>tgSet("size",i)])];
+  if(step==="big") return ["What do buyers check first?",[["The price (biggest price)",()=>tgSet("big",0)],["Maker + model (bigger)",()=>tgSet("big",1)],["Maker + model (biggest)",()=>tgSet("big",2)]]];
+  return ["",[]]; }
+function tgSet(k,v){ TG.hist.push([k,TG[k]]); TG[k]=v; TG.msg=""; tgShow(); }
+function tgPick(i){ const it=tgItem(tags[i].number); if(it.err){ TG.msg=it.err; return tgShow(); }
+  TG.hist.push(["i",TG.i]); Object.assign(TG,{i,mode:"",facts:null,size:-1,big:null,holdOk:false,find:[],msg:""}); tgShow(); }
+function tgBack(){ const h=TG.hist.pop(); if(!h) return closeTaginator(); TG[h[0]]=h[1]; TG.msg="";
+  if(h[0]==="i") Object.assign(TG,{mode:"",facts:null,size:-1,big:null}); if(h[0]==="mode") TG.facts=null; tgShow(); }
+// a typed request, or an answer typed instead of clicked
+async function tgSubmit(text){
+  text=String(text||"").trim(); if(!text) return;
+  const n=text.match(/^[1-9]$/); if(n){ const o=TG.opts[+n[0]-1]; if(o) o[1](); return; }
+  const hit=text.length>2&&TG.opts.find(o=>HW(o[0]).includes(HW(text))||helpSim(text,o[0].replace(/^✓ /,""))>=.8); if(hit){ hit[1](); return; }
+  const t=tgTag(), r=tgParse(text,{gun:!!t&&tgGun(t),used:!!t&&usedIntake(t),brands:(t?tgBrands(t):[]).concat(tgBrands())});
+  if(r.blocked){ TG.msg=r.blocked; return tgShow(); }
+  if(r.kind==="sign"&&!r.num){ TG.msg="Signs are coming next: for now Taginator makes tags"; return tgShow(); }
+  if(!r.num&&r.left.length&&tags.length){ TG.find=tgFind(r.left); if(TG.find.length){ r.left=[]; r.understood=true; } }   // "dewalt drill": placed by the search
+  let miss=false; await updateShared(d=>{ miss=tgLogIn(d,r,tgMe(),tgPc()); if(miss) TG.missId=d.tgMiss[d.tgMiss.length-1].id; },true);
+  TG.msg="";
+  if(r.num){ const it=tgItem(r.num); if(it.err) TG.msg=it.err; else if(it.i!==TG.i){ TG.hist.push(["i",TG.i]); Object.assign(TG,{i:it.i,mode:"",facts:null,size:-1,big:null,holdOk:false,find:[]}); } }
+  else if(TG.find.length===1){ TG.hist.push(["i",TG.i]); Object.assign(TG,{i:TG.find[0],mode:"",facts:null,size:-1,big:null,holdOk:false,find:[]}); }
+  if(r.extras){ const no=claimCheck(r.extras,{gun:!!tgTag()&&tgGun(tgTag()),brands:tgTag()?tgBrands(tgTag()):[]}); if(no) TG.msg=no; else TG.extras=r.extras; }
+  if(r.size>=0) TG.size=r.size;
+  if(miss&&!TG.msg) TG.msg="I didn't get \""+r.left.join(" ")+"\": pick below (a manager can teach me those words)";
+  tgShow(); }
+// save the design: the auto-check first (a design that fails can't be saved), then pending for a manager
+async function tgSave(){
+  const p=tgPreviewTag(), s=settings(p.kind), err=designCheck(TG.draft); if(err){ TG.msg=err; return tgShow(); }
+  const rep=preflight(TYPE,[{kind:kindOf(p.kind),sel:[p],s}]);
+  if(rep.left.length||rep.sheet.length){ TG.msg="Can't save yet: "+[...rep.sheet,...rep.left.flatMap(x=>x.why.map(w=>w.role+(w.why==="outside"?" runs outside the tag":" text too small")))].slice(0,3).join("; ")+". Try a bigger size."; return tgShow(); }
+  const def=tgDefault(tgTag()); let res={}; await updateShared(d=>{ res=tgDesignIn(d,{...TG.draft,variantOf:def?def.name:""},tgMe()); });
+  if(res.err){ TG.msg=res.err; return tgShow(); }
+  TG.hist.push(["mode","new"]); Object.assign(TG,{mode:"use",pick:res.x.id,draft:null,msg:def?"✓ Saved: yours to use now; sent to a manager as a variant of "+def.name+" (the default stays)"
+    :"✓ Saved for "+res.x.cat+": yours now, everyone's once a manager OKs it"}); tgShow(); }
+// put the item on the print list, checked, with this tag (kind set for this session only, never remembered by item #)
+function tgUse(){
+  const t=tgTag(), kid=tgKindId(); if(!t||!kid) return;
+  t.kind=kid; tgApply(t); if(TG.extras&&TG.extras!==t.extras){ t.extras=TG.extras; rememberEdit(t,"extras"); }
+  t.include=true; checkOne(t); view();
+  if(TG.missId){ const ch=[t.number,kindOf(kid).name,TG.extras].filter(Boolean).join(" · "), id=TG.missId; updateShared(d=>{ const m=(d.tgMiss||[]).find(x=>x.id===id); if(m){ m.chose=ch; m.t=Date.now(); } },true); }
+  closeTaginator(); toast("✓ "+t.number+" is on the print list, checked: Print from the main screen"); }
+function tgShow(){
+  if(!TG.open) return;
+  if(!TG.fresh&&!tgOnScreen()){ TG.open=false; TG.draft=null; return; }   // closed with the shade / Edit panel on top: never paint over it
+  TG.fresh=false;
+  const step=tgStep(), t=tgTag(), [q,opts]=tgQuestion(step,t), kid=t?tgKindId():"", warn=t&&!TG.holdOk?holdWarn(tgPriced(t)):"";
+  TG.opts=opts;
+  const part=(l,v,k)=>`<button class="chip${v?" on":""}" data-tgpart="${k}">${esc(l)}: ${esc(v||"?")}${v?" ✓":""}</button>`;
+  openDrawer(`<div class="top"><h3>Taginator</h3><button class="x" id="tgX">✕</button></div>
+    <div class="body">
+      <div class="field"><input id="tgIn" maxlength="${TG_MAX}" placeholder="Tell me what you want: tag for C33016383 w/ charger" autocomplete="off"></div>
+      ${t?`<div class="kindrow">${part("Item",t.number+" "+[t.brand,t.model].filter(Boolean).join(" "),"i")}${TG.extras?part("Extras",TG.extras,"extras"):""}${TG.mode==="use"&&kid?part("Tag",kindOf(kid).name,"mode"):""}${TG.mode==="new"?part("Size",TG.size>=0?tgSizes()[TG.size].label:"","size")+part("Biggest",TG.big===null?"":["price","maker + model","maker + model, biggest"][TG.big],"big"):""}</div>`:""}
+      ${TG.msg?`<div class="raw tg-msg">${esc(TG.msg)}</div>`:""}
+      ${warn?`<div class="raw tg-warn">⚠ ${esc(warn)} <button class="chip" id="tgHold">OK, I checked</button></div>`:""}
+      ${q?`<h3 class="tg-q">${esc(q)}</h3>`:""}
+      <div class="tg-opts">${opts.map((o,i)=>`<button class="btn" data-tgopt="${i}">${i<9?"<b>"+(i+1)+"</b> ":""}${esc(o[0])}</button>`).join("")}</div>
+      ${t&&kid?`<div class="sides"><canvas id="tgFront"></canvas>${twoSided()?'<canvas id="tgBack"></canvas>':""}</div>`:""}
+    </div>
+    <div class="foot"><button class="btn" id="tgBk">Back</button>${step==="done"&&TG.mode==="new"?`<button class="btn primary grow" id="tgSave">Save for ${esc(t.category||"")}</button>`:""}${step==="done"&&TG.mode==="use"?'<button class="btn primary grow" id="tgUse">Put on print list</button>':""}</div>`);
+  if(t&&kid){ const p=tgPreviewTag(), k=Math.min(1,320/settings(p.kind).W); paint($("tgFront"),p,k,false); if($("tgBack")) paint($("tgBack"),p,k,true); }
+  $("tgX").onclick=closeTaginator; $("tgBk").onclick=tgBack;
+  if($("tgSave")) $("tgSave").onclick=tgSave; if($("tgUse")) $("tgUse").onclick=tgUse; if($("tgHold")) $("tgHold").onclick=()=>{ TG.holdOk=true; tgShow(); };
+  $("drawer").querySelectorAll("[data-tgopt]").forEach(b=>b.onclick=()=>opts[+b.dataset.tgopt][1]());
+  $("drawer").querySelectorAll("[data-tgpart]").forEach(b=>b.onclick=()=>{ const k=b.dataset.tgpart;   // tap a part to change it
+    if(k==="i") tgSet("i",-1); else if(k==="extras") tgSet("extras",""); else if(k==="mode") tgSet("mode",""); else if(k==="size") tgSet("size",-1); else if(k==="big") tgSet("big",null); });
+  const inp=$("tgIn"); inp.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); const v=inp.value; inp.value=""; tgSubmit(v); } };
+  setTimeout(()=>inp.focus(),30); }
+// keys 1-9 pick an answer only when no text box has focus; Esc closes
+if(typeof document!=="undefined") document.addEventListener("keydown",e=>{ if(!tgOnScreen()) return;
+  if(e.key==="Escape"){ e.preventDefault(); closeTaginator(); return; }
+  if(/INPUT|TEXTAREA/.test((document.activeElement||{}).tagName||"")) return;
+  if(/^[1-9]$/.test(e.key)&&TG.opts[+e.key-1]){ e.preventDefault(); e.stopPropagation(); TG.opts[+e.key-1][1](); } },true);
+
+// ---------- console: designs ----------
+TG_CMDS.push('tdesigns / tdel <#>                       Taginator tag designs (live / waiting) / delete one');
+async function tgDesignCmd(c,a){
+  const d=SH.data;
+  if(c==="tdesigns"){ tgList=(d.designs||[]).filter(x=>!x.deleted); if(!tgList.length) cprint("No Taginator designs yet.","dim");
+    tgList.forEach((x,i)=>cprint(String(i+1).padStart(3)+"  "+x.cat.padEnd(24)+" "+(tgSizes()[x.size]||{}).label+"  by "+x.by+"  "+(tgApproved(d,x)?"live":"waiting for a manager"))); return true; }
+  if(c==="tdel"){ const x=tgList[+a[1]-1]; if(!x||!x.cat){ cprint("No #"+(a[1]||"")+" — type tdesigns first","bad"); return true; }
+    let done=false; await updateShared(dd=>{ done=tgDelDesignIn(dd,x.id); });
+    if(done&&typeof reloadTags==="function") reloadTags();
+    cprint(done?"Deleted the design for "+x.cat+" (its tags go back to General Merchandise)":"Already deleted (maybe on another computer)",done?"ok":"bad"); return true; }
+  return false; }
 
 </script>
 <script>
@@ -6825,6 +7217,7 @@ const PLX=(()=>{
   const MAXN=20, DAY=864e5;
   const clean=s=>String(s||"").replace(/\s+/g," ").trim().slice(0,MAXN);
   const pid=s=>clean(s).toLowerCase();
+  const t10=v=>Math.round(v*10)/10;
   const when=x=>x.status==="approved"?(x.done||x.at||0):(x.at||0);   // a token counts from the moment it was approved
   // balance, pending count and the latest manager decision for one profile
   function account(log,p){
@@ -6832,8 +7225,8 @@ const PLX=(()=>{
     let bal=0, pending=0, last=null, left=0, cur=null;
     for(const x of mine){
       const n=Math.max(0,+x.n||0);
-      if(x.status==="approved") bal+=n;
-      else if(x.status==="spent"){ if(n<=bal){ bal-=n;             // two computers spending the last token at once: the 2nd one doesn't count (no time either)
+      if(x.status==="approved") bal=t10(bal+n);                    // tenths (rewards are 0.1 / 0.2): no 0.1+0.2 float drift
+      else if(x.status==="spent"){ if(n<=bal+1e-9){ bal=t10(bal-n);             // two computers spending the last token at once: the 2nd one doesn't count (no time either)
         const l=Math.max(0,(+x.sec||0)-(+x.used||0)); left+=l; if(l>0&&!cur) cur=x; } }
       else if(x.status==="pending") pending++;
       if(!x.auto&&(x.status==="approved"||x.status==="rejected")&&(!last||(x.done||0)>(last.done||0))) last=x;
@@ -6853,10 +7246,20 @@ const PLX=(()=>{
     const x=(d.tokens||[]).find(y=>y.id===kind+":"+p+":"+ref);
     if(x&&x.status==="pending"&&!x.deleted){ x.deleted=true; x.t=now||Date.now(); }
   }
-  // manager decision: true = done now, false = it was already decided (on this or another computer)
-  function decideIn(d,id,ok,reward,note,by,now){
-    const x=(d.tokens||[]).find(y=>y.id===id); if(!x||x.deleted||x.status!=="pending") return false;
+  // No approving your own submission (xf, 11-22-2026) for Taginator kinds: a manager's own design / fact / taught phrase needs
+  // another manager; the owner (blsxf) may approve his own. by = the approving manager's profile id (signed in + console PIN;
+  // sign-in is a name card, so this stops honest mistakes, not a manager using a second profile). "" = OK, else why not.
+  // (xf, 11-22-2026: every kind, not only Taginator's)
+  const OWNER="blsxf";
+  function canDecide(d,id,ok,by){
+    const x=(d.tokens||[]).find(y=>y.id===id); if(!x||!ok||x.auto) return "";
+    if(!by) return "Sign in as a manager to approve this";
+    return x.p===by&&by!==OWNER?"This is your own "+x.kind+": another manager has to approve it":""; }
+  // manager decision: true = done now, false = it was already decided (on this or another computer) or canDecide said no
+  function decideIn(d,id,ok,reward,note,by,now,pc){
+    const x=(d.tokens||[]).find(y=>y.id===id); if(!x||x.deleted||x.status!=="pending"||canDecide(d,id,ok,by)) return false;
     now=now||Date.now(); Object.assign(x,{status:ok?"approved":"rejected",n:ok?Math.max(0,+reward||0):0,note:String(note||"").slice(0,120),done:now,t:now,by:by||""});
+    if(pc) x.pc=pc;
     return true;
   }
   // panel time: the spend entry with time left, or a new token turned into sec seconds. null = no time and no tokens.
@@ -6905,8 +7308,10 @@ const PLX=(()=>{
       if(!d.profiles.some(p=>p&&p.id===id)) d.profiles.push({id,name:id,created:1,t:1,hide:null});
       if(!d.mgr[id]) d.mgr[id]={star:true,t:1}; }); }
   // console: star / unstar / remove. Returns an error message, or "" when done. The last manager can't be unstarred or removed.
-  function mgrEdit(d,op,id,now){
+  // by = the manager doing it. blsxf's profile is only his to change (xf, 11-22-2026): nobody else can unstar, remove or reset its PIN.
+  function mgrEdit(d,op,id,now,by){
     now=now||Date.now(); const p=live(d).find(x=>x.id===id); if(!p) return "No profile \""+id+"\"";
+    if(id===OWNER&&by!==OWNER&&op!=="star") return "Only "+OWNER+" can change the "+OWNER+" profile";
     const last=isMgr(d,id)&&managers(d).length<=1;
     if(op==="star"){ setMgrIn(d,id,{star:true},now); return ""; }
     if(op==="unstar"){ if(last) return "Can't unstar the last manager: star someone else first"; setMgrIn(d,id,{star:false},now); return ""; }
@@ -6914,7 +7319,7 @@ const PLX=(()=>{
       Object.assign(p,{deleted:true,t:now}); if((d.mgr||{})[id]) setMgrIn(d,id,{star:false,pin:null},now); return ""; }
     if(op==="resetpin"){ if(!isMgr(d,id)) return p.name+" isn't a manager"; setMgrIn(d,id,{pin:null},now); return ""; }
     return "?"; }
-  return {MAXN,MAXP,clean,pid,account,earnIn,unearnIn,decideIn,playIn,useIn,weeklyIn,weeks,live,isMgr,managers,hashPin,pinOk,setMgrIn,seedIn,mgrEdit};
+  return {MAXN,MAXP,OWNER,clean,pid,account,earnIn,unearnIn,canDecide,decideIn,playIn,useIn,weeklyIn,weeks,live,isMgr,managers,hashPin,pinOk,setMgrIn,seedIn,mgrEdit};
 })();
 if(typeof module!=="undefined") module.exports=PLX;
 
@@ -6927,9 +7332,9 @@ if(typeof document!=="undefined") PL=(()=>{
   const acct=p=>PLX.account(SH.data.tokens,p||ME.id);
   const secPer=()=>Math.max(1,+((CONFIG.tokens||{}).minutesPerToken??30)||30)*60;
   const mins=s=>Math.ceil(s/60)+" min";
-  const reward=k=>+(((CONFIG.tokens||{}).reward||{})[k]??1)||0;
-  const tok=n=>n+" token"+(n===1?"":"s");
-  const KIND={suggestion:"suggestion",ticket:"Help ticket",fix:"name fix",sample:"sample tag",play:"PRAWN play",weekly:"free weekly token"};
+  const reward=k=>+(((CONFIG.tokens||{}).reward||{})[k]??.1)||0;
+  const tok=n=>(Math.round(n*10)/10)+" token"+(n===1?"":"s");
+  const KIND={suggestion:"suggestion",ticket:"Help ticket",fix:"name fix",sample:"sample tag",play:"PRAWN play",weekly:"free weekly token",design:"tag design",fact:"fact",phrase:"taught phrase"};
   const free=()=>Math.max(0,+((CONFIG.tokens||{}).freePerWeek??1)||0);
 
   // ---------- markup: the sign-in screen (xf's mockup 11-21-2026) ----------
@@ -6952,7 +7357,7 @@ if(typeof document!=="undefined") PL=(()=>{
       <section class="si-main"><h2 id="hubHi"></h2>
         <div class="si-hub">
           <button class="si-tile" data-h="tool"><span class="si-n">1</span><b>Manual Tag Tool</b><small>Open the Bravo report and print tags</small></button>
-          <button class="si-tile off" data-h="soon" aria-disabled="true"><span class="si-n">2</span><b>Taginator</b><small>Coming soon</small></button>
+          <button class="si-tile" data-h="tagi"><span class="si-n">2</span><b>Taginator</b><small>Tell it what tag you want</small></button>
         </div><div class="si-msg" id="soMsg"></div></section></div>
     <div class="si-dim" id="siDim" hidden><div class="si-box" role="dialog" aria-label="Your name">
       <button class="si-x" id="siX" aria-label="Close">✕</button>
@@ -7022,7 +7427,7 @@ if(typeof document!=="undefined") PL=(()=>{
   function lockConsole(){ if(typeof CON==="undefined") return; CON.unlocked=false; CON.pin=null; $("conOut").innerHTML=""; $("conIn").type="text"; if(CON.open) closeConsole(); }
   function hubGo(h){
     if(h==="tool"){ if(!ME.id) return openBox(); $("signon").hidden=true; return; }
-    if(h==="soon") return toast("Taginator is coming soon"); }
+    if(h==="tagi"){ if(!ME.id) return openBox(); $("signon").hidden=true; if(typeof openTaginator==="function") openTaginator(); } }
   $("signon").querySelectorAll(".si-tile").forEach(t=>t.onclick=()=>hubGo(t.dataset.h));
   $("siX").onclick=closeBox; $("siOut").onclick=logOut;
   $("siDim").addEventListener("mousedown",e=>{ if(e.target===$("siDim")){ e.preventDefault(); $("soName").focus(); } });   // clicks outside the box do nothing
@@ -7048,7 +7453,7 @@ if(typeof document!=="undefined") PL=(()=>{
       else if(e.key==="Tab"){ e.preventDefault(); $("soName").focus(); }        // focus stays in the box
       else if(document.activeElement!==$("soName")) $("soName").focus();
       return; }
-    if(/^[12]$/.test(e.key)&&!/INPUT|TEXTAREA/.test(document.activeElement.tagName)){ e.preventDefault(); hubGo(e.key==="1"?"tool":"soon"); }
+    if(/^[12]$/.test(e.key)&&!/INPUT|TEXTAREA/.test(document.activeElement.tagName)){ e.preventDefault(); hubGo(e.key==="1"?"tool":"tagi"); }
   },true);
 
   // the latest manager decision, shown under the Alt+Enter menu entry
@@ -7181,8 +7586,8 @@ if(typeof document!=="undefined") PL=(()=>{
       const w=a.slice(1).join(" "), l=profiles(), p=/^\d+$/.test(w)?l[+w-1]:l.find(x=>x.id===PLX.pid(w));
       if(!w||!p){ cprint(w?"No profile \""+w+"\" — type profiles":"Use: "+c+" <name>","bad"); return true; }
       let err="", d0={...SH.data,profiles:(SH.data.profiles||[]).map(x=>({...x})),mgr:{...(SH.data.mgr||{})}};
-      err=PLX.mgrEdit(d0,c,p.id);                                // check on this copy first, so a refusal saves nothing
-      if(!err){ await updateShared(d=>{ err=PLX.mgrEdit(d,c,p.id); },true); }
+      err=PLX.mgrEdit(d0,c,p.id,0,ME.id);                                // check on this copy first, so a refusal saves nothing
+      if(!err){ await updateShared(d=>{ err=PLX.mgrEdit(d,c,p.id,0,ME.id); },true); }
       if(err){ cprint(err,"bad"); return true; }
       cprint({star:"★ "+p.name+" is a manager",unstar:p.name+" is no longer a manager",remove:"Removed "+p.name+" (their saves stay on each computer)",resetpin:p.name+"'s PIN is cleared: they set a new one next time"}[c],"ok");
       if(p.id===ME.id&&(c==="remove"||c==="unstar")){ refresh(); if(c==="remove") setTimeout(logOut,800); else lockConsole(); return true; }
@@ -7191,7 +7596,9 @@ if(typeof document!=="undefined") PL=(()=>{
       if(!plist.length) cprint("Nothing waiting.","dim"); else plist.forEach((x,i)=>cprint(pline(x,i+1))); return true; }
     if(c==="approve"||c==="reject"){ const x=plist[+a[1]-1]; if(!x){ cprint("No #"+(a[1]||"")+" — type pending first","bad"); return true; }
       const note=a.slice(2).join(" "), ok=c==="approve", r=reward(x.kind); let done=false;
-      await updateShared(d=>{ done=PLX.decideIn(d,x.id,ok,r,note,typeof pcName==="function"?pcName():""); });
+      const no=PLX.canDecide(SH.data,x.id,ok,ME.id); if(no){ cprint(no,"bad"); return true; }
+      await updateShared(d=>{ done=PLX.decideIn(d,x.id,ok,r,note,ME.id,0,typeof pcName==="function"?pcName():"");
+        if(done&&typeof tgDecided==="function") tgDecided(d,x,ok); });                // Taginator: a rejected phrase is a tombstone
       if(!done) cprint("#"+a[1]+" was already decided (maybe on another computer) — nothing paid twice. Type pending.","bad");
       else cprint((ok?"Approved: +"+tok(r)+" to ":"Rejected: 0 tokens to ")+pname(x.p)+(note?' — "'+note+'"':""),"ok");
       refresh(); return true; }
