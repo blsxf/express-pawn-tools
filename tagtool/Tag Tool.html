@@ -7,7 +7,7 @@
 <script>
 // ---- self-update: checks the public mirror when online, keeps the newest build on this computer ----
 // Newer build saved earlier -> run that instead of this file. Add ?local to the address to skip it.
-var TT_BUILD=1795236364518;
+var TT_BUILD=1795315628656;
 (function(){
   var REMOTE="https://raw.githubusercontent.com/blsxf/express-pawn-tools/main/tagtool/", KEY="tagtool.update";
   function db(){ return new Promise(function(res,rej){ var r=indexedDB.open("tagtool",1);
@@ -335,6 +335,7 @@ main{flex:1;padding:16px 16px 90px;display:flex;flex-direction:column}
 #drop.busy .ic svg{animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 #emptyMsg{color:var(--bad);font-size:14px;min-height:1.2em}
+#privWarn{color:var(--bad);font-size:14px;font-weight:600;margin:0 0 10px}
 .link{background:none;border:0;padding:2px;color:var(--ink3);text-decoration:underline;text-underline-offset:3px;font-size:14px}
 .link:hover{color:var(--ink)}
 #grid{display:flex;flex-direction:column}
@@ -518,6 +519,7 @@ button.xp-row{cursor:pointer}button.xp-row:hover{border-color:#2f6aa5}.xp-row.on
 </header>
 
 <main>
+  <div id="privWarn" hidden></div>
   <section id="empty">
     <div id="drop">
       <div class="ic"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
@@ -1405,6 +1407,33 @@ function itemWhat(item,mfr,model,category,tools,out){
   return said?"":what;
 }
 
+// ---- report columns: matched by header name (case, spaces and punctuation don't matter) ----
+const hdrKey=s=>String(s||"").toUpperCase().replace(/[^A-Z0-9]+/g,"");
+const isHeaderLine=line=>{ const txt=line.map(c=>c.str).join(" "); return /Manufacturer/.test(txt)&&/Caliber/.test(txt); };
+// which column a text box belongs to: its middle, against the header's left edges (cols sorted by x)
+function colOf(cols,c){ const cx=c.x+(c.w?Math.min(c.w/2,40):0.5); let col=cols[0]; for(const k of cols) if(cx>=k.x-2) col=k; return col; }
+// Personal data (bravo.md "Never use"): customer / vendor / last-sold-to columns. Broad on purpose: a miss leaks, an extra drop costs nothing.
+const PRIVATE_COL=/\b(?:CUSTOMER|CUST|E-?MAIL|PHONE|CELL|ADDRESS|VENDOR|SOLD TO|SSN|DOB|BIRTH)\b/i;
+// Drops those columns from the report as it's read, before anything else sees it: never shown, kept, saved or
+// put in tickets. Returns the lines without them + the header names dropped (names only, never values),
+// so the screen can tell the manager to take them out of the saved Custom report (11-21-2026).
+function stripPrivate(lines){
+  let cols=null; const out=[], dropped=new Set();
+  for(const line of lines){
+    if(isHeaderLine(line)){
+      cols=line.filter(c=>c.str.trim()).map(c=>({x:c.x,priv:PRIVATE_COL.test(c.str.replace(/\s+/g," ").trim()),name:c.str.replace(/\s+/g," ").trim()})).sort((a,b)=>a.x-b.x);
+      cols.forEach(k=>{ if(k.priv) dropped.add(k.name); });
+      out.push(line.filter(c=>!c.str.trim()||!PRIVATE_COL.test(c.str.replace(/\s+/g," ").trim()))); continue;
+    }
+    if(!cols||!cols.some(k=>k.priv)){ out.push(line); continue; }
+    const keep=line.filter(c=>!colOf(cols,c).priv); if(keep.length) out.push(keep);
+  }
+  return {lines:out, dropped:[...dropped]};
+}
+// UPC-A (12) / EAN-13 (13) with a good check digit -> 13 digits; anything else -> ""
+function ean13Of(s){ const d=String(s||"").replace(/\s/g,""); if(!/^(\d{12}|\d{13})$/.test(d)) return "";
+  const e=d.padStart(13,"0"), sum=[...e.slice(0,12)].reduce((a,c,i)=>a+(+c)*(i%2?3:1),0); return (10-sum%10)%10===+e[12]?e:""; }
+
 // rows: [{cells:[{x,w,str}], page}] sorted; returns raw records.
 // Works with the old "Custom" report and the newer one with Category / Description columns,
 // read from Bravo's own saved report (.prnx). Columns can be in any order; any other column
@@ -1412,24 +1441,27 @@ function itemWhat(item,mfr,model,category,tools,out){
 // Date to Inventory feed the barcode label printed on the back (t.label).
 // item #s the last report priced at $0.01 (not priced yet, no tag): the Help box explains them (help.js)
 let PENNY=new Set();
+const COLS={Manufacturer:"mfr",Model:"model",Number:"number",Category:"category",Description:"desc",Caliber:"caliber",Cost:"cost",Price:"price",
+  RetailPrice:"price",SellingPrice:"price",Gun:"gun",GunNo:"gun",GunNumber:"gun",
+  Location:"location",Barcode:"barcode",SerialNumber:"serial",DateToInventory:"date",     // these four: the printed barcode label
+  Quality:"quality",                                            // NEW / VERY GOOD / GOOD... (NEW guns: "NEW Glock")
+  // kept on the item (t.more), not printed yet (11-21-2026): jewelry tags will use the jewelry ones. All optional.
+  UPC:"upc",Store:"store",Quantity:"qty",SKUNumber:"sku",InventoryAge:"age",
+  TotalJewelryWeight:"jwWeight",MetalWeight:"metalWeight",MetalTypeColor:"metalType",MetalType:"metalType",MetalColor:"metalColor",
+  MetalPurity:"metalPurity",TotalDiamondSize:"diamondSize",TotalStoneSize:"stoneSize",
+  AuthenticDiamondJewelry:"authDiamond",AuthenticStoneJewelry:"authStone"};
+const COLKEY=Object.fromEntries(Object.entries(COLS).map(([h,k])=>[hdrKey(h),k]));
+const MORE=["upc","store","qty","sku","age","jwWeight","metalWeight","metalType","metalColor","metalPurity","diamondSize","stoneSize","authDiamond","authStone"];
 function parseRows(lines){
   let cols=null; const out=[]; PENNY=new Set();
-  const NAMES={Manufacturer:"mfr",Model:"model",Number:"number",Category:"category",Description:"desc",Caliber:"caliber",Cost:"cost",Price:"price",
-    Location:"location",Barcode:"barcode","Serial Number":"serial","Date to Inventory":"date",     // these four: the printed barcode label
-    Quality:"quality"};                                         // NEW / VERY GOOD / GOOD... (NEW guns: "NEW Glock")
   for(const line of lines){
-    const txt = line.map(c=>c.str).join(" ");
-    if(/Manufacturer/.test(txt) && /Caliber/.test(txt)){
-      cols = line.filter(c=>c.str.trim()).map(c=>{ const h=c.str.trim(); return {key:NAMES[h]||(/^(Retail|Selling) Price$/i.test(h)?"price":/^Gun\s*(#|No\.?|Number)$/i.test(h)?"gun":"skip"),x:c.x}; }).sort((a,b)=>a.x-b.x);
+    if(isHeaderLine(line)){
+      cols = line.filter(c=>c.str.trim()).map(c=>({key:PRIVATE_COL.test(c.str)?"skip":COLKEY[hdrKey(c.str)]||"skip",x:c.x})).sort((a,b)=>a.x-b.x);
       continue;
     }
     if(!cols) continue;
-    const parts={quality:[],mfr:[],model:[],number:[],category:[],desc:[],caliber:[],cost:[],price:[],location:[],barcode:[],serial:[],date:[],gun:[],skip:[]};
-    for(const c of line){
-      const cx = c.x + (c.w ? Math.min(c.w/2,40) : 0.5);       // middle of the text decides its column
-      let col=cols[0]; for(const k of cols) if(cx>=k.x-2) col=k;
-      parts[col.key].push(c.str);
-    }
+    const parts={skip:[]}; for(const k of Object.values(COLS)) parts[k]=[];
+    for(const c of line) parts[colOf(cols,c).key].push(c.str);
     const number = parts.number.join("").trim();
     if(!/^[A-Z]{0,3}\d{5,}$/.test(number)&&!/^(?=.*\d{3})[A-Z0-9]+(?:-[A-Z0-9]+)+$/.test(number)) continue;   // C33016383; also G-I-1176, I-507, 2104954-4
     const j = a => a.join(" ").replace(/\s+/g," ").replace(/\s*…/g,"…").trim();
@@ -1438,8 +1470,10 @@ function parseRows(lines){
     const cost = m ? money(m[2]) : money(j(parts.cost)), price = m ? money(m[3]) : money(j(parts.price));
     if(!isFinite(cost) && !isFinite(price)) continue;
     if(price===0.01){ PENNY.add(number); continue; }            // penny price = not priced yet; no tag
+    const more={}; for(const k of MORE){ const v=j(parts[k]); if(v) more[k]=v; }
+    const ean=ean13Of(more.upc); if(ean) more.ean13=ean;         // real UPC (new goods): the EAN-13 to use, not one guessed from Barcode
     out.push({mfr:j(parts.mfr), model:j(parts.model), number, category:j(parts.category), desc:j(parts.desc),
-              caliberRaw:m?m[1].trim():j(parts.caliber), quality:j(parts.quality), price:isFinite(price)?price:0, cost,
+              caliberRaw:m?m[1].trim():j(parts.caliber), quality:j(parts.quality), price:isFinite(price)?price:0, cost, more,
               label:{barcode:j(parts.barcode).replace(/\s/g,""), location:j(parts.location), serial:j(parts.serial), date:j(parts.date), gun:j(parts.gun), desc:j(parts.desc)}});
   }
   return out;
@@ -1540,7 +1574,7 @@ function toTag(r){
   // coins / proof sets: the year is what buyers look for
   if(!conflict&&/\bPROOF\b|\bMINT SET|\bCOINS?\b|\bSILVER EAGLE|\bMORGAN\b/.test(item+" "+String(r.model+" "+r.category).toUpperCase())&&!/\b(?:1[789]|20)\d\d\b/.test(item+" "+r.model))
     conflict="No year in Bravo's description";
-  return {include:true, brand, model, caliber, extras:parseExtras(r.desc), accessories:parseAccessories(r.desc,r.mfr+" "+r.model,r.category,r.price), what, notes, quality, kbKey, whatKnown:w!==null, conflict, checked:"", finish, category:r.category||"", price:r.price, cost:r.cost, number:r.number, label:r.label, ...specsOf(r),
+  return {include:true, brand, model, caliber, extras:parseExtras(r.desc), accessories:parseAccessories(r.desc,r.mfr+" "+r.model,r.category,r.price), what, notes, quality, kbKey, whatKnown:w!==null, conflict, checked:"", finish, category:r.category||"", price:r.price, cost:r.cost, number:r.number, label:r.label, more:r.more||{}, ...specsOf(r),
           raw:[r.mfr, r.model, r.desc, r.caliberRaw].filter(Boolean).join(" | ")};
 }
 
@@ -2285,7 +2319,7 @@ window.addEventListener("focus",()=>{ if(SH.ok) syncShared(); });
 <script>
 // ===== APP: the screen =====
 const $=id=>document.getElementById(id);
-let TYPE=null, tags=[], lastLines=null, editIdx=-1, showBack=false;
+let TYPE=null, tags=[], lastLines=null, privCols=[], editIdx=-1, showBack=false;   // privCols: customer/vendor column names dropped from this report (names only)
 // built-in tag font for the on-screen previews
 // (Print draws on canvas too, so it waits for this.)
 const FONT_READY=(async()=>{ try{ const bin=atob(AH_B64), u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
@@ -2447,8 +2481,8 @@ async function handleFile(file,auto){
   if(!file) return; if(!TYPE) return toast("No tag templates loaded yet",true);
   if(!/\.prnx$/i.test(file.name)){ toast("Needs Bravo's saved report (.prnx): Save in Bravo's Report Preview",true); return; }
   reading=true; $("drop").classList.add("busy"); $("dropBig").textContent="Reading…"; $("dropSmall").textContent=file.name;
-  try{ if(typeof DecompressionStream==="undefined") throw 0; const lines=await readPrnxLines(file);
-    loadedAt=Math.max(loadedAt,file.lastModified||0); newer=null; $("newer").hidden=true; loadLines(lines); }
+  try{ if(typeof DecompressionStream==="undefined") throw 0; const r=stripPrivate(await readPrnxLines(file));   // personal-data columns go before anything keeps the lines
+    privCols=r.dropped; loadedAt=Math.max(loadedAt,file.lastModified||0); newer=null; $("newer").hidden=true; loadLines(r.lines); }
   catch(e){ if(auto) failedAt=Math.max(failedAt,file.lastModified||0);   // half-saved / damaged: try again only once it's saved again
     if(tags.length) toast("Couldn't read "+file.name+" — the tags on screen are unchanged",true);
     else { view(); $("emptyMsg").textContent="Couldn't read that file."; } }
@@ -2509,6 +2543,8 @@ function newTag(){
 // ---------- which parts show ----------
 function view(){
   const has=tags.length>0;
+  $("privWarn").hidden=!privCols.length;
+  $("privWarn").textContent=privCols.length?"This report has customer/vendor columns ("+privCols.join(", ")+"). The Tag Tool ignored them; please remove them from the saved Custom report in Bravo.":"";
   $("empty").hidden=has; $("tagsView").hidden=$("tools").hidden=$("bar").hidden=!has;
   $("flip").textContent=showBack?"Show fronts":"Show backs"; $("flip").classList.toggle("on",showBack);
   const nAll=tags.filter(t=>!t._need&&!t.include).length; $("needOnly").hidden=!hasHistory()||!nAll;
@@ -2798,7 +2834,7 @@ window.addEventListener("focus",()=>setTimeout(loadNewest,400));   // a newer re
 // ---------- Home: back to the start screen to open another report ----------
 function goHome(){
   if(tags.some(t=>t.hand)&&!confirm("Back to the start screen?\n\nTags added by hand will be cleared.")) return;
-  closeDrawer(); tags=[]; lastLines=null; skips={}; onlyNeed=false; newer=null; $("newer").hidden=true;
+  closeDrawer(); tags=[]; lastLines=null; privCols=[]; skips={}; onlyNeed=false; newer=null; $("newer").hidden=true;
   $("q").value=""; $("emptyMsg").textContent=""; view(); window.scrollTo({top:0});
 }
 $("home").onclick=goHome;
