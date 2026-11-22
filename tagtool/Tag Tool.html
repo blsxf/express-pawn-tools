@@ -7,7 +7,7 @@
 <script>
 // ---- self-update: checks the public mirror when online, keeps the newest build on this computer ----
 // Newer build saved earlier -> run that instead of this file. Add ?local to the address to skip it.
-var TT_BUILD=1795315628656;
+var TT_BUILD=1795317439656;
 (function(){
   var REMOTE="https://raw.githubusercontent.com/blsxf/express-pawn-tools/main/tagtool/", KEY="tagtool.update";
   function db(){ return new Promise(function(res,rej){ var r=indexedDB.open("tagtool",1);
@@ -36,7 +36,7 @@ var TT_BUILD=1795315628656;
     fetch(REMOTE+"version.json?t="+Date.now(),{cache:"no-store"}).then(function(r){ return r.json(); }).then(function(j){
       if(!sane(+j.v) || !(+j.v>window.TT_RUNNING) || +j.v===saved()) return;
       return fetch(REMOTE+encodeURIComponent(j.file||"Tag Tool.html")+"?t="+Date.now(),{cache:"no-store"}).then(function(r){ return r.text(); }).then(function(t){
-        if(t.indexOf("var TT_BUILD="+j.v+";")<0) return;           // incomplete / mismatched download
+        if(t.indexOf("var TT_BUILD="+j.v+";")<0||!/<\/html>\s*$/.test(t)) return;   // mismatched / cut-off download
         return put("build",{v:+j.v,html:t}).then(function(){
           localStorage.setItem(KEY,String(j.v));
           var b=document.createElement("div");
@@ -1595,13 +1595,15 @@ function layaway(price,over){
   return {total, down, monthly};
 }
 const fmt$ = n => "$"+Math.round(n).toLocaleString("en-US");
+// the price itself: whole dollars, but a price with cents keeps them (the barcode label on the back shows the exact price)
+const fmtP = n => Math.round((+n||0)*100)%100?"$"+(+n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}):fmt$(+n||0);
 // a tag's layaway: the hand-set total counts only at the price it was set for (re-priced item -> back to the rule)
 function layOver(t){ const o=money(t.layTotal), p=money(t.layFor);
   return o>0&&(!isFinite(p)||Math.round(p*100)===Math.round((t.price||0)*100))?o:0; }
 const layOf = t => layaway(t.price||0,layOver(t));
-// soft check: a hand-set total above the rule's total is probably a typo (the shop only rounds down)
-function layNote(t){ const o=layOver(t), r=layaway(t.price||0).total;
-  return o>r?"Layaway total "+fmt$(o)+" is above the usual "+fmt$(r)+" — typo?":""; }
+// soft check: a hand-set total above the rule's total, or below the price itself, is probably a typo (the shop only rounds down)
+function layNote(t){ const o=layOver(t), r=layaway(t.price||0).total, p=t.price||0;
+  return o>r?"Layaway total "+fmt$(o)+" is above the usual "+fmt$(r)+" — typo?":o&&o<p?"Layaway total "+fmt$(o)+" is below the price "+fmtP(p)+" — typo?":""; }
 
 // ---- graphics adapters: same drawing code goes to screen and to PDF ----
 function canvasG(ctx){
@@ -1649,8 +1651,9 @@ function fitRow(g,str,cx,top,maxW,h,scale,wrap,col){
       const sz=Math.min(g.fitSize(a,maxW,h*.42),g.fitSize(b,maxW,h*.42)), bal=-Math.abs(a.length-b.length);
       const w=words[i]==="w/";                                  // a break before "w/" wins unless it costs >15% text size
       if(!best||(w&&!best[4]&&sz>=best[2]*.85)||(!(best[4]&&!w&&sz<best[2]/.85)&&(sz>best[2]+.01||(Math.abs(sz-best[2])<=.01&&bal>best[3])))) best=[a,b,sz,bal,w];}
-    g.fitText(best[0],cx,top+h*.29,maxW,best[2],col); g.fitText(best[1],cx,top+h*.72,maxW,best[2],col);
-  } else g.fitText(str,cx,top+h/2,maxW,h*scale,col);
+    if(best){ g.fitText(best[0],cx,top+h*.29,maxW,best[2],col); g.fitText(best[1],cx,top+h*.72,maxW,best[2],col); return; }   // none allowed ("w/ ..." with no comma): one line
+  }
+  g.fitText(str,cx,top+h/2,maxW,h*scale,col);
 }
 
 // Top rows from a type's CONFIG.rows. Blank rows give their space to a neighbor (the main row first).
@@ -1982,7 +1985,7 @@ function drawGunFront(g,x,y,t,s){
   let cy=y; const ys=groups.map(gr=>{ const r=[cy,gr.h*k]; cy+=gr.h*k; return r; });
   // big yellow price
   g.rect(x,yPrice,W,ph,C.yellow);
-  g.role("price"); g.fitText(fmt$(t.price||0),x+W/2,yPrice+ph/2,W-3*pad,ph*.82);
+  g.role("price"); g.fitText(fmtP(t.price||0),x+W/2,yPrice+ph/2,W-3*pad,ph*.82);
   // big navy "LAYAWAY ON BACK!" band pinned to the bottom (11-19-2026): makes customers ask to see
   // the item, and the back closes it. layout.front.payments > 0 adds a "$20 Down | $7/mo" row under it.
   const l=layOf(t);
@@ -2258,13 +2261,23 @@ function mergeData(a,b){
   return out;
 }
 const cache={ get(){ try{ return Object.assign(blankData(),JSON.parse(localStorage.getItem("tagtool.shared"))||{}); }catch(e){ return blankData(); } },
-              set(d){ try{ localStorage.setItem("tagtool.shared",JSON.stringify(d)); }catch(e){} } };
+              // browser storage full (big sample pictures/PDFs): keep a copy without the samples (only removals), which come back
+              // from the shared file. Left out, not emptied: an empty copy with the same time could win a merge and spread.
+              set(d){ try{ localStorage.setItem("tagtool.shared",JSON.stringify(d)); return true; }catch(e){
+                try{ localStorage.setItem("tagtool.shared",JSON.stringify({...d,samples:(d.samples||[]).filter(s=>!s.data),tickets:(d.tickets||[]).map(({pic,...x})=>x)})); }catch(e2){}
+                if(!cache.warned&&typeof toast==="function"){ cache.warned=true; toast("This computer's browser storage is full: sample pictures are kept only in the shared folder",true); }
+                return false; } } };
 SH.data=cache.get();
 
 async function readShared(){
   const fh=await SH.dir.getFileHandle(DATA_FILE,{create:true}), txt=await (await fh.getFile()).text();
   if(!txt.trim()) return blankData();
-  try{ return Object.assign(blankData(),JSON.parse(txt)); }catch(e){ throw new Error("the shared data file is damaged"); }
+  try{ return Object.assign(blankData(),JSON.parse(txt)); }
+  catch(e){   // damaged: keep a copy of it, then this computer's copy rebuilds the file (other computers merge theirs back in on their next sync)
+    const name="Tag Tool Data (damaged "+new Date().toISOString().slice(0,16).replace(/[T:]/g,"-")+").json";
+    const bh=await SH.dir.getFileHandle(name,{create:true}), w=await bh.createWritable(); await w.write(txt); await w.close();
+    if(typeof toast==="function") toast("The shared data file was damaged: saved a copy as \""+name+"\" and rebuilt it",true);
+    return blankData(); }
 }
 async function writeShared(d){
   const fh=await SH.dir.getFileHandle(DATA_FILE,{create:true}), w=await fh.createWritable();
@@ -2282,10 +2295,11 @@ async function syncShared(){
 }
 // make a change for every computer
 async function updateShared(fn){
-  if(SH.ok){ try{ SH.data=mergeData(await readShared(),SH.data); }catch(e){} }
+  let ok=SH.ok, lost=false;   // couldn't read the shared file: never write over it (the change stays here and goes out on the next sync)
+  if(ok){ try{ SH.data=mergeData(await readShared(),SH.data); }catch(e){ ok=false; lost=true; lostShared(e); } }
   fn(SH.data); cache.set(SH.data);
-  if(SH.ok){ try{ await writeShared(SH.data); }catch(e){ lostShared(e); } }
-  else toast("Saved on this computer only — click Connect to share",true);
+  if(ok){ try{ await writeShared(SH.data); }catch(e){ lostShared(e); } }
+  else if(!lost) toast("Saved on this computer only — click Connect to share",true);
   onSharedChange();
 }
 function onSharedChange(){
@@ -2327,7 +2341,7 @@ const FONT_READY=(async()=>{ try{ const bin=atob(AH_B64), u=new Uint8Array(bin.l
 
 // ---------- saved on this computer ----------
 const store={get(k){try{return JSON.parse(localStorage.getItem("tagtool."+k))}catch(e){return null}},
-             set(k,v){try{localStorage.setItem("tagtool."+k,JSON.stringify(v))}catch(e){}}};
+             set(k,v){try{localStorage.setItem("tagtool."+k,JSON.stringify(v));return true}catch(e){return false}}};
 
 // ---------- light / dark ----------
 const SUN='<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
@@ -2498,6 +2512,13 @@ function loadLines(lines,quiet){
   $("emptyMsg").textContent=""; view(); window.scrollTo({top:0}); if(!quiet) prawn("load",tags.map(t=>t.number||t.raw||""));
   kbResearch(tags);                                              // unknown models: ask Reverb in the background (once a day each)
   if(!quiet) toast(hasHistory()?needMsg():"✓ "+kinds().map(k=>[ofKind(tags,k.id).length,k.name]).filter(x=>x[0]).map(x=>x[0]+" "+x[1]).join(" · ")+" · First time: print what you need, or Mark all tagged");
+}
+// same report again after a store-wide fix (Help box, console): keeps tags added by hand, check marks and start spots
+function reloadTags(){
+  if(!lastLines) return;
+  const hand=tags.filter(t=>t.hand), inc=new Map(tags.filter(t=>t.number&&!t.hand).map(t=>[t.number,t.include])), sk={...skips}, on=onlyNeed;
+  loadLines(lastLines,true);
+  tags.forEach(t=>{ if(inc.has(t.number)) t.include=inc.get(t.number); }); tags.push(...hand); skips=sk; onlyNeed=on; view();
 }
 
 // ---------- which tags are needed: checked against what's been printed (shared, by item #) ----------
@@ -2764,7 +2785,7 @@ function kbBox(t,s){
 // still prints, gets a "!" on screen, and is named when you print.
 // skipped when nothing that changes the fit (size, text, price) changed since the last check
 const CHECKED=new WeakMap();
-function checkOne(t){ const s=settings(t.kind); t._check=kbCheck(t,s)||layNote(t); const key=JSON.stringify([s.W,s.H,s.extrasFront,s.design,s.bigTop,TYPE.fields.map(f=>t[f[0]]),t.price,layOver(t)]);
+function checkOne(t){ const s=settings(t.kind); t._check=kbCheck(t,s)||layNote(t); const key=JSON.stringify([s.W,s.H,s.extrasFront,s.design,s.bigTop,TYPE.fields.map(f=>t[f[0]]),(design(s).fields||[]).map(f=>t[f[0]]),t.price,layOver(t)]);   // + electronics boxes (Title, CPU...)
   if(CHECKED.get(t)===key) return; CHECKED.set(t,key);
   const r=fitTag(TYPE,t,s); t._warn=r.left.length?r.left:null; }
 function checkAll(){ tags.forEach(checkOne); }
@@ -2778,8 +2799,8 @@ function checkPrint(){
     ? "Small text on "+plural(rep.left.length,"tag")+": "+rep.left.slice(0,2).map(x=>name(x.t)).join(", ")+(rep.left.length>2?"…":"")+" · "+printTip()
     : "✓ Checked "+plural(rep.tags,"tag")+(rep.fixed.length?" · "+rep.fixed.length+" fixed to fit":"")+" · "+printTip();
   if(ask.length) rep.msg="Check "+plural(ask.length,"tag")+" (what it is): "+ask.slice(0,2).map(name).join(", ")+(ask.length>2?"…":"")+" · "+rep.msg;
-  const lay=tags.filter(t=>t.include&&layNote(t));                    // hand-set layaway total above the rule: likely a typo
-  if(lay.length) rep.msg="Check "+plural(lay.length,"tag")+" (layaway total above usual): "+lay.slice(0,2).map(name).join(", ")+(lay.length>2?"…":"")+" · "+rep.msg;
+  const lay=tags.filter(t=>t.include&&layNote(t));                    // hand-set layaway total above the rule or below the price: likely a typo
+  if(lay.length) rep.msg="Check "+plural(lay.length,"tag")+" (layaway total typo?): "+lay.slice(0,2).map(name).join(", ")+(lay.length>2?"…":"")+" · "+rep.msg;
   if(/Firefox\//.test(navigator.userAgent)) rep.msg="Use Edge or Chrome to print — Firefox won't turn on two-sided by itself.";
   return rep;
 }
@@ -2805,7 +2826,7 @@ function openLineup(){
   $("luPrint").onclick=()=>{ const n=nudge(); printHere(T=>drawTestSheet(T,n),"line-up-test.pdf","Cardstock · Two-sided on"); };
   if($("luReset")) $("luReset").onclick=()=>{ store.set("nudge",{x:0,y:0}); toast("Back to normal"); closeDrawer(); };
   $("luSave").onclick=()=>{
-    const m=savedNudge(); store.set("nudge",{x:m.x+read.x*NUDGE_STEP,y:m.y+read.y*NUDGE_STEP});
+    const m=savedNudge(); if(!store.set("nudge",{x:m.x+read.x*NUDGE_STEP,y:m.y+read.y*NUDGE_STEP})) return toast("Couldn't save on this computer (browser storage full or blocked)",true);
     toast(read.x||read.y?"✓ Saved. Print the test sheet again: both should read 0.":"✓ Lined up"); closeDrawer(); };
   $("luX").onclick=closeDrawer;
 }
@@ -2924,7 +2945,7 @@ function applyKB(t){
 // staff typed / accepted "what it is": every tag of that model, now and later, on every computer
 const pendingKB={};
 function kbSet(t,what){
-  if(!t.kbKey) return; what=String(what).trim(); pendingKB[t.kbKey]={what,over:t._rule||""};   // over: staff overruled the built-in answer delete kbWeb[t.kbKey]; saveKbWeb();
+  if(!t.kbKey) return; what=String(what).trim(); pendingKB[t.kbKey]={what,over:t._rule||""};   // over: staff overruled the built-in answer
   (typeof tags!=="undefined"?tags:[]).forEach(x=>{ if(x.kbKey===t.kbKey){ x.what=what; x._kb=true; x._kbOver=t._rule||""; } });
   clearTimeout(editTimer); editTimer=setTimeout(flushEdits,700);
 }
@@ -3027,12 +3048,13 @@ function itemList(){ const items=itemFixes(), out=[]; for(const n in items) for(
 async function runCmd(line){
   line=line.trim(); if(!line) return;
   if(CONFIG.managerPin&&!CON.unlocked){
-    if(line===String(CONFIG.managerPin)){ CON.unlocked=true; $("conIn").type="text"; cprint("Unlocked. Type \"help\".","ok"); }
+    if(line===String(CONFIG.managerPin)){ CON.unlocked=true; $("conIn").type="text"; cprint("Unlocked. Type \"help\".","ok");
+      if(String(CONFIG.managerPin)==="1234") cprint("The manager PIN is still the built-in 1234, which anyone can look up. Set your own: managerPin in Tag Tool Settings.js (Notepad).","bad"); }
     else cprint("Wrong PIN.","bad"); return;
   }
   cprint("> "+line,"me"); CON.hist.push(line); CON.hi=CON.hist.length;
   const a=args(line), cmd=(a[0]||"").toLowerCase();
-  const reload=()=>{ if(lastLines) loadLines(lastLines,true); };
+  const reload=reloadTags;
   if(cmd==="help"){
     [ 'fix <field> "find" -> "replace"           fix every matching tag',
       'fix <field> "find" -> "replace" if <field> "value"   only when, e.g. if brand "Glock"',
@@ -3088,7 +3110,7 @@ $("conIn").addEventListener("keydown",e=>{
 $("conFile").onchange=async()=>{
   const f=$("conFile").files[0]; $("conFile").value=""; if(!f) return;
   try{ const d=JSON.parse(await f.text()); (d.rules||[]).forEach(r=>{ r.id=r.id||newId(); r.t=r.t||Date.now(); }); await updateShared(cur=>{ const m=mergeData(cur,Object.assign(blankData(),d)); Object.assign(cur,m); });
-    cprint("Imported "+(d.rules||[]).length+" rules.","ok"); if(lastLines) loadLines(lastLines,true);
+    cprint("Imported "+(d.rules||[]).length+" rules.","ok"); reloadTags();
   }catch(e){ cprint("That file isn't a Tag Tool data file.","bad"); }
 };
 $("console").addEventListener("click",e=>{ if(e.target.id==="console") closeConsole(); else $("conIn").focus(); });
@@ -3163,10 +3185,11 @@ function helpMissing(c){
 }
 function helpOpenField(i,k){ openEditor(i); const el=document.querySelector('#drawer input[data-k="'+k+'"]'); if(el) setTimeout(()=>{ el.focus(); el.select(); el.scrollIntoView({block:"center"}); },80); }
 
-// item # from the words or the box: "C33016383", or the last 4+ digits of one in this report
+// item # from the words or the box: "C33016383", or the last digits of one in this report (5+, or 4 after "#" / "item")
 function helpItem(s,box){
   const raw=String(box||"").trim().toUpperCase()||((s.toUpperCase().match(/\b[A-Z]{1,3}\d{5,}\b/)||[])[0])||"";
-  const d=raw||((s.match(/\b\d{4,}\b/)||[])[0])||""; if(!d) return {num:"",i:-1};
+  // bare digits from the words: 5+, or 4 right after "#" / "item" ("1911", "2019" are models and years, not items)
+  const d=raw||((s.match(/\b\d{5,}\b/)||[])[0])||((s.match(/(?:#|\bitem\s*#?|\bnumber)\s*(\d{4})\b/i)||[])[1])||""; if(!d) return {num:"",i:-1};
   let i=tags.findIndex(t=>t.number&&t.number.toUpperCase()===d.toUpperCase());
   if(i<0&&/^\d+$/.test(d)){ const hit=tags.map((t,j)=>j).filter(j=>String(tags[j].number||"").endsWith(d)); if(hit.length===1) i=hit[0];
     else if(!hit.length){ const p=[...PENNY].filter(n=>n.endsWith(d)); if(p.length===1) return {num:p[0],i:-1}; } }   // $0.01 items aren't in tags
@@ -3229,7 +3252,7 @@ function helpOffer(c,m,n){
 async function helpApply(c,f,p){
   const all=$("hpAll")&&$("hpAll").checked;
   if(all&&($("hpPin").value||"")!==String(CONFIG.managerPin)) return toast("Wrong PIN — or uncheck \"Every item\"",true);   // PIN every time
-  if(all){ await updateShared(d=>p.rules.forEach(r=>d.rules.push({...r,id:newId(),t:Date.now()}))); if(lastLines) loadLines(lastLines,true); }
+  if(all){ await updateShared(d=>p.rules.forEach(r=>d.rules.push({...r,id:newId(),t:Date.now()}))); reloadTags(); }
   else p.apply();
   checkAll(); view(); if(!$("drawer").hidden&&$("hpOut")){
     helpShow(`<p>✓ Done${all?" for every item like this":c.t&&c.t.number?" — remembered for "+esc(c.t.number):""}. Did that fix it?</p>`,
