@@ -7,7 +7,7 @@
 <script>
 // ---- self-update: checks the public mirror when online, keeps the newest build on this computer ----
 // Newer build saved earlier -> run that instead of this file. Add ?local to the address to skip it.
-var TT_BUILD=1795321393774;
+var TT_BUILD=1795326871347;
 (function(){
   var REMOTE="https://raw.githubusercontent.com/blsxf/express-pawn-tools/main/tagtool/", KEY="tagtool.update";
   function db(){ return new Promise(function(res,rej){ var r=indexedDB.open("tagtool",1);
@@ -132,8 +132,13 @@ const CONFIG = {
   // Maker names the tool may shorten, only when the name won't fit big enough (e.g. next to a red NEW!)
   shortMakers: [["Yankee Hill Machine","YHM"],["Rugged Suppressors","Rugged"],["Smith & Wesson","S&W"],["Heckler & Koch","H&K"]],
 
-  // ---- Manager fixes console: Ctrl+Shift+F.  PIN ("" = no PIN) ---------
+  // ---- Help box "Every item" fixes ask for this PIN ("" = no PIN) ---------
+  // (The manager console has its own PIN per manager, set the first time they open it: see managers below.)
   managerPin: "1234",
+
+  // ---- Managers: profiles that start out as managers (lowercase names). Only managers can open the console (Ctrl+Shift+F).
+  // More managers: star <name> in the console. This list only seeds a new data file; un-starring in the console sticks.
+  managers: ["blsxf"],
 
   // ---- Tokens for the Alt+Enter panel (players.js) ---------------------------
   // 1 token = minutesPerToken minutes in the panel, counted only while it's in use
@@ -259,11 +264,12 @@ try{ document.documentElement.dataset.theme=JSON.parse(localStorage.getItem("tag
 :root{
   --navy:#0F2A5C;--yellow:#FFD400;--yellow2:#F2C500;--onyellow:#0F2A5C;
   --head:#0F2A5C;--headink:#FFFFFF;--headink2:rgba(255,255,255,.72);--headchip:rgba(255,255,255,.09);--headline:rgba(255,255,255,.2);
-  --good:#3ecf74;--bad:#ff6b6b;--warn:#f5b84a;--r:10px;
+  --good:#3ecf74;--bad:#ff6b6b;--warn:#f5b84a;--r:10px;--star:#D4B062;--acc2:#FFFFFF;
 }
 [data-theme=dark]{
-  --bg:#0B1628;--panel:#13223F;--panel2:#1A2C4F;--line:#24365C;--line2:#33497A;
-  --ink:#E8ECF3;--ink2:#A9B4C8;--ink3:#7686A3;--acc:var(--yellow);
+  /* deep navy (xf's sign-in mockup 11-21-2026): page, top bar, cards, borders, accent, text, secondary as given; panel2/line2/ink3 in between */
+  --bg:#0F1A2E;--head:#0B1424;--panel:#1A2A47;--panel2:#22355A;--line:#2A3F63;--line2:#3A5280;
+  --ink:#E8EEF7;--ink2:#9AACC8;--ink3:#7A8CAB;--acc:#8EA9D6;--acc2:#8EA9D6;
   --shadow:0 2px 10px rgba(0,0,0,.45);--shade:rgba(3,8,18,.62);--scroll:#2A3D63;--off:#3A4A6B;
 }
 [data-theme=light]{
@@ -283,6 +289,7 @@ svg{width:1em;height:1em;flex:none;stroke:currentColor;fill:none;stroke-width:2;
 
 /* top bar: navy with a yellow edge in both modes */
 header{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--head);color:var(--headink);border-bottom:3px solid var(--yellow);flex:none;position:sticky;top:0;z-index:15}
+[data-theme=dark] header{border-bottom:1px solid var(--line)}
 header h1{font-size:17px;font-weight:700;margin:0 8px 0 0;letter-spacing:.2px;white-space:nowrap}
 header h1 b{color:var(--yellow);font-weight:800;margin-right:6px}
 #tools{display:flex;align-items:center;gap:8px;flex:1;min-width:0;flex-wrap:wrap;row-gap:6px}   /* wraps instead of running under Help / player chips on smaller screens */
@@ -513,28 +520,59 @@ button.xp-row{cursor:pointer}button.xp-row:hover{border-color:#2f6aa5}.xp-row.on
 #toast{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);background:var(--navy);border:1px solid var(--yellow);color:#fff;padding:10px 16px;border-radius:8px;font-size:14px;font-weight:600;z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.35);transition:opacity .2s;max-width:90vw;text-align:center}
 #toast.bad{border-color:var(--bad);background:var(--panel);color:var(--bad)}
 
-/* sign-on + hub (players.js): arcade feel, big readable text, follows light/dark */
-.arcade{position:fixed;inset:0;z-index:50;background:var(--bg);overflow:auto;display:flex;justify-content:center;align-items:flex-start;padding:6vh 20px 40px}
-.arcade::before{content:"";position:fixed;inset:0 0 auto 0;height:8px;background:var(--yellow)}
-.ar-in{width:100%;max-width:980px;text-align:center}
-.ar-brand{font-size:15px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--ink3)}
-.arcade h2{font-size:clamp(34px,6vw,58px);font-weight:900;letter-spacing:6px;margin:6px 0 28px;color:var(--yellow);text-shadow:0 3px 0 var(--navy),0 0 24px rgba(255,212,0,.25)}
-[data-theme=light] .arcade h2{color:var(--navy);text-shadow:0 3px 0 var(--yellow)}
-.ar-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;text-align:left}
-.ar-grid.hub{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
-.ar-tile{position:relative;display:flex;flex-direction:column;gap:4px;min-height:96px;padding:16px 16px 14px 64px;border:3px solid var(--line2);border-radius:12px;background:var(--panel);color:var(--ink);text-align:left;font-size:22px;outline:none}
-.ar-tile b{font-size:24px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ar-tile small{font-size:15px;color:var(--ink2)}
-.ar-n{position:absolute;left:14px;top:16px;width:38px;height:38px;border-radius:8px;background:var(--navy);color:var(--yellow);font-weight:900;font-size:22px;display:flex;align-items:center;justify-content:center;border:2px solid var(--yellow)}
-.ar-tile.on,.ar-tile:hover{border-color:var(--yellow);box-shadow:0 0 0 3px rgba(255,212,0,.35)}
-.ar-tile.on .ar-n{background:var(--yellow);color:var(--navy)}
-.ar-tile.off{opacity:.5;cursor:default}
-.ar-tile.new input{font-size:20px;font-weight:700;background:transparent;border:0;border-bottom:2px solid var(--line2);outline:none;padding:6px 0;width:100%;color:var(--ink)}
-.ar-tile.new input:focus{border-color:var(--yellow)}
-.ar-msg{margin:20px 0 0;font-size:16px;color:var(--ink2);min-height:22px}
-.ar-msg .chip{margin-left:8px}
-.ar-keys{margin-top:14px;font-size:14px;color:var(--ink3);letter-spacing:.5px}
-#hubSwitch{margin-top:18px}
+/* sign-in screen + hub (players.js, xf's mockup 11-21-2026): follows light/dark */
+#signon{position:fixed;inset:0;z-index:25;background:var(--bg);color:var(--ink);display:flex;flex-direction:column}
+.si-top{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;padding:10px 16px;background:var(--head);color:var(--headink);border-bottom:1px solid var(--line);flex:none}
+.si-title{font-size:18px;font-weight:700;letter-spacing:.3px}
+.si-right{display:flex;align-items:center;justify-content:flex-end;gap:10px}
+.si-who{text-align:right;font-size:14px;line-height:1.35}
+.si-star{color:var(--star);margin-left:5px}
+.si-link{background:none;border:0;padding:0;color:var(--acc2);text-decoration:underline;text-underline-offset:3px;font-size:13px;cursor:pointer}
+.si-mw{position:relative}
+.si-more{width:36px;height:32px;border-radius:8px;border:1px solid var(--headline);background:var(--headchip);color:var(--headink);font-size:18px;line-height:1;padding:0 0 6px}
+.si-more:hover,.si-more:focus-visible{border-color:var(--acc2);outline:0}
+.si-menu{position:absolute;right:0;top:38px;z-index:3;min-width:150px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 14px 34px rgba(0,0,0,.35);padding:5px}
+.si-menu button{display:block;width:100%;text-align:left;background:none;border:0;border-radius:6px;padding:8px 10px;font-size:14px;color:var(--ink)}
+.si-menu button:hover{background:var(--panel2)}
+.si-body{flex:1;display:flex;min-height:0;position:relative}
+.si-left{width:250px;flex:none;display:flex;flex-direction:column;gap:8px;padding:16px 16px 120px;border-right:1px solid var(--line);overflow:auto;overflow-x:hidden;transition:width .2s ease,padding .2s ease,border-color .2s}
+.si-left.shut{width:0;padding-left:0;padding-right:0;border-right-color:transparent}
+.si-cards{display:flex;flex-direction:column;gap:8px;min-width:218px}
+.si-hide{align-self:flex-start;background:none;border:0;padding:0 8px 4px;color:var(--ink2);font-size:26px;line-height:1;white-space:nowrap}
+.si-hide:hover,.si-hide:focus-visible{color:var(--acc);outline:0}
+.si-pop{position:absolute;left:0;top:16px;z-index:2;padding:2px 12px 6px 9px;border:1px solid var(--line);border-left:0;border-radius:0 10px 10px 0;background:var(--panel);color:var(--ink2);font-size:26px;line-height:1}
+.si-pop:hover,.si-pop:focus-visible{color:var(--acc);border-color:var(--acc);outline:0}
+.si-card{position:relative;display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);text-align:left;font-size:15px}
+.si-card b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.si-card:hover,.si-card:focus-visible{border-color:var(--acc);outline:0}
+.si-card.on{border-color:var(--acc);box-shadow:inset 3px 0 0 var(--acc)}
+.si-ini{width:34px;height:34px;flex:none;border-radius:50%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
+.si-mgr{color:var(--star);font-size:18px;line-height:1}
+.si-add{background:transparent;border-style:dashed;color:var(--ink2)}
+.si-add .si-ini{background:transparent;border-style:dashed;color:var(--ink2);font-size:18px}
+.si-msg{position:absolute;right:16px;bottom:14px;max-width:340px;text-align:right;font-size:13px;color:var(--ink2)}
+.si-msg:empty{display:none}
+.si-msg .si-link{color:var(--acc)}
+.si-shred{position:absolute;left:12px;bottom:10px;z-index:2;display:flex;flex-direction:column;align-items:center;gap:6px;width:88px;padding:8px 4px;background:none;border:1px solid transparent;border-radius:10px;color:var(--ink);font-size:13px}
+.si-shred svg{width:64px;height:64px;padding:12px;border-radius:12px;background:var(--panel);border:1px solid var(--line);fill:none;stroke:var(--ink2);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.si-shred:hover,.si-shred:focus-visible{border-color:var(--line);background:var(--panel2);outline:0}
+.si-shred:hover svg{stroke:var(--acc)}
+.si-main{flex:1;overflow:auto;padding:6vh 32px 32px;display:flex;flex-direction:column;align-items:center}
+.si-main h2{font-size:26px;font-weight:700;margin:0 0 22px}
+.si-hub{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,300px));gap:14px;justify-content:center;width:100%}
+.si-tile{position:relative;display:flex;flex-direction:column;gap:4px;min-height:96px;padding:16px 16px 14px 62px;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--ink);text-align:left}
+.si-tile b{font-size:20px;font-weight:700}
+.si-tile small{font-size:14px;color:var(--ink2)}
+.si-n{position:absolute;left:16px;top:16px;width:32px;height:32px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--ink2);font-weight:700;display:flex;align-items:center;justify-content:center}
+.si-tile:not(.off):hover,.si-tile:not(.off):focus-visible{border-color:var(--acc);outline:0}
+.si-tile.off{opacity:.5;cursor:default}
+.si-dim{position:absolute;inset:0;z-index:5;background:rgba(4,9,18,.62);display:flex;align-items:center;justify-content:center}
+[data-theme=light] .si-dim{background:rgba(15,25,45,.4)}
+.si-box{position:relative;width:300px;max-width:calc(100vw - 32px);background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:34px 24px 16px;box-shadow:0 20px 50px rgba(0,0,0,.45)}
+.si-x{position:absolute;top:8px;right:8px;width:30px;height:30px;border:0;border-radius:8px;background:none;color:var(--acc);font-size:16px;padding:0}
+.si-x:hover,.si-x:focus-visible{background:var(--panel2);outline:0}
+#soName{display:block;width:100%;background:transparent;border:0;border-bottom:2px solid var(--acc);outline:0;padding:6px 2px;font-size:20px;color:var(--ink);caret-color:var(--acc)}
+.si-err{min-height:20px;margin-top:6px;font-size:13px;color:var(--bad)}
 .ar-lock{color:#fff;text-align:center;max-width:520px;font-size:18px;padding:20px}
 .ar-lock h2{font-size:44px;letter-spacing:6px;color:#FFD400;margin:0 0 16px}
 .ar-clock{position:fixed;top:12px;left:14px;z-index:100;font:700 16px/1 "Segoe UI",system-ui,sans-serif;color:#FFD400;background:rgba(15,42,92,.85);border:1px solid #FFD400;border-radius:8px;padding:7px 10px;pointer-events:none}
@@ -2306,7 +2344,9 @@ const SH = { dir:null, ok:false, data:null };
 // profiles: staff sign-on names {id: lowercased name, name, t, created, used, hide: tag type ids hidden from their list} (players.js; a label, not security)
 // tokens: token log {id,p: profile id,kind,at,t,status: pending/approved/rejected/spent,n,text,ref,note} (players.js;
 //         the balance is never stored, it's worked out from this log, so two computers saving at once can't pay twice)
-const blankData = () => ({ v:1, rules:[], items:{}, tagTypes:[], samples:[], kb:{}, printed:{}, tickets:[], helpPhrases:[], profiles:[], tokens:[] });
+// mgr: managers {profile id: {star, pin: salted hash of the 4-digit console PIN, t}} (players.js). Kept apart from profiles so a
+//      sign-in (which re-saves the profile) on a computer with an old copy can't undo a star or a PIN.
+const blankData = () => ({ v:1, rules:[], items:{}, tagTypes:[], samples:[], kb:{}, printed:{}, tickets:[], helpPhrases:[], profiles:[], tokens:[], mgr:{} });
 
 // small key-value store in the browser to remember the folder
 function idb(){ return new Promise((res,rej)=>{ const r=indexedDB.open("tagtool",1);
@@ -2326,6 +2366,7 @@ function mergeData(a,b){
     if(!cur||(v.t||0)>(cur.t||0)){ out.items[n]=out.items[n]||{}; out.items[n][k]=v; } }
   for(const src of [a.kb||{},b.kb||{}]) for(const k in src){ const cur=out.kb[k], v=src[k]; if(!cur||(v.t||0)>(cur.t||0)) out.kb[k]=v; }
   for(const src of [a.printed||{},b.printed||{}]) for(const k in src){ const cur=out.printed[k], v=src[k]; if(!cur||(v.t||0)>(cur.t||0)) out.printed[k]=v; }
+  for(const src of [a.mgr||{},b.mgr||{}]) for(const k in src){ const cur=out.mgr[k], v=src[k]; if(v&&(!cur||(v.t||0)>(cur.t||0))) out.mgr[k]=v; }
   for(const src of [a,b]) for(const k in src) if(!(k in out)) out[k]=src[k];   // a part a newer build added: keep it, never drop it
   return out;
 }
@@ -3105,10 +3146,15 @@ function flushEdits(){
 // ---------- manager console (Ctrl+Shift+F) ----------
 const CON={open:false,hist:[],hi:0,unlocked:false};
 function cprint(txt,cls){ const d=document.createElement("div"); d.className="cl "+(cls||""); d.textContent=txt; $("conOut").appendChild(d); $("conOut").scrollTop=1e9; }
+// Managers only (players.js): a signed-in manager, unlocked with their own PIN (set the first time). Without players.js: CONFIG.managerPin.
+const conPL=()=>typeof PL!=="undefined"&&PL?PL:null;
 function openConsole(){
+  const pl=conPL();
+  if(pl&&!pl.isMgr()) return toast(pl.me()?"The console is for managers":"Sign in first (the console is for managers)",true);
   $("console").hidden=false; CON.open=true; $("conIn").value=""; $("conIn").focus();
   if(!$("conOut").childElementCount){
-    if(CONFIG.managerPin&&!CON.unlocked){ cprint("Manager PIN:","dim"); $("conIn").type="password"; }
+    if(pl&&!CON.unlocked) pl.pinPrompt();
+    else if(!pl&&CONFIG.managerPin&&!CON.unlocked){ cprint("Manager PIN:","dim"); $("conIn").type="password"; }
     else cprint('Tag Tool fixes console. Type "help".',"dim");
   }
 }
@@ -3124,7 +3170,13 @@ const ruleText=r=>`${r.field} "${r.find}" -> "${r.replace}"`+(r.ifField?`  if ${
 function itemList(){ const items=itemFixes(), out=[]; for(const n in items) for(const k in items[n]) out.push({n,k,...items[n][k]}); return out; }
 async function runCmd(line){
   line=line.trim(); if(!line) return;
-  if(CONFIG.managerPin&&!CON.unlocked){
+  const pl=conPL();
+  if(pl&&!CON.unlocked){
+    if(!pl.isMgr()){ closeConsole(); return; }
+    if(await pl.pinLine(line)){ CON.unlocked=pl.me().id; $("conIn").type="text"; cprint('Unlocked. Type "help".',"ok"); }
+    return;
+  }
+  if(!pl&&CONFIG.managerPin&&!CON.unlocked){
     if(line===String(CONFIG.managerPin)){ CON.unlocked=true; $("conIn").type="text"; cprint("Unlocked. Type \"help\".","ok");
       if(String(CONFIG.managerPin)==="1234") cprint("The manager PIN is still the built-in 1234, which anyone can look up. Set your own: managerPin in Tag Tool Settings.js (Notepad).","bad"); }
     else cprint("Wrong PIN.","bad"); return;
@@ -6833,7 +6885,36 @@ const PLX=(()=>{
       out.push({from:a,by}); }
     return out;
   }
-  return {MAXN,clean,pid,account,earnIn,unearnIn,decideIn,playIn,useIn,weeklyIn,weeks};
+  // ---------- profiles, managers, console PIN ----------
+  const MAXP=6;                                                    // the sign-in screen holds 6; more only if they already existed (never dropped)
+  const live=d=>(d.profiles||[]).filter(p=>p&&p.id&&!p.deleted);
+  const isMgr=(d,id)=>!!id&&live(d).some(p=>p.id===id)&&!!((d.mgr||{})[id]||{}).star;
+  const managers=d=>live(d).filter(p=>isMgr(d,p.id)).map(p=>p.id);
+  // 4-digit PIN -> salted hash (FNV-1a, 2 lanes x 2000 rounds). Works from file:// (no crypto.subtle). A deterrent, not real security.
+  function hashPin(id,pin){
+    const s="tagtool|"+id+"|"+String(pin); let a=0x811c9dc5, b=0x01000193^s.length;
+    for(let r=0;r<2000;r++) for(let i=0;i<s.length;i++){ const c=s.charCodeAt(i)+r; a=Math.imul(a^c,16777619)>>>0; b=Math.imul(b^(c*31+a),2246822519)>>>0; }
+    return "h1:"+a.toString(16).padStart(8,"0")+b.toString(16).padStart(8,"0"); }
+  const pinOk=(d,id,pin)=>{ const m=(d.mgr||{})[id]; return !!(m&&m.pin)&&m.pin===hashPin(id,pin); };
+  function setMgrIn(d,id,patch,now){ d.mgr=d.mgr||{}; d.mgr[id]={...(d.mgr[id]||{}),...patch,t:now||Date.now()}; return d.mgr[id]; }
+  // seed managers (CONFIG.managers) into a data file that has never heard of them. t:1 = any real record wins a merge,
+  // so a removed or un-starred seed stays that way.
+  function seedIn(d,ids){
+    d.profiles=d.profiles||[]; d.mgr=d.mgr||{};
+    (ids||[]).map(pid).filter(Boolean).forEach(id=>{
+      if(!d.profiles.some(p=>p&&p.id===id)) d.profiles.push({id,name:id,created:1,t:1,hide:null});
+      if(!d.mgr[id]) d.mgr[id]={star:true,t:1}; }); }
+  // console: star / unstar / remove. Returns an error message, or "" when done. The last manager can't be unstarred or removed.
+  function mgrEdit(d,op,id,now){
+    now=now||Date.now(); const p=live(d).find(x=>x.id===id); if(!p) return "No profile \""+id+"\"";
+    const last=isMgr(d,id)&&managers(d).length<=1;
+    if(op==="star"){ setMgrIn(d,id,{star:true},now); return ""; }
+    if(op==="unstar"){ if(last) return "Can't unstar the last manager: star someone else first"; setMgrIn(d,id,{star:false},now); return ""; }
+    if(op==="remove"){ if(last) return "Can't remove the last manager: star someone else first";
+      Object.assign(p,{deleted:true,t:now}); if((d.mgr||{})[id]) setMgrIn(d,id,{star:false,pin:null},now); return ""; }
+    if(op==="resetpin"){ if(!isMgr(d,id)) return p.name+" isn't a manager"; setMgrIn(d,id,{pin:null},now); return ""; }
+    return "?"; }
+  return {MAXN,MAXP,clean,pid,account,earnIn,unearnIn,decideIn,playIn,useIn,weeklyIn,weeks,live,isMgr,managers,hashPin,pinOk,setMgrIn,seedIn,mgrEdit};
 })();
 if(typeof module!=="undefined") module.exports=PLX;
 
@@ -6851,50 +6932,77 @@ if(typeof document!=="undefined") PL=(()=>{
   const KIND={suggestion:"suggestion",ticket:"Help ticket",fix:"name fix",sample:"sample tag",play:"PRAWN play",weekly:"free weekly token"};
   const free=()=>Math.max(0,+((CONFIG.tokens||{}).freePerWeek??1)||0);
 
-  // ---------- markup ----------
+  // ---------- markup: the sign-in screen (xf's mockup 11-21-2026) ----------
+  // Profiles left (max PLX.MAXP), Complaints shredder bottom left (opens Help), the hub tiles in the middle.
+  // On start (and on Log out / + Add profile) the page dims and the name box shows; nothing behind it can be clicked.
+  const SHRED=`<svg viewBox="0 0 40 40" aria-hidden="true"><rect x="5" y="12" width="30" height="13" rx="2.5"/><rect x="10" y="4" width="20" height="9" rx="1"/><line x1="9" y1="18.5" x2="31" y2="18.5"/>`
+    +[11,15,19,23,27].map((x,i)=>`<path d="M${x} 25v${i%2?9:12}"/>`).join("")+`</svg>`;
   document.body.insertAdjacentHTML("beforeend",`
-  <div id="signon" class="arcade" hidden><div class="ar-in">
-    <div class="ar-brand">${esc(CONFIG.shop||"")} Tag Tool</div><h2>SELECT PLAYER</h2>
-    <div class="ar-grid" id="soGrid"></div>
-    <div class="ar-msg" id="soMsg"></div>
-    <div class="ar-keys">1–9 pick · arrows move · Enter selects · or just type a new name</div></div></div>
-  <div id="hub" class="arcade" hidden><div class="ar-in">
-    <div class="ar-brand">${esc(CONFIG.shop||"")} Tag Tool</div><h2 id="hubHi"></h2>
-    <div class="ar-grid hub">
-      <button class="ar-tile" data-h="tool"><span class="ar-n">1</span><b>Manual Tag Tool</b><small>Open the Bravo report and print tags</small></button>
-      <button class="ar-tile off" data-h="soon" aria-disabled="true"><span class="ar-n">2</span><b>Taginator</b><small>Coming soon</small></button>
-    </div>
-    <div class="ar-keys">1–2 pick · arrows move · Enter selects · S switch player</div>
-    <button class="chip" id="hubSwitch">Switch player</button></div></div>`);
-  $("theme").insertAdjacentHTML("beforebegin",`<button class="chip" id="whoBtn" title="Back to the start screen" hidden></button><button class="chip" id="switchBtn" title="Sign in as someone else" hidden>Switch player</button>`);
+  <div id="signon" hidden>
+    <div class="si-top"><span></span><div class="si-title">Tag Tool</div>
+      <div class="si-right"><div class="si-who" id="siWho" hidden><div>Current user: <b id="siName"></b><span class="si-star" id="siStar" title="Manager">★</span></div>
+        <button class="si-link" id="siOut">Not you? Log out</button></div>
+        <div class="si-mw"><button class="si-more" id="siMore" title="More" aria-label="More">···</button>
+          <div class="si-menu" id="siMenu" hidden><button id="siCon">Console</button><button id="siTheme">Theme</button></div></div></div></div>
+    <div class="si-body">
+      <aside class="si-left" id="siLeft"><div class="si-cards" id="siCards"></div>
+        <button class="si-hide" id="siHide" title="Hide the profile list" aria-label="Hide the profile list">‹</button></aside>
+      <button class="si-pop" id="siPop" title="Show the profile list" aria-label="Show the profile list" hidden>›</button>
+      <button class="si-shred" id="siShred" title="Something wrong? Tell the Help box">${SHRED}<span>Complaints</span></button>
+      <section class="si-main"><h2 id="hubHi"></h2>
+        <div class="si-hub">
+          <button class="si-tile" data-h="tool"><span class="si-n">1</span><b>Manual Tag Tool</b><small>Open the Bravo report and print tags</small></button>
+          <button class="si-tile off" data-h="soon" aria-disabled="true"><span class="si-n">2</span><b>Taginator</b><small>Coming soon</small></button>
+        </div><div class="si-msg" id="soMsg"></div></section></div>
+    <div class="si-dim" id="siDim" hidden><div class="si-box" role="dialog" aria-label="Your name">
+      <button class="si-x" id="siX" aria-label="Close">✕</button>
+      <input id="soName" maxlength="${PLX.MAXN}" autocomplete="off" spellcheck="false" aria-label="Your name"><div class="si-err" id="siErr"></div></div></div>
+  </div>`);
+  $("theme").insertAdjacentHTML("beforebegin",`<button class="chip" id="whoBtn" title="Back to the start screen" hidden></button>`);
 
-  // ---------- sign-on ----------
-  const SO={i:0,list:[]};
-  function showSignOn(){
-    try{ $("hub").hidden=true; $("signon").hidden=false; if(typeof closeDrawer==="function") closeDrawer();
-      SO.list=profiles(); const last=store.get("player"); SO.i=Math.max(0,SO.list.findIndex(p=>p.id===last));
-      renderSignOn(); }
-    catch(e){ $("signon").hidden=true; toast("Couldn't show the player list — the tool works as usual",true); } }   // never trap anyone behind it
-  function renderSignOn(){
-    const keep=$("soName")&&$("soName").value, typing=document.activeElement===$("soName");
-    $("soGrid").innerHTML=SO.list.map((p,i)=>`<button class="ar-tile" data-i="${i}"><span class="ar-n">${i<9?i+1:"·"}</span><b>${esc(p.name)}</b></button>`).join("")
-      +`<div class="ar-tile new" data-i="${SO.list.length}"><span class="ar-n">+</span><input id="soName" maxlength="${PLX.MAXN}" placeholder="New player: type your name" autocomplete="off" spellcheck="false"></div>`;
-    $("soGrid").querySelectorAll("button.ar-tile").forEach(b=>b.onclick=()=>signIn(SO.list[+b.dataset.i].name));
-    const inp=$("soName"); inp.value=keep||""; inp.onfocus=()=>soSel(SO.list.length,true);
-    soSel(typing?SO.list.length:SO.i,typing); soMsg(); }
-  function soSel(i,noFocus){
-    const tiles=[...$("soGrid").children]; SO.i=(i+tiles.length)%tiles.length;
-    tiles.forEach((t,j)=>t.classList.toggle("on",j===SO.i)); const t=tiles[SO.i];
-    if(!noFocus){ if(t.classList.contains("new")) $("soName").focus(); else { if(document.activeElement===$("soName")) $("soName").blur(); t.scrollIntoView({block:"nearest"}); } } }
+  // ---------- sign-in screen ----------
+  const live=()=>PLX.live(SH.data), isMgr=id=>PLX.isMgr(SH.data,id||ME.id);
+  const initials=n=>{ const w=String(n).split(" ").filter(Boolean); return (w.length>1?w[0][0]+w[1][0]:(w[0]||"?")[0]).toUpperCase(); };
+  const boxOpen=()=>!$("signon").hidden&&!$("siDim").hidden;
+  const CARDS={open:false};                                          // profile list opened while signed in
+  function seed(){ const ids=(CONFIG.managers||[]).map(PLX.pid).filter(Boolean);
+    if(ids.every(id=>(SH.data.profiles||[]).some(p=>p&&p.id===id)&&(SH.data.mgr||{})[id])) return;
+    PLX.seedIn(SH.data,ids); updateShared(d=>PLX.seedIn(d,ids),true); }
+  function showSignOn(box){
+    try{ if(typeof closeDrawer==="function") closeDrawer(); $("signon").hidden=false; render();
+      if(box!==false) openBox(); else closeBox(); }
+    catch(e){ $("signon").hidden=true; toast("Couldn't show the sign-in screen — the tool works as usual",true); } }   // never trap anyone behind it
+  function openBox(){ $("siDim").hidden=false; $("soName").value=""; $("siErr").textContent=""; $("siMenu").hidden=true; setTimeout(()=>$("soName").focus(),0); }
+  function closeBox(){ $("siDim").hidden=true; }
+  function render(){
+    const p=me(), l=profiles();
+    $("siWho").hidden=!p; if(p){ $("siName").textContent=p.name; $("siStar").hidden=!isMgr(); }
+    $("siCon").hidden=!isMgr();
+    $("hubHi").textContent=p?"Hi, "+p.name:"Sign in to start";
+    // signed in: the whole profile column slides away to the left (› brings it back, ‹ hides it); nobody signed in: it stays out
+    const shut=!!p&&!CARDS.open;
+    $("siLeft").classList.toggle("shut",shut); $("siPop").hidden=!shut; $("siHide").hidden=!p;
+    $("siCards").innerHTML=l.map(x=>`<button class="si-card${x.id===ME.id?" on":""}" data-id="${esc(x.id)}"><span class="si-ini">${esc(initials(x.name))}</span><b>${esc(x.name)}</b>${isMgr(x.id)?`<span class="si-mgr" title="Manager">☆</span>`:""}</button>`).join("")
+      +(l.length<PLX.MAXP?`<button class="si-card si-add" id="siAdd"><span class="si-ini">+</span><b>Add profile</b></button>`:"");
+    $("siCards").querySelectorAll("[data-id]").forEach(b=>b.onclick=()=>{
+      if(b.dataset.id===ME.id){ CARDS.open=false; return render(); }               // already you: just tuck the list away
+      const x=l.find(y=>y.id===b.dataset.id); if(x) signIn(x.name); });
+    if($("siAdd")) $("siAdd").onclick=openBox;
+    soMsg(); }
   function soMsg(){
     const m=$("soMsg"); if(!m) return; const can=!!window.showDirectoryPicker;
     m.innerHTML=SH.ok?"":!can?"This browser can't reach the shared folder: names are kept on this computer only."
-      :`Shared folder not connected: names you add are kept on this computer and shared once it connects. <button class="chip" id="soConnect">Connect</button>`;
+      :`Shared folder not connected: names you add are kept on this computer and shared once it connects. <button class="si-link" id="soConnect">Connect</button>`;
     if($("soConnect")) $("soConnect").onclick=e=>{ e.stopPropagation(); connectShared(); }; }
-  // arrows in a grid: up/down jump a whole row
-  const cols=g=>{ const c=[...g.children], y=c[0]&&c[0].offsetTop; return Math.max(1,c.filter(x=>x.offsetTop===y).length); };
+  // the name box: Enter = that profile (made if new), empty = "Type a name", full = pick one on the left
+  function submit(){
+    const n=PLX.clean($("soName").value), id=n.toLowerCase(), err=t=>{ $("siErr").textContent=t; $("soName").focus(); };
+    if(!n) return err("Type a name");
+    if(!live().some(p=>p.id===id)&&live().length>=PLX.MAXP) return err("6 profiles max: pick yours on the left (X), or a manager removes one");
+    signIn(n); }
   function signIn(name){
-    const n=PLX.clean(name), id=n.toLowerCase(); if(!n){ $("soName").focus(); return; }
+    const n=PLX.clean(name), id=n.toLowerCase(); if(!n) return openBox();
+    if(ME.id!==id) lockConsole();
     const old=(SH.data.profiles||[]).find(p=>p.id===id&&!p.deleted);
     ME.id=id; ME.name=old?old.name:n; store.set("player",id);
     // panel saves on this computer: the first profile here keeps the old ones (migration), the rest get their own
@@ -6903,66 +7011,57 @@ if(typeof document!=="undefined") PL=(()=>{
     try{ if(typeof TIDE!=="undefined"&&TIDE.useKey) TIDE.useKey(key("tagtool.tide")); }catch(e){}
     try{ if(typeof PRAWN!=="undefined"&&PRAWN.useKey) PRAWN.useKey(key("tagtool.prawn")); }catch(e){}
     view_.show=false;
-    updateShared(d=>{ d.profiles=d.profiles||[]; let p=d.profiles.find(x=>x.id===id);
+    const add=d=>{ d.profiles=d.profiles||[]; let p=d.profiles.find(x=>x.id===id);
       if(!p||p.deleted){ d.profiles=d.profiles.filter(x=>x.id!==id); p={id,name:n,created:Date.now(),hide:null}; d.profiles.push(p); }
-      p.used=p.t=Date.now(); PLX.weeklyIn(d,id,free()); },true);
-    $("signon").hidden=true; showHub(); refresh(); if(typeof tags!=="undefined"&&tags.length) view(); }
+      p.used=p.t=Date.now(); };
+    add(SH.data);                                                    // on screen at once; the save follows
+    updateShared(d=>{ add(d); PLX.weeklyIn(d,id,free()); },true);
+    CARDS.open=false; closeBox(); refresh(); if(typeof tags!=="undefined"&&tags.length) view(); }
+  function logOut(){ lockConsole(); ME.id=null; ME.name=null; view_.show=false; refresh(); if(typeof tags!=="undefined"&&tags.length) view(); openBox(); }
+  // the console unlocks for one manager at a time: a different profile (or nobody) locks it again
+  function lockConsole(){ if(typeof CON==="undefined") return; CON.unlocked=false; CON.pin=null; $("conOut").innerHTML=""; $("conIn").type="text"; if(CON.open) closeConsole(); }
+  function hubGo(h){
+    if(h==="tool"){ if(!ME.id) return openBox(); $("signon").hidden=true; return; }
+    if(h==="soon") return toast("Taginator is coming soon"); }
+  $("signon").querySelectorAll(".si-tile").forEach(t=>t.onclick=()=>hubGo(t.dataset.h));
+  $("siX").onclick=closeBox; $("siOut").onclick=logOut;
+  $("siDim").addEventListener("mousedown",e=>{ if(e.target===$("siDim")){ e.preventDefault(); $("soName").focus(); } });   // clicks outside the box do nothing
+  $("siShred").onclick=()=>openHelp(-1);
+  $("siPop").onclick=()=>{ CARDS.open=true; render(); }; $("siHide").onclick=()=>{ CARDS.open=false; render(); };
+  $("siMore").onclick=e=>{ e.stopPropagation(); $("siMenu").hidden=!$("siMenu").hidden; };
+  $("siCon").onclick=()=>{ $("siMenu").hidden=true; openConsole(); };
+  $("siTheme").onclick=()=>{ $("siMenu").hidden=true; $("theme").click(); };
+  document.addEventListener("click",()=>{ $("siMenu").hidden=true; });
 
-  // ---------- hub ----------
-  const HUB={i:0};
-  const hubTiles=()=>[...$("hub").querySelectorAll(".ar-tile")];
-  function showHub(){ $("signon").hidden=true; $("hub").hidden=false; HUB.i=0; renderHub(); }
-  function renderHub(){
-    const p=me(); if(!p) return;
-    $("hubHi").textContent="READY, "+p.name.toUpperCase();
-    hubTiles().forEach((t,j)=>t.classList.toggle("on",j===HUB.i)); }
+  // ---------- keys: while the screen is up, nothing behind it reacts (Ctrl+P, Alt+Enter, Esc...) ----------
+  window.addEventListener("keydown",e=>{
+    if($("signon").hidden) return;
+    if(typeof CON!=="undefined"&&CON.open) return;                                  // manager console on top
+    if(!$("drawer").hidden&&!boxOpen()) return;                                     // Help box (Complaints) on top
+    if(e.ctrlKey&&e.shiftKey&&e.key.toLowerCase()==="f") return;                    // console shortcut (managers only: openConsole checks)
+    e.stopPropagation();
+    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="p"){ e.preventDefault(); return; }
+    if(e.ctrlKey||e.metaKey||e.altKey){ if(e.altKey&&e.key==="Enter") e.preventDefault(); return; }
+    if(boxOpen()){
+      if(e.key==="Enter"){ e.preventDefault(); submit(); }
+      else if(e.key==="Escape"){ e.preventDefault(); closeBox(); }
+      else if(e.key==="Tab"){ e.preventDefault(); $("soName").focus(); }        // focus stays in the box
+      else if(document.activeElement!==$("soName")) $("soName").focus();
+      return; }
+    if(/^[12]$/.test(e.key)&&!/INPUT|TEXTAREA/.test(document.activeElement.tagName)){ e.preventDefault(); hubGo(e.key==="1"?"tool":"soon"); }
+  },true);
+
+  // the latest manager decision, shown under the Alt+Enter menu entry
   const noteLine=a=>{ const l=a.last; if(!l) return "";
     return (l.status==="approved"?"✓ Approved: your "+(KIND[l.kind]||l.kind)+" +"+tok(l.n):"✗ Not approved: your "+(KIND[l.kind]||l.kind))+(l.note?" — \""+l.note+"\"":""); };
-  function hubGo(h){
-    if(h==="tool"){ $("hub").hidden=true; return; }
-    if(h==="soon") return toast("Taginator is coming soon"); }
-  hubTiles().forEach((t,j)=>t.onclick=()=>{ HUB.i=j; hubGo(t.dataset.h); });
-  $("hubSwitch").onclick=showSignOn;
-
-  // ---------- keys: the sign-on and hub own the keyboard while they're up (kiosk window, no mouse needed) ----------
-  window.addEventListener("keydown",e=>{
-    const so=!$("signon").hidden, hub=!$("hub").hidden; if(!so&&!hub) return;
-    if(typeof CON!=="undefined"&&CON.open) return;                                  // manager console on top
-    if(e.ctrlKey&&e.shiftKey&&e.key.toLowerCase()==="f") return;                    // ... and its shortcut
-    e.stopPropagation();                                                            // not Ctrl+P, Alt+Enter, Esc... behind
-    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="p"){ e.preventDefault(); return; }
-    if(e.ctrlKey||e.metaKey||e.altKey) return;
-    if(so){ const inp=$("soName"), n=SO.list.length;
-      if(document.activeElement===inp){
-        if(e.key==="Enter"){ e.preventDefault(); signIn(inp.value); }
-        else if(e.key==="Escape"||e.key==="Tab"||(e.key==="ArrowUp"||e.key==="ArrowLeft")&&!inp.value){ e.preventDefault(); if(e.key==="Escape") inp.value=""; soSel(n?Math.min(SO.i,n-1):0); if(!n) inp.focus(); }
-        return; }
-      const c=cols($("soGrid"));
-      if(/^[1-9]$/.test(e.key)){ e.preventDefault(); if(+e.key<=n) signIn(SO.list[+e.key-1].name); }
-      else if(e.key==="ArrowRight"||e.key==="Tab"&&!e.shiftKey){ e.preventDefault(); soSel(SO.i+1); }
-      else if(e.key==="ArrowLeft"||e.key==="Tab"){ e.preventDefault(); soSel(SO.i-1); }
-      else if(e.key==="ArrowDown"){ e.preventDefault(); soSel(Math.min(n,SO.i+c)); }
-      else if(e.key==="ArrowUp"){ e.preventDefault(); soSel(Math.max(0,SO.i-c)); }
-      else if(e.key==="Enter"){ e.preventDefault(); if(SO.i<n) signIn(SO.list[SO.i].name); else inp.focus(); }
-      else if(e.key.length===1&&/\S/.test(e.key)){ soSel(n,true); inp.focus(); }  // just start typing a new name
-      return; }
-    const t=hubTiles(), k=e.key.toLowerCase();
-    if(/^[1-2]$/.test(k)){ e.preventDefault(); HUB.i=+k-1; renderHub(); hubGo(t[HUB.i].dataset.h); }
-    else if(k==="arrowright"||k==="arrowdown"||k==="tab"&&!e.shiftKey){ e.preventDefault(); HUB.i=(HUB.i+1)%t.length; renderHub(); }
-    else if(k==="arrowleft"||k==="arrowup"||k==="tab"){ e.preventDefault(); HUB.i=(HUB.i+t.length-1)%t.length; renderHub(); }
-    else if(k==="enter"||k===" "){ e.preventDefault(); hubGo(t[HUB.i].dataset.h); }
-    else if(k==="s"){ e.preventDefault(); showSignOn(); }
-    else if(k==="escape"){ e.preventDefault(); hubGo("tool"); }
-  },true);
 
   // ---------- top bar ----------
   function refresh(){
     const p=me(), w=$("whoBtn");
-    if(w){ w.hidden=$("switchBtn").hidden=!p; if(p) w.textContent="★ "+p.name; }
-    if(!$("hub").hidden) renderHub();
-    if(!$("signon").hidden){ const ids=SO.list.map(p=>p.id).join(), now=profiles(); if(now.map(p=>p.id).join()!==ids&&document.activeElement!==$("soName")){ const cur=SO.list[SO.i]; SO.list=now; SO.i=Math.max(0,cur?now.findIndex(p=>p.id===cur.id):0); renderSignOn(); } else soMsg(); }
+    if(w){ w.hidden=!p; if(p) w.textContent=p.name+(isMgr()?" ★":""); }
+    if(!$("signon").hidden) render();
     if($("viewMenu")&&!$("viewMenu").hidden) renderView(); }
-  $("whoBtn").onclick=showHub; $("switchBtn").onclick=showSignOn;
+  $("whoBtn").onclick=()=>showSignOn(false);
 
   // ---------- per-profile list filter (view only: never what's printed-tracked, checked by default or fixed) ----------
   const view_={show:false};                                         // "show them": hidden items shown until the next sign-in
@@ -7001,7 +7100,7 @@ if(typeof document!=="undefined") PL=(()=>{
   const IDLE=60e3; let lastKey=0;
   ["keydown","pointerdown","pointermove","wheel"].forEach(ev=>window.addEventListener(ev,()=>{ lastKey=Date.now(); },{capture:true,passive:true}));
   async function startPlay(){
-    if(!ME.id) return {why:"Sign in first: Switch player at the top."};
+    if(!ME.id) return {why:"Sign in first: click your name at the top."};
     let x=null; await updateShared(d=>{ x=PLX.playIn(d,ME.id,secPer()); if(x) x={...x}; },true);
     if(x) return {x};
     const a=acct(); return {why:"PRAWN needs a token: 1 token = "+mins(secPer())+" of play. You have "+tok(a.bal)+(a.pending?" ("+a.pending+" waiting for the manager's OK)":"")+"."};
@@ -7057,8 +7156,37 @@ if(typeof document!=="undefined") PL=(()=>{
   const CMDS=['pending                                   things staff sent, waiting for your OK (tokens)',
     'approve <#> [note] / reject <#> [note]    pay tokens.reward for it / pay 0 (the note shows to them)',
     'players                                   balance and waiting count per player',
-    'week [n]                                  approved items per player per week (last n weeks)'];
+    'week [n]                                  approved items per player per week (last n weeks)',
+    'profiles                                  sign-in profiles (★ = manager)',
+    'star <name> / unstar <name>               make someone a manager / not',
+    'remove <name>                             take a profile off the sign-in screen (their saves stay)',
+    'resetpin <name>                           clear a manager\'s console PIN: they set a new one next time'];
+  // ---------- console PIN (fixes.js openConsole / runCmd): set once per manager, asked every visit ----------
+  const PIN={mode:null,first:null};
+  function pinPrompt(){ const m=(SH.data.mgr||{})[ME.id]||{}; PIN.first=null; $("conIn").type="password";
+    if(m.pin){ PIN.mode="check"; cprint("Manager PIN:","dim"); } else { PIN.mode="set"; cprint("First time here: set your 4-digit manager PIN:","dim"); } }
+  async function pinLine(line){                                  // true = unlocked
+    const v=line.trim();
+    if(PIN.mode==="check"){ if(PLX.pinOk(SH.data,ME.id,v)) return true; cprint("Wrong PIN.","bad"); return false; }
+    if(!/^\d{4}$/.test(v)){ cprint("4 digits, please:","bad"); return false; }
+    if(PIN.mode==="set"){ PIN.first=v; PIN.mode="again"; cprint("Type it again:","dim"); return false; }
+    if(v!==PIN.first){ PIN.mode="set"; PIN.first=null; cprint("Didn't match. Set your 4-digit manager PIN:","bad"); return false; }
+    const h=PLX.hashPin(ME.id,v); PLX.setMgrIn(SH.data,ME.id,{pin:h});
+    await updateShared(d=>PLX.setMgrIn(d,ME.id,{pin:h}),true); cprint("PIN saved.","ok"); return true; }
   async function cmd(c,a){
+    if(c==="profiles"){ const l=profiles(); if(!l.length) cprint("No profiles yet.","dim");
+      l.forEach((p,i)=>{ const m=(SH.data.mgr||{})[p.id]||{}; cprint(String(i+1).padStart(3)+"  "+p.name.padEnd(20)+(isMgr(p.id)?" ★ manager"+(m.pin?"":" (no PIN yet)"):"")); });
+      cprint("Max "+PLX.MAXP+" on the sign-in screen.","dim"); return true; }
+    if(c==="star"||c==="unstar"||c==="remove"||c==="resetpin"){
+      const w=a.slice(1).join(" "), l=profiles(), p=/^\d+$/.test(w)?l[+w-1]:l.find(x=>x.id===PLX.pid(w));
+      if(!w||!p){ cprint(w?"No profile \""+w+"\" — type profiles":"Use: "+c+" <name>","bad"); return true; }
+      let err="", d0={...SH.data,profiles:(SH.data.profiles||[]).map(x=>({...x})),mgr:{...(SH.data.mgr||{})}};
+      err=PLX.mgrEdit(d0,c,p.id);                                // check on this copy first, so a refusal saves nothing
+      if(!err){ await updateShared(d=>{ err=PLX.mgrEdit(d,c,p.id); },true); }
+      if(err){ cprint(err,"bad"); return true; }
+      cprint({star:"★ "+p.name+" is a manager",unstar:p.name+" is no longer a manager",remove:"Removed "+p.name+" (their saves stay on each computer)",resetpin:p.name+"'s PIN is cleared: they set a new one next time"}[c],"ok");
+      if(p.id===ME.id&&(c==="remove"||c==="unstar")){ refresh(); if(c==="remove") setTimeout(logOut,800); else lockConsole(); return true; }
+      refresh(); return true; }
     if(c==="pending"){ plist=(SH.data.tokens||[]).filter(x=>x.status==="pending"&&!x.deleted).sort((x,y)=>x.at-y.at);
       if(!plist.length) cprint("Nothing waiting.","dim"); else plist.forEach((x,i)=>cprint(pline(x,i+1))); return true; }
     if(c==="approve"||c==="reject"){ const x=plist[+a[1]-1]; if(!x){ cprint("No #"+(a[1]||"")+" — type pending first","bad"); return true; }
@@ -7074,8 +7202,8 @@ if(typeof document!=="undefined") PL=(()=>{
     return false; }
 
   // first screen on every launch: data from this computer's copy now; the shared file catches up behind it
-  showSignOn();
-  return {hides, hiddenLine, refresh, earnIn, unearnIn, cmd, CMDS, me, showSignOn, showHub};
+  seed(); showSignOn();
+  return {hides, hiddenLine, refresh, earnIn, unearnIn, cmd, CMDS, me, showSignOn, isMgr:()=>isMgr(), pinPrompt, pinLine};
 })();
 
 </script>
