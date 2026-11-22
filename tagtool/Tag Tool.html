@@ -7,7 +7,7 @@
 <script>
 // ---- self-update: checks the public mirror when online, keeps the newest build on this computer ----
 // Newer build saved earlier -> run that instead of this file. Add ?local to the address to skip it.
-var TT_BUILD=1795318070630;
+var TT_BUILD=1795321393774;
 (function(){
   var REMOTE="https://raw.githubusercontent.com/blsxf/express-pawn-tools/main/tagtool/", KEY="tagtool.update";
   function db(){ return new Promise(function(res,rej){ var r=indexedDB.open("tagtool",1);
@@ -134,6 +134,15 @@ const CONFIG = {
 
   // ---- Manager fixes console: Ctrl+Shift+F.  PIN ("" = no PIN) ---------
   managerPin: "1234",
+
+  // ---- Tokens for the Alt+Enter panel (players.js) ---------------------------
+  // 1 token = minutesPerToken minutes in the panel, counted only while it's in use
+  // (not when it's closed, the window is in the background, or nobody has touched a key or the mouse for a minute).
+  // Staff earn tokens only when the manager approves something they sent (console: pending / approve / reject).
+  // reward = tokens per approved kind.
+  // freePerWeek: free tokens each week, given at sign-in (weeks nobody signs in don't pile up).
+  // Tokens show only inside that panel.
+  tokens: { minutesPerToken: 30, freePerWeek: 1, reward: { suggestion: 1, ticket: 1, fix: 1, sample: 2 } },
   // Built-in name fixes for every computer, e.g.
   //   {field:"model", find:"Spear Rifle", replace:"Spear"}
   //   {field:"model", find:"G19", replace:"19", ifField:"brand", ifValue:"Glock"}
@@ -276,14 +285,14 @@ svg{width:1em;height:1em;flex:none;stroke:currentColor;fill:none;stroke-width:2;
 header{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--head);color:var(--headink);border-bottom:3px solid var(--yellow);flex:none;position:sticky;top:0;z-index:15}
 header h1{font-size:17px;font-weight:700;margin:0 8px 0 0;letter-spacing:.2px;white-space:nowrap}
 header h1 b{color:var(--yellow);font-weight:800;margin-right:6px}
-#tools{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+#tools{display:flex;align-items:center;gap:8px;flex:1;min-width:0;flex-wrap:wrap;row-gap:6px}   /* wraps instead of running under Help / player chips on smaller screens */
 .chip{height:36px;padding:0 13px;border:1px solid var(--line);background:var(--panel2);border-radius:8px;font-size:14px;color:var(--ink2);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .chip:hover{color:var(--ink);border-color:var(--line2)}
 header .chip,#ttBtn,.search{background:var(--headchip);border-color:var(--headline);color:var(--headink)}
 header .chip:hover,#ttBtn:hover{border-color:var(--yellow);color:var(--headink)}
 .chip.on{background:var(--yellow);border-color:var(--yellow);color:var(--onyellow);font-weight:700}
 header .chip.on:hover{color:var(--onyellow)}
-.search{display:flex;align-items:center;gap:8px;border:1px solid;border-radius:8px;padding:0 10px;height:36px;flex:1;max-width:340px}
+.search{display:flex;align-items:center;gap:8px;border:1px solid;border-radius:8px;padding:0 10px;height:36px;flex:1;max-width:340px;min-width:140px}
 .search svg{color:var(--headink2)}
 .search input{border:0;outline:0;background:none;flex:1;font-size:14px;min-width:0;color:var(--headink)}
 .search input::placeholder{color:var(--headink2)}
@@ -399,6 +408,14 @@ main{flex:1;padding:16px 16px 90px;display:flex;flex-direction:column}
 .pr-grid{display:flex;gap:28px;flex-wrap:wrap;justify-content:center;padding:16px}
 .pr-slot{width:220px;height:150px;border:3px solid #333;border-radius:10px;background:#111;color:#ddd;font:700 26px/1 monospace;letter-spacing:3px;cursor:pointer}
 .pr-slot.pr-on{border-color:var(--yellow);color:#fff;box-shadow:0 0 22px rgba(255,212,0,.35)}
+.pr-cell{display:flex;flex-direction:column;align-items:center;gap:10px;width:260px}
+.pr-slot.pr-dim{opacity:.35;filter:grayscale(1)}
+.pr-tok{color:#ddd;font:700 18px/1.3 monospace;text-align:center;position:relative}
+.pr-tok .pr-sub{font-size:13px;color:#999;font-weight:400}
+.pr-more{margin-top:8px;background:none;border:0;color:#FFD400;font:700 13px monospace;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.pr-how{display:none;position:absolute;top:100%;left:50%;transform:translateX(-50%);width:340px;margin-top:6px;padding:12px 14px;background:#111;border:1px solid #FFD400;border-radius:8px;text-align:left;font:400 14px/1.4 "Segoe UI",system-ui,sans-serif;color:#ddd;z-index:2}
+.pr-how p{margin:0 0 6px}.pr-how ul{margin:0;padding-left:18px}.pr-how b{color:#fff}
+.pr-more:hover+.pr-how,.pr-how:hover,.pr-tok.pr-open .pr-how{display:block}
 /* EXPress Prawn (hidden, in the probe overlay) */
 .xp-root{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;max-width:960px;width:100%;padding:16px;max-height:100vh;overflow:auto;color:#eaf6ff;font:600 14px system-ui,sans-serif}
 .xp-left{flex:0 1 480px;min-width:0;display:flex;flex-direction:column;gap:8px}
@@ -495,6 +512,41 @@ button.xp-row{cursor:pointer}button.xp-row:hover{border-color:#2f6aa5}.xp-row.on
 
 #toast{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);background:var(--navy);border:1px solid var(--yellow);color:#fff;padding:10px 16px;border-radius:8px;font-size:14px;font-weight:600;z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.35);transition:opacity .2s;max-width:90vw;text-align:center}
 #toast.bad{border-color:var(--bad);background:var(--panel);color:var(--bad)}
+
+/* sign-on + hub (players.js): arcade feel, big readable text, follows light/dark */
+.arcade{position:fixed;inset:0;z-index:50;background:var(--bg);overflow:auto;display:flex;justify-content:center;align-items:flex-start;padding:6vh 20px 40px}
+.arcade::before{content:"";position:fixed;inset:0 0 auto 0;height:8px;background:var(--yellow)}
+.ar-in{width:100%;max-width:980px;text-align:center}
+.ar-brand{font-size:15px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--ink3)}
+.arcade h2{font-size:clamp(34px,6vw,58px);font-weight:900;letter-spacing:6px;margin:6px 0 28px;color:var(--yellow);text-shadow:0 3px 0 var(--navy),0 0 24px rgba(255,212,0,.25)}
+[data-theme=light] .arcade h2{color:var(--navy);text-shadow:0 3px 0 var(--yellow)}
+.ar-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;text-align:left}
+.ar-grid.hub{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.ar-tile{position:relative;display:flex;flex-direction:column;gap:4px;min-height:96px;padding:16px 16px 14px 64px;border:3px solid var(--line2);border-radius:12px;background:var(--panel);color:var(--ink);text-align:left;font-size:22px;outline:none}
+.ar-tile b{font-size:24px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ar-tile small{font-size:15px;color:var(--ink2)}
+.ar-n{position:absolute;left:14px;top:16px;width:38px;height:38px;border-radius:8px;background:var(--navy);color:var(--yellow);font-weight:900;font-size:22px;display:flex;align-items:center;justify-content:center;border:2px solid var(--yellow)}
+.ar-tile.on,.ar-tile:hover{border-color:var(--yellow);box-shadow:0 0 0 3px rgba(255,212,0,.35)}
+.ar-tile.on .ar-n{background:var(--yellow);color:var(--navy)}
+.ar-tile.off{opacity:.5;cursor:default}
+.ar-tile.new input{font-size:20px;font-weight:700;background:transparent;border:0;border-bottom:2px solid var(--line2);outline:none;padding:6px 0;width:100%;color:var(--ink)}
+.ar-tile.new input:focus{border-color:var(--yellow)}
+.ar-msg{margin:20px 0 0;font-size:16px;color:var(--ink2);min-height:22px}
+.ar-msg .chip{margin-left:8px}
+.ar-keys{margin-top:14px;font-size:14px;color:var(--ink3);letter-spacing:.5px}
+#hubSwitch{margin-top:18px}
+.ar-lock{color:#fff;text-align:center;max-width:520px;font-size:18px;padding:20px}
+.ar-lock h2{font-size:44px;letter-spacing:6px;color:#FFD400;margin:0 0 16px}
+.ar-clock{position:fixed;top:12px;left:14px;z-index:100;font:700 16px/1 "Segoe UI",system-ui,sans-serif;color:#FFD400;background:rgba(15,42,92,.85);border:1px solid #FFD400;border-radius:8px;padding:7px 10px;pointer-events:none}
+.ar-clock.paused{opacity:.6}
+.ar-clock.low{color:#fff;background:#C8102E}
+#viewMenu{position:absolute;top:42px;left:0;z-index:20;min-width:220px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 14px 34px rgba(0,0,0,.35);padding:8px}
+#viewMenu label{display:flex;gap:8px;align-items:center;padding:7px 8px;border-radius:6px;cursor:pointer}
+#viewMenu label:hover{background:var(--panel2)}
+#viewMenu .vmh{font-size:12px;color:var(--ink3);padding:4px 8px 6px}
+#viewMenu .link{margin:6px 8px 2px}
+#hiddenNeed{display:flex;align-items:center;gap:12px;margin:0 0 12px;padding:10px 14px;border:1px solid var(--warn);border-radius:10px;background:var(--panel);font-weight:600}
+#hiddenNeed[hidden]{display:none!important}
 
 /* screen parts hidden in CONFIG.hidden */
 .ui-hidden{display:none!important}
@@ -1884,7 +1936,6 @@ function fitTag(type,t,s){
   let p=tagProblems(type,t,s); if(!p.length) return {fixed:false,left:[]};
   const steps=[
     ()=>{ if(p.some(x=>x.role==="extras")) t.fit.extras2=true; },
-    ()=>{ if(p.some(x=>x.role==="extras")) t.fit.extrasTall=true; },
     ()=>{ for(const k of ["model","brand"]) if(p.some(x=>x.role===k)){ const v=shortenWords(String(t[k]||"")); if(v!==t[k]) t.fit[k]=v; } },
   ];
   const score=q=>{ const worst={}; let o=0;      // worst shortfall per part, outside = very bad
@@ -2079,9 +2130,9 @@ function drawGunBack(g,x0,y0,t,s0){
   g.role("bleed"); g.rect(xa,ye-lw/2,xb-xa,lw,K); g.rect(xa,yEnd,xb-xa,lw,K);
   g.role("extras");
   const ey=ye+he/2, ew=W-2*pad;
-  if(extras){ const line=(/^(?:No |Tool Only)/.test(extras)?"":W_.withPrefix)+extras, two=t.fit&&t.fit.extras2&&extras.includes(", ");
+  if(extras){ const pre=/^(?:No |Tool Only)/.test(extras)?"":W_.withPrefix, line=pre+extras, two=t.fit&&t.fit.extras2&&extras.includes(", ");   // "No Battery..." never gets "w/ "
     if(!two) g.fitText(line,cx,ey+1,ew,he*.5*B);
-    else { const q=extras.split(", "), h=Math.ceil(q.length/2), a=W_.withPrefix+q.slice(0,h).join(", ")+",", b=q.slice(h).join(", ");
+    else { const q=extras.split(", "), h=Math.ceil(q.length/2), a=pre+q.slice(0,h).join(", ")+",", b=q.slice(h).join(", ");
       const sz=Math.min(g.fitSize(a,ew,he*.36*B),g.fitSize(b,ew,he*.36*B));
       g.fitText(a,cx,ye+he*.3,ew,sz); g.fitText(b,cx,ye+he*.7,ew,sz); } }
   // bottom: the shop's barcode label, printed (11-20-2026). No Bravo barcode (hand-added tag) = spot for the sticker.
@@ -2252,7 +2303,10 @@ const SH = { dir:null, ok:false, data:null };
 // printed: what's already been tagged {item #: {p:price printed, t}} -> the tool works out which tags are needed
 // tickets: Help box problems it couldn't fix {id,t,text,item,pic,checks,build,pc,status} (help.js)
 // helpPhrases: phrases a manager taught the Help box {id,t,phrase,fix}
-const blankData = () => ({ v:1, rules:[], items:{}, tagTypes:[], samples:[], kb:{}, printed:{}, tickets:[], helpPhrases:[] });
+// profiles: staff sign-on names {id: lowercased name, name, t, created, used, hide: tag type ids hidden from their list} (players.js; a label, not security)
+// tokens: token log {id,p: profile id,kind,at,t,status: pending/approved/rejected/spent,n,text,ref,note} (players.js;
+//         the balance is never stored, it's worked out from this log, so two computers saving at once can't pay twice)
+const blankData = () => ({ v:1, rules:[], items:{}, tagTypes:[], samples:[], kb:{}, printed:{}, tickets:[], helpPhrases:[], profiles:[], tokens:[] });
 
 // small key-value store in the browser to remember the folder
 function idb(){ return new Promise((res,rej)=>{ const r=indexedDB.open("tagtool",1);
@@ -2266,6 +2320,7 @@ function mergeData(a,b){
   const byId=(x,y)=>{ const m=new Map(); [...(x||[]),...(y||[])].forEach(r=>{ const o=m.get(r.id); if(!o||(r.t||0)>(o.t||0)) m.set(r.id,r); }); return [...m.values()]; };
   out.rules=byId(a.rules,b.rules); out.tagTypes=byId(a.tagTypes,b.tagTypes); out.samples=byId(a.samples,b.samples);
   out.tickets=byId(a.tickets,b.tickets); out.helpPhrases=byId(a.helpPhrases,b.helpPhrases);
+  out.profiles=byId(a.profiles,b.profiles); out.tokens=byId(a.tokens,b.tokens);
   for(const src of [a.items||{},b.items||{}]) for(const n in src) for(const k in src[n]){
     const cur=(out.items[n]||{})[k], v=src[n][k];
     if(!cur||(v.t||0)>(cur.t||0)){ out.items[n]=out.items[n]||{}; out.items[n][k]=v; } }
@@ -2308,15 +2363,16 @@ async function syncShared(){
   catch(e){ lostShared(e); }
 }
 // make a change for every computer
-async function updateShared(fn){
+async function updateShared(fn,quiet){   // quiet: no "this computer only" toast (players.js says it on its own screen)
   let ok=SH.ok, lost=false;   // couldn't read the shared file: never write over it (the change stays here and goes out on the next sync)
   if(ok){ try{ SH.data=mergeData(await readShared(),SH.data); }catch(e){ ok=false; lost=true; lostShared(e); } }
   fn(SH.data); cache.set(SH.data);
   if(ok){ try{ await writeShared(SH.data); }catch(e){ lostShared(e); } }
-  else if(!lost) toast("Saved on this computer only — click Connect to share",true);
+  else if(!lost&&!quiet) toast("Saved on this computer only — click Connect to share",true);
   onSharedChange();
 }
 function onSharedChange(){
+  if(typeof PL!=="undefined"&&PL) PL.refresh();   // token balance / profiles changed
   if(typeof subs!=="function") return;
   if(!TYPE&&subs().length) return useSub();
   if(TYPE&&tags.length){ if(typeof refreshNeed==="function") refreshNeed(); view(); }   // tag type sizes / names / printed may have changed on another computer
@@ -2340,6 +2396,7 @@ function shareUI(){
   const b=$("shareBtn"); if(!b) return;
   b.hidden=!window.showDirectoryPicker; b.classList.toggle("on",SH.ok);
   b.title=SH.ok?"Shared folder: "+SH.dir.name:(SH.dir?"Reconnect shared folder":"Connect shared folder");
+  if(typeof PL!=="undefined"&&PL) PL.refresh();
 }
 window.addEventListener("focus",()=>{ if(SH.ok) syncShared(); });
 
@@ -2372,7 +2429,9 @@ function toast(t,bad){ const el=$("toast"); el.textContent=t; el.className=bad?"
   clearTimeout(toastT); toastT=setTimeout(()=>{ el.style.opacity=0; setTimeout(()=>el.hidden=true,200); },bad?(t.length>90?9000:5000):4200); }
 const plural=(n,w)=>n+" "+w+(n===1?"":"s");
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const sel=()=>tags.filter(t=>t.include);
+// a profile's list filter (players.js) hides tag types from the list; hidden tags don't print (the list says how many need tags)
+const viewHid=t=>typeof PL!=="undefined"&&!!PL&&PL.hides(kindOf(t.kind).id);
+const sel=()=>tags.filter(t=>t.include&&!viewHid(t));
 // EXPress Prawn XP (src/prawn.js) + Tide Tales drift-crate gifts (src/tide.js, print only); can never break tag work
 const prawn=(k,n)=>{ try{ if(typeof PRAWN!=="undefined") PRAWN.award(k,n); }catch(e){} try{ if(typeof TIDE!=="undefined") TIDE.award(k,n); }catch(e){} };
 const twoSided=()=>!!(TYPE&&TYPE.drawBack);
@@ -2416,7 +2475,8 @@ function wireSample(id,keep){
     renderMenu(); };
   if($("teRm")) $("teRm").onclick=async()=>{ keep&&keep(); await saveSample({id,deleted:true}); renderMenu(); };
 }
-const saveSample=s=>updateShared(d=>{ d.samples=(d.samples||[]).filter(y=>y.id!==s.id); d.samples.push({...s,t:Date.now()}); });
+const saveSample=s=>updateShared(d=>{ d.samples=(d.samples||[]).filter(y=>y.id!==s.id); d.samples.push({...s,t:Date.now()});
+  if(s.data&&typeof PL!=="undefined"&&PL){ const k=subs().find(x=>x.id===s.id); PL.earnIn(d,"sample",s.id+":"+Date.now(),"Sample tag for "+(k?k.name:s.id)+": "+(s.name||"")); } });   // a token once the manager OKs it
 // picture -> JPEG at most 1200px (keeps the shared file small); PDF kept as is, up to 2 MB
 async function sampleData(f){
   const url=()=>new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(f); });
@@ -2584,7 +2644,7 @@ function view(){
   $("flip").textContent=showBack?"Show fronts":"Show backs"; $("flip").classList.toggle("on",showBack);
   const nAll=tags.filter(t=>!t._need&&!t.include).length; $("needOnly").hidden=!hasHistory()||!nAll;
   $("needOnly").textContent=onlyNeed?"Show all ("+nAll+" tagged)":"Hide tagged"; $("markAll").hidden=!has||hasHistory()&&!tags.some(t=>t._need);
-  if(has&&TYPE){ checkAll(); buildGrid(); updateBar(); }
+  if(has&&TYPE){ checkAll(); buildGrid(); updateBar(); if(typeof PL!=="undefined"&&PL) PL.hiddenLine(); }
 }
 
 // ---------- tag grid: one group per tag type, cards drawn only when on screen ----------
@@ -2608,7 +2668,7 @@ function buildGrid(){
   let shown=0;
   for(const kd of kinds()){
     const s=settings(kd.id), idx=tags.map((t,i)=>i).filter(i=>kindOf(tags[i].kind).id===kd.id);
-    if(!idx.length) continue;
+    if(!idx.length||typeof PL!=="undefined"&&PL&&PL.hides(kd.id)) continue;
     const per=layoutGrid(s).per, n=idx.filter(i=>tags[i].include).length;
     const head=document.createElement("div"); head.className="grp"; head.dataset.k=kd.id;
     head.innerHTML=`${esc(kd.name)}<small>${esc(plural(n,"tag"))} · ${esc(plural(Math.ceil((n+s.skip)/per)||0,"sheet"))} · ${per} per sheet</small>`;
@@ -2629,7 +2689,7 @@ function buildGrid(){
     if(!wrap.children.length&&onlyNeed&&!q){ head.remove(); wrap.remove(); }   // "Hide tagged": no empty groups
   }
   $("noMatch").hidden=shown>0||!tags.length;
-  $("noMatch").textContent=q||!onlyNeed?"No tags match that search.":"Everything in this report is already tagged. Show all to see them.";
+  $("noMatch").textContent=!grid.children.length&&!q?"Nothing in your list for this report. Use the Show ▾ button to change your list.":q||!onlyNeed?"No tags match that search.":"Everything in this report is already tagged. Show all to see them.";
 }
 function buildGridHeadsOnly(){
   $("grid").querySelectorAll(".grp").forEach(h=>{ const kd=kinds().find(x=>x.id===h.dataset.k); if(!kd) return;
@@ -3035,8 +3095,11 @@ function rememberEdit(t,k){
 function flushEdits(){
   const list=Object.values(pendingEdits), kb=Object.entries(pendingKB); if(!list.length&&!kb.length) return;
   for(const key in pendingEdits) delete pendingEdits[key]; for(const [k] of kb) delete pendingKB[k];
-  updateShared(d=>{ d.kb=d.kb||{}; for(const [k,v] of kb) d.kb[k]={...v,t:Date.now()}; for(const e of list){ d.items[e.n]=d.items[e.n]||{};
-    d.items[e.n][e.k]=e.to===e.from?{deleted:true,t:Date.now()}:{from:e.from,to:e.to,t:Date.now()}; } });
+  const pl=typeof PL!=="undefined"&&PL;   // each fix = one token entry per item # + box, waiting for the manager's OK (put back = taken back)
+  updateShared(d=>{ d.kb=d.kb||{}; for(const [k,v] of kb){ d.kb[k]={...v,t:Date.now()}; if(pl) pl.earnIn(d,"fix","kb:"+k,"What it is: "+k+" = "+v.what); }
+    for(const e of list){ d.items[e.n]=d.items[e.n]||{};
+    d.items[e.n][e.k]=e.to===e.from?{deleted:true,t:Date.now()}:{from:e.from,to:e.to,t:Date.now()};
+    if(pl){ if(e.to===e.from) pl.unearnIn(d,"fix",e.n+":"+e.k); else pl.earnIn(d,"fix",e.n+":"+e.k,e.n+" "+e.k+': "'+e.from+'" -> "'+e.to+'"'); } } });
 }
 
 // ---------- manager console (Ctrl+Shift+F) ----------
@@ -3081,6 +3144,7 @@ async function runCmd(line){
       'status / folder                           shared folder: show / pick',
       'export / import                           backup file / load a backup',
       ...(typeof HELP_CMDS!=="undefined"?HELP_CMDS:[]),
+      ...(typeof PL!=="undefined"&&PL?PL.CMDS:[]),
       'clear, exit' ].forEach(x=>cprint(x));
   } else if(cmd==="fix"){
     const arrow=a.indexOf("->"); const ifAt=a.findIndex((x,i)=>i>arrow&&x.toLowerCase()==="if");
@@ -3111,6 +3175,7 @@ async function runCmd(line){
   } else if(cmd==="import"){ $("conFile").click();
   } else if(cmd==="clear"){ $("conOut").innerHTML="";
   } else if(cmd==="exit"||cmd==="quit"){ closeConsole();
+  } else if(typeof PL!=="undefined"&&PL&&await PL.cmd(cmd,a)){   // tokens (players.js)
   } else if(typeof helpCmd==="function"&&await helpCmd(cmd,a)){   // Help box tickets (help.js)
   } else cprint('Unknown command. Type "help".',"bad");
 }
@@ -3229,8 +3294,8 @@ function openHelp(i){
       <textarea id="hpText" rows="3" placeholder="e.g. the model is cut off · should be a long gun · backs don't line up · where's C33016383?"></textarea></div>
       <div class="field"><label>Item # ${t?"":"(if it's about one tag)"}</label><input id="hpNum" value="${esc(HELP.num)}" ${t&&t.number?"readonly":""}></div>
       <div id="hpOut"></div></div>
-    <div class="foot"><button class="btn" id="hpBack" ${t?"":"hidden"}>Back to Edit</button><button class="btn primary grow" id="hpGo">Find a fix</button></div>`);
-  $("hpX").onclick=closeDrawer; if($("hpBack")) $("hpBack").onclick=()=>openEditor(HELP.i);
+    <div class="foot"><button class="btn" id="hpBack" ${t?"":"hidden"}>Back to Edit</button><button class="btn" id="hpIdea" title="An idea to make the tool or the shop better">Suggest an improvement</button><button class="btn primary grow" id="hpGo">Find a fix</button></div>`);
+  $("hpX").onclick=closeDrawer; if($("hpBack")) $("hpBack").onclick=()=>openEditor(HELP.i); $("hpIdea").onclick=helpIdea;
   $("hpGo").onclick=helpFind; $("hpText").onkeydown=e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); helpFind(); } };
   setTimeout(()=>$("hpText").focus(),50);
 }
@@ -3277,17 +3342,32 @@ function helpShow(html,btns){
   ft.innerHTML=btns.map((b,j)=>`<button class="btn${j?"":" primary grow"}" data-h="${j}">${esc(b[0])}</button>`).join("");
   ft.querySelectorAll("[data-h]").forEach(b=>b.onclick=()=>btns[+b.dataset.h][1]());
 }
+// ---------- Suggest an improvement: free text, saved as a ticket (kind suggestion) + a token entry waiting for the manager ----------
+function helpIdea(){
+  const was=$("hpText").value.trim();
+  openDrawer(`<div class="top"><h3>Suggest an improvement</h3><button class="x" id="hpX">✕</button></div>
+    <div class="body"><div class="field"><label>Your idea: what would make the tool or the shop better?</label>
+      <textarea id="hpText" rows="4" maxlength="300" placeholder="e.g. show the gun's barrel length on long gun tags"></textarea></div>
+      <p class="hint">The manager reads every one.</p><div id="hpOut"></div></div>
+    <div class="foot"><button class="btn" id="hpBack">Back</button><button class="btn primary grow" id="hpGo">Send</button></div>`);
+  $("hpX").onclick=closeDrawer; $("hpBack").onclick=()=>openHelp(HELP.i); $("hpText").value=was;
+  $("hpGo").onclick=()=>{ const text=$("hpText").value.trim(); if(!text) return $("hpText").focus();
+    helpTicket({text,num:"",t:null},"suggestion","Thanks! Sent to the manager"); };
+  setTimeout(()=>$("hpText").focus(),50);
+}
 // ---------- tickets: what the box couldn't fix, for the manager (and Claude) ----------
 const pcName=()=>{ let n=store.get("pc"); if(!n){ n="PC-"+Math.random().toString(36).slice(2,6).toUpperCase(); store.set("pc",n); } return n; };
 function tagPic(t){ try{ const cv=document.createElement("canvas"); paint(cv,t,Math.min(1,240/settings(t.kind).W),false);
   return cv.toDataURL("image/jpeg",.6); }catch(e){ return ""; } }
+const text0=k=>(k.item?k.item+": ":"")+k.text;
 async function helpTicket(c,how,msg){
   const t=c.t, l=t&&layOf(t);
   const k={id:newId(),t:Date.now(),at:Date.now(),status:"open",text:c.text,how,item:c.num||"",build:typeof TT_BUILD!=="undefined"?TT_BUILD:0,pc:pcName(),
     tag:t?{kind:kindOf(t.kind).name,brand:t.brand,model:t.model,caliber:t.caliber,what:t.what,extras:t.extras,notes:t.notes,price:t.price,layaway:l.total,raw:t.raw,category:t.category}:null,
     checks:t?{small:(t._warn||[]).map(x=>x.role+" "+(x.why||"")).join(", "),check:t._check||"",need:t._need||"",printing:!!t.include}:null,
     pic:t?tagPic(t):""};
-  await updateShared(d=>{ d.tickets=d.tickets||[]; d.tickets.push(k); });
+  const pl=typeof PL!=="undefined"&&PL&&PL.me(); if(pl) k.player=pl.id;   // who sent it: a token entry waiting for the manager's OK
+  await updateShared(d=>{ d.tickets=d.tickets||[]; d.tickets.push(k); if(pl) PL.earnIn(d,how==="suggestion"?"suggestion":"ticket",k.id,text0(k)); });
   helpShow(`<p>${esc(msg||"Saved for the manager. Thanks — they'll fix it")}${c.num?" ("+esc(c.num)+")":""}.</p>`,
     how==="no match"?[["Close",closeDrawer],["Try other words",helpRetry]]:[["Close",closeDrawer]]);
 }
@@ -3329,7 +3409,7 @@ $("helpBtn").onclick=()=>openHelp(editIdx>=0?editIdx:-1);
 // so it keeps going while tags are made and catches up (capped, slower) after the tool was closed.
 // Saved per computer in localStorage "tagtool.prawn". Never uses the app's toast().
 var PRAWN=(function(){
-  const KEY="tagtool.prawn", MAXL=99;
+  let KEY="tagtool.prawn"; const MAXL=99;   // per profile: players.js calls useKey on sign-in
   const R=()=>Math.random(), now=()=>Date.now()/1000;
   // ---- every balance knob lives here (system files read G.BAL) ----
   const BAL={
@@ -3479,7 +3559,10 @@ var PRAWN=(function(){
   Object.assign(G,{BAL,R,now,fmt,XPAT,MAXL,lvl,L,total,SKILLS,SK,MONS,SHOP,SELL,FOOD,STAGES,SYS,bonus,emit,gain,log,pfx,eat:()=>eat(false),
     advance,save,care,speed,mon,xpMult,hatBonus,stageOf,reset,start,fx:[],open:false,clock:0,touch:()=>{ dirty=true; }});
   Object.defineProperty(G,"S",{get:()=>S});
-  return {award, G, slot:{label:"PRAWN",run:h=>G.ui(h)}};
+  // switch save (players.js, on sign-in): bring the current one up to now and write it, then load the next
+  function useKey(k){ if(G.open) return false; if(k===KEY) return true;
+    if(S){ try{ advance(); }catch(e){} save(true); } KEY=k; if(started){ S=load(); dirty=false; } return true; }
+  return {award, G, useKey, slot:{label:"PRAWN",run:h=>G.ui(h)}};
 })();
 
 </script>
@@ -6028,7 +6111,8 @@ var DEEP=(function(){
 // Tag tie-in: app.js calls TIDE.award("print",[item #s]); each item # pays once a day into the drift crate
 // by the shrimp's home (Bubble Snacks, Kelp Tonics) and unlocks perks at tag milestones. No XP from tags.
 var TIDE=(function(){
-  const A=TIDEART, D=TIDEDATA, W=240, H=160, KEY="tagtool.tide", VER=1, SPEED=5;
+  const A=TIDEART, D=TIDEDATA, W=240, H=160, VER=1, SPEED=5;
+  let KEY="tagtool.tide";   // per profile: players.js calls useKey on sign-in (the first profile on a computer keeps this key)
   const SOLID="T#ouwkmXSELPC~K";
   let S=null, g=null, cv=null, host=null, raf=0, lastT=0, time=0, open=false;
   const dbg={on:false};
@@ -6664,7 +6748,334 @@ var TIDE=(function(){
         if(dlg.opts&&dlg.pi===dlg.pg.length-1) break; queue.push("A"); await dbg.step(); } return log; },
     dlg:()=>dlg&&{who:dlg.who,text:dlg.pg[dlg.pi].join(" "),opts:dlg.opts}, ui:()=>ui&&{kind:ui.kind,cur:ui.cur,n:(ui.items||[]).length}, typeName:s=>{ if(nameBuf){ nameBuf.s=s; nameBuf.done=1; } }
   });
-  return {award, slot:{label:"PRAWN",run:h=>ui_(h)}, dbg};
+  // switch save (players.js, on sign-in): the open panel blocks it; the current save is written first
+  function useKey(k){ if(open) return false; if(k===KEY) return true; save(); KEY=k; S=null; return true; }
+  return {award, useKey, slot:{label:"PRAWN",run:h=>ui_(h)}, dbg};
+})();
+
+</script>
+<script>
+// ===== PLAYERS (11-21-2026): required sign-on ("SELECT PLAYER"), the hub, and tokens for the Alt+Enter panel =====
+// A name is a label, not security: nothing shop-critical depends on who's signed in. Profiles and the token log live in
+// "Tag Tool Data.json" (profiles, tokens; merged by id in shared.js). Shared tag state (printed, item fixes, layaway,
+// kb, tickets, which items start checked) is never per profile; a profile only remembers which tag types its list shows.
+// Tokens: staff send something (suggestion, Help ticket, Edit-panel name fix, shop sample) -> a PENDING entry; the
+// manager console approves it (+tokens.reward[kind]) or rejects it (0). Plus tokens.freePerWeek free (granted at sign-in).
+// Tokens stay out of sight: nothing on the sign-on, hub or top bar; the Alt+Enter menu shows the balance under its entry
+// (greyed out at 0) and "Obtaining more tokens". 1 token = tokens.minutesPerToken minutes in that panel, counted only
+// while it's in use (spend entry: sec bought, used so far; the next token is taken when time runs out).
+// The balance is never stored: it's replayed from the log in time order, so a merge can't pay twice and it can't go below 0.
+// Panel saves stay on each computer: the first profile that signs in here keeps the old keys (tagtool.tide / tagtool.prawn),
+// the others get tagtool.tide.<id> / tagtool.prawn.<id>. No save is ever deleted.
+
+// ---------- the math (no screen; tools/players-test.js runs it in node) ----------
+const PLX=(()=>{
+  const MAXN=20, DAY=864e5;
+  const clean=s=>String(s||"").replace(/\s+/g," ").trim().slice(0,MAXN);
+  const pid=s=>clean(s).toLowerCase();
+  const when=x=>x.status==="approved"?(x.done||x.at||0):(x.at||0);   // a token counts from the moment it was approved
+  // balance, pending count and the latest manager decision for one profile
+  function account(log,p){
+    const mine=(log||[]).filter(x=>x&&x.p===p&&!x.deleted).sort((a,b)=>when(a)-when(b)||String(a.id).localeCompare(String(b.id)));
+    let bal=0, pending=0, last=null, left=0, cur=null;
+    for(const x of mine){
+      const n=Math.max(0,+x.n||0);
+      if(x.status==="approved") bal+=n;
+      else if(x.status==="spent"){ if(n<=bal){ bal-=n;             // two computers spending the last token at once: the 2nd one doesn't count (no time either)
+        const l=Math.max(0,(+x.sec||0)-(+x.used||0)); left+=l; if(l>0&&!cur) cur=x; } }
+      else if(x.status==="pending") pending++;
+      if(!x.auto&&(x.status==="approved"||x.status==="rejected")&&(!last||(x.done||0)>(last.done||0))) last=x;
+    }
+    return {bal,pending,last,left,cur};
+  }
+  // earn: one pending entry per (kind, profile, ref). Already decided = left alone (can't be paid twice).
+  function earnIn(d,p,kind,ref,text,now){
+    if(!p) return null; now=now||Date.now(); d.tokens=d.tokens||[];
+    const id=ref?kind+":"+p+":"+ref:kind+":"+p+":"+now.toString(36)+Math.random().toString(36).slice(2,6);
+    const x=d.tokens.find(y=>y.id===id), txt=String(text||"").slice(0,300);
+    if(x){ if(x.status!=="pending") return x; Object.assign(x,{text:txt,t:now}); delete x.deleted; return x; }
+    const e={id,p,kind,at:now,t:now,status:"pending",n:0,text:txt,ref:ref||""}; d.tokens.push(e); return e;
+  }
+  // take back a pending one (an Edit-panel fix put back the way it was)
+  function unearnIn(d,p,kind,ref,now){
+    const x=(d.tokens||[]).find(y=>y.id===kind+":"+p+":"+ref);
+    if(x&&x.status==="pending"&&!x.deleted){ x.deleted=true; x.t=now||Date.now(); }
+  }
+  // manager decision: true = done now, false = it was already decided (on this or another computer)
+  function decideIn(d,id,ok,reward,note,by,now){
+    const x=(d.tokens||[]).find(y=>y.id===id); if(!x||x.deleted||x.status!=="pending") return false;
+    now=now||Date.now(); Object.assign(x,{status:ok?"approved":"rejected",n:ok?Math.max(0,+reward||0):0,note:String(note||"").slice(0,120),done:now,t:now,by:by||""});
+    return true;
+  }
+  // panel time: the spend entry with time left, or a new token turned into sec seconds. null = no time and no tokens.
+  function playIn(d,p,sec,now){
+    if(!p) return null; const a=account(d.tokens,p); if(a.cur) return a.cur;
+    if(a.bal<1) return null; now=now||Date.now(); d.tokens=d.tokens||[];
+    const x={id:"play:"+p+":"+now.toString(36)+Math.random().toString(36).slice(2,6),p,kind:"play",at:now,t:now,status:"spent",n:1,sec:Math.max(60,+sec||1800),used:0};
+    d.tokens.push(x); return x;
+  }
+  // seconds used on one token (only goes up: two saves of the same session can't give time back)
+  function useIn(d,id,used,now){ const x=(d.tokens||[]).find(y=>y.id===id); if(!x) return; const u=Math.min(+x.sec||0,Math.max(+x.used||0,Math.round(used)));
+    if(u!==x.used){ x.used=u; x.t=now||Date.now(); } }
+  // weeks start Monday (local time)
+  const weekOf=now=>{ const d=new Date(now); d.setHours(0,0,0,0); d.setDate(d.getDate()-((d.getDay()+6)%7)); return d.getTime(); };
+  // free tokens once a week (only weeks they sign in; missed weeks don't pile up). Same id on every computer = paid once.
+  function weeklyIn(d,p,n,now){
+    if(!p||!(n>0)) return null; now=now||Date.now(); const w=weekOf(now), id="weekly:"+p+":"+w; d.tokens=d.tokens||[];
+    let x=d.tokens.find(y=>y.id===id); if(x) return x;
+    x={id,p,kind:"weekly",at:w,t:now,status:"approved",n,done:w,auto:true}; d.tokens.push(x); return x;
+  }
+  // approved items per profile per week (weeks start Monday), newest week first; the free weekly token isn't an item
+  function weeks(log,n,now){
+    now=now||Date.now(); const out=[], start=new Date(now); start.setHours(0,0,0,0); start.setDate(start.getDate()-((start.getDay()+6)%7));
+    for(let i=0;i<(n||4);i++){ const a=start.getTime()-i*7*DAY, b=a+7*DAY, by={};
+      (log||[]).forEach(x=>{ if(x&&!x.deleted&&!x.auto&&x.status==="approved"&&x.done>=a&&x.done<b) by[x.p]=(by[x.p]||0)+1; });
+      out.push({from:a,by}); }
+    return out;
+  }
+  return {MAXN,clean,pid,account,earnIn,unearnIn,decideIn,playIn,useIn,weeklyIn,weeks};
+})();
+if(typeof module!=="undefined") module.exports=PLX;
+
+// ---------- the screens ----------
+var PL=null;
+if(typeof document!=="undefined") PL=(()=>{
+  const ME={id:null};
+  const profiles=()=>(SH.data.profiles||[]).filter(p=>p&&p.id&&!p.deleted).map(p=>p.name?p:{...p,name:p.id}).sort((a,b)=>(b.used||0)-(a.used||0)||String(a.name).localeCompare(String(b.name)));
+  const me=()=>ME.id&&((SH.data.profiles||[]).find(p=>p.id===ME.id)||{id:ME.id,name:ME.name});
+  const acct=p=>PLX.account(SH.data.tokens,p||ME.id);
+  const secPer=()=>Math.max(1,+((CONFIG.tokens||{}).minutesPerToken??30)||30)*60;
+  const mins=s=>Math.ceil(s/60)+" min";
+  const reward=k=>+(((CONFIG.tokens||{}).reward||{})[k]??1)||0;
+  const tok=n=>n+" token"+(n===1?"":"s");
+  const KIND={suggestion:"suggestion",ticket:"Help ticket",fix:"name fix",sample:"sample tag",play:"PRAWN play",weekly:"free weekly token"};
+  const free=()=>Math.max(0,+((CONFIG.tokens||{}).freePerWeek??1)||0);
+
+  // ---------- markup ----------
+  document.body.insertAdjacentHTML("beforeend",`
+  <div id="signon" class="arcade" hidden><div class="ar-in">
+    <div class="ar-brand">${esc(CONFIG.shop||"")} Tag Tool</div><h2>SELECT PLAYER</h2>
+    <div class="ar-grid" id="soGrid"></div>
+    <div class="ar-msg" id="soMsg"></div>
+    <div class="ar-keys">1–9 pick · arrows move · Enter selects · or just type a new name</div></div></div>
+  <div id="hub" class="arcade" hidden><div class="ar-in">
+    <div class="ar-brand">${esc(CONFIG.shop||"")} Tag Tool</div><h2 id="hubHi"></h2>
+    <div class="ar-grid hub">
+      <button class="ar-tile" data-h="tool"><span class="ar-n">1</span><b>Manual Tag Tool</b><small>Open the Bravo report and print tags</small></button>
+      <button class="ar-tile off" data-h="soon" aria-disabled="true"><span class="ar-n">2</span><b>Taginator</b><small>Coming soon</small></button>
+    </div>
+    <div class="ar-keys">1–2 pick · arrows move · Enter selects · S switch player</div>
+    <button class="chip" id="hubSwitch">Switch player</button></div></div>`);
+  $("theme").insertAdjacentHTML("beforebegin",`<button class="chip" id="whoBtn" title="Back to the start screen" hidden></button><button class="chip" id="switchBtn" title="Sign in as someone else" hidden>Switch player</button>`);
+
+  // ---------- sign-on ----------
+  const SO={i:0,list:[]};
+  function showSignOn(){
+    try{ $("hub").hidden=true; $("signon").hidden=false; if(typeof closeDrawer==="function") closeDrawer();
+      SO.list=profiles(); const last=store.get("player"); SO.i=Math.max(0,SO.list.findIndex(p=>p.id===last));
+      renderSignOn(); }
+    catch(e){ $("signon").hidden=true; toast("Couldn't show the player list — the tool works as usual",true); } }   // never trap anyone behind it
+  function renderSignOn(){
+    const keep=$("soName")&&$("soName").value, typing=document.activeElement===$("soName");
+    $("soGrid").innerHTML=SO.list.map((p,i)=>`<button class="ar-tile" data-i="${i}"><span class="ar-n">${i<9?i+1:"·"}</span><b>${esc(p.name)}</b></button>`).join("")
+      +`<div class="ar-tile new" data-i="${SO.list.length}"><span class="ar-n">+</span><input id="soName" maxlength="${PLX.MAXN}" placeholder="New player: type your name" autocomplete="off" spellcheck="false"></div>`;
+    $("soGrid").querySelectorAll("button.ar-tile").forEach(b=>b.onclick=()=>signIn(SO.list[+b.dataset.i].name));
+    const inp=$("soName"); inp.value=keep||""; inp.onfocus=()=>soSel(SO.list.length,true);
+    soSel(typing?SO.list.length:SO.i,typing); soMsg(); }
+  function soSel(i,noFocus){
+    const tiles=[...$("soGrid").children]; SO.i=(i+tiles.length)%tiles.length;
+    tiles.forEach((t,j)=>t.classList.toggle("on",j===SO.i)); const t=tiles[SO.i];
+    if(!noFocus){ if(t.classList.contains("new")) $("soName").focus(); else { if(document.activeElement===$("soName")) $("soName").blur(); t.scrollIntoView({block:"nearest"}); } } }
+  function soMsg(){
+    const m=$("soMsg"); if(!m) return; const can=!!window.showDirectoryPicker;
+    m.innerHTML=SH.ok?"":!can?"This browser can't reach the shared folder: names are kept on this computer only."
+      :`Shared folder not connected: names you add are kept on this computer and shared once it connects. <button class="chip" id="soConnect">Connect</button>`;
+    if($("soConnect")) $("soConnect").onclick=e=>{ e.stopPropagation(); connectShared(); }; }
+  // arrows in a grid: up/down jump a whole row
+  const cols=g=>{ const c=[...g.children], y=c[0]&&c[0].offsetTop; return Math.max(1,c.filter(x=>x.offsetTop===y).length); };
+  function signIn(name){
+    const n=PLX.clean(name), id=n.toLowerCase(); if(!n){ $("soName").focus(); return; }
+    const old=(SH.data.profiles||[]).find(p=>p.id===id&&!p.deleted);
+    ME.id=id; ME.name=old?old.name:n; store.set("player",id);
+    // panel saves on this computer: the first profile here keeps the old ones (migration), the rest get their own
+    if(!store.get("saveOwner")) store.set("saveOwner",id);
+    const key=b=>store.get("saveOwner")===id?b:b+"."+id;
+    try{ if(typeof TIDE!=="undefined"&&TIDE.useKey) TIDE.useKey(key("tagtool.tide")); }catch(e){}
+    try{ if(typeof PRAWN!=="undefined"&&PRAWN.useKey) PRAWN.useKey(key("tagtool.prawn")); }catch(e){}
+    view_.show=false;
+    updateShared(d=>{ d.profiles=d.profiles||[]; let p=d.profiles.find(x=>x.id===id);
+      if(!p||p.deleted){ d.profiles=d.profiles.filter(x=>x.id!==id); p={id,name:n,created:Date.now(),hide:null}; d.profiles.push(p); }
+      p.used=p.t=Date.now(); PLX.weeklyIn(d,id,free()); },true);
+    $("signon").hidden=true; showHub(); refresh(); if(typeof tags!=="undefined"&&tags.length) view(); }
+
+  // ---------- hub ----------
+  const HUB={i:0};
+  const hubTiles=()=>[...$("hub").querySelectorAll(".ar-tile")];
+  function showHub(){ $("signon").hidden=true; $("hub").hidden=false; HUB.i=0; renderHub(); }
+  function renderHub(){
+    const p=me(); if(!p) return;
+    $("hubHi").textContent="READY, "+p.name.toUpperCase();
+    hubTiles().forEach((t,j)=>t.classList.toggle("on",j===HUB.i)); }
+  const noteLine=a=>{ const l=a.last; if(!l) return "";
+    return (l.status==="approved"?"✓ Approved: your "+(KIND[l.kind]||l.kind)+" +"+tok(l.n):"✗ Not approved: your "+(KIND[l.kind]||l.kind))+(l.note?" — \""+l.note+"\"":""); };
+  function hubGo(h){
+    if(h==="tool"){ $("hub").hidden=true; return; }
+    if(h==="soon") return toast("Taginator is coming soon"); }
+  hubTiles().forEach((t,j)=>t.onclick=()=>{ HUB.i=j; hubGo(t.dataset.h); });
+  $("hubSwitch").onclick=showSignOn;
+
+  // ---------- keys: the sign-on and hub own the keyboard while they're up (kiosk window, no mouse needed) ----------
+  window.addEventListener("keydown",e=>{
+    const so=!$("signon").hidden, hub=!$("hub").hidden; if(!so&&!hub) return;
+    if(typeof CON!=="undefined"&&CON.open) return;                                  // manager console on top
+    if(e.ctrlKey&&e.shiftKey&&e.key.toLowerCase()==="f") return;                    // ... and its shortcut
+    e.stopPropagation();                                                            // not Ctrl+P, Alt+Enter, Esc... behind
+    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="p"){ e.preventDefault(); return; }
+    if(e.ctrlKey||e.metaKey||e.altKey) return;
+    if(so){ const inp=$("soName"), n=SO.list.length;
+      if(document.activeElement===inp){
+        if(e.key==="Enter"){ e.preventDefault(); signIn(inp.value); }
+        else if(e.key==="Escape"||e.key==="Tab"||(e.key==="ArrowUp"||e.key==="ArrowLeft")&&!inp.value){ e.preventDefault(); if(e.key==="Escape") inp.value=""; soSel(n?Math.min(SO.i,n-1):0); if(!n) inp.focus(); }
+        return; }
+      const c=cols($("soGrid"));
+      if(/^[1-9]$/.test(e.key)){ e.preventDefault(); if(+e.key<=n) signIn(SO.list[+e.key-1].name); }
+      else if(e.key==="ArrowRight"||e.key==="Tab"&&!e.shiftKey){ e.preventDefault(); soSel(SO.i+1); }
+      else if(e.key==="ArrowLeft"||e.key==="Tab"){ e.preventDefault(); soSel(SO.i-1); }
+      else if(e.key==="ArrowDown"){ e.preventDefault(); soSel(Math.min(n,SO.i+c)); }
+      else if(e.key==="ArrowUp"){ e.preventDefault(); soSel(Math.max(0,SO.i-c)); }
+      else if(e.key==="Enter"){ e.preventDefault(); if(SO.i<n) signIn(SO.list[SO.i].name); else inp.focus(); }
+      else if(e.key.length===1&&/\S/.test(e.key)){ soSel(n,true); inp.focus(); }  // just start typing a new name
+      return; }
+    const t=hubTiles(), k=e.key.toLowerCase();
+    if(/^[1-2]$/.test(k)){ e.preventDefault(); HUB.i=+k-1; renderHub(); hubGo(t[HUB.i].dataset.h); }
+    else if(k==="arrowright"||k==="arrowdown"||k==="tab"&&!e.shiftKey){ e.preventDefault(); HUB.i=(HUB.i+1)%t.length; renderHub(); }
+    else if(k==="arrowleft"||k==="arrowup"||k==="tab"){ e.preventDefault(); HUB.i=(HUB.i+t.length-1)%t.length; renderHub(); }
+    else if(k==="enter"||k===" "){ e.preventDefault(); hubGo(t[HUB.i].dataset.h); }
+    else if(k==="s"){ e.preventDefault(); showSignOn(); }
+    else if(k==="escape"){ e.preventDefault(); hubGo("tool"); }
+  },true);
+
+  // ---------- top bar ----------
+  function refresh(){
+    const p=me(), w=$("whoBtn");
+    if(w){ w.hidden=$("switchBtn").hidden=!p; if(p) w.textContent="★ "+p.name; }
+    if(!$("hub").hidden) renderHub();
+    if(!$("signon").hidden){ const ids=SO.list.map(p=>p.id).join(), now=profiles(); if(now.map(p=>p.id).join()!==ids&&document.activeElement!==$("soName")){ const cur=SO.list[SO.i]; SO.list=now; SO.i=Math.max(0,cur?now.findIndex(p=>p.id===cur.id):0); renderSignOn(); } else soMsg(); }
+    if($("viewMenu")&&!$("viewMenu").hidden) renderView(); }
+  $("whoBtn").onclick=showHub; $("switchBtn").onclick=showSignOn;
+
+  // ---------- per-profile list filter (view only: never what's printed-tracked, checked by default or fixed) ----------
+  const view_={show:false};                                         // "show them": hidden items shown until the next sign-in
+  // stored as the tag types to HIDE, so a type that wasn't in that day's report (or is new) still shows
+  const filt=()=>{ const p=me(); return p&&Array.isArray(p.hide)&&p.hide.length?p.hide:null; };
+  const hides=id=>!view_.show&&!!filt()&&filt().includes(id);
+  $("toggleAll").insertAdjacentHTML("beforebegin",`<div class="menuwrap"><button class="chip" id="viewBtn" title="Which tag types your list shows (saved for you)">Show ▾</button><div id="viewMenu" hidden></div></div>`);
+  function renderView(){
+    const f=filt()||[], M=$("viewMenu"), ks=kinds().filter(k=>tags.some(t=>kindOf(t.kind).id===k.id));
+    M.innerHTML=`<div class="vmh">Show in my list${me()?" ("+esc(me().name)+")":""}</div>`+ks.map(k=>`<label><input type="checkbox" data-k="${esc(k.id)}"${f.includes(k.id)?"":" checked"}> ${esc(k.name)}</label>`).join("")
+      +`<button class="link" id="viewAll">Show everything</button>`;
+    M.querySelectorAll("[data-k]").forEach(c=>c.onchange=()=>{ const off=[...M.querySelectorAll("[data-k]:not(:checked)")].map(x=>x.dataset.k);
+      setFilter([...new Set([...f.filter(id=>!ks.some(k=>k.id===id)),...off])]); });   // types not in this report keep their setting
+    $("viewAll").onclick=()=>setFilter([]); }
+  function setFilter(h){ if(!ME.id) return toast("Sign in to save what your list shows",true); view_.show=false; h=h.length?h:null;
+    const p=(SH.data.profiles||[]).find(x=>x.id===ME.id); if(p) p.hide=h;          // shows at once; the save follows
+    updateShared(d=>{ const x=(d.profiles||[]).find(y=>y.id===ME.id); if(x){ x.hide=h; x.t=Date.now(); } },true); view(); }
+  $("viewBtn").onclick=e=>{ e.stopPropagation(); const M=$("viewMenu"); M.hidden=!M.hidden; if(!M.hidden) renderView(); };
+  $("viewMenu").addEventListener("click",e=>e.stopPropagation());
+  document.addEventListener("click",()=>{ $("viewMenu").hidden=true; });
+  // the line over the list: needed tags a filter is hiding
+  $("tagsView").insertAdjacentHTML("afterbegin",`<div id="hiddenNeed" hidden><span></span><button class="chip on" id="showHidden">Show them</button></div>`);
+  $("showHidden").onclick=()=>{ view_.show=true; view(); };
+  function hiddenLine(){
+    const n=filt()&&!view_.show?tags.filter(t=>t._need&&hides(kindOf(t.kind).id)).length:0;
+    $("hiddenNeed").hidden=!n; if(n) $("hiddenNeed").querySelector("span").textContent=n+" hidden item"+(n===1?" needs a tag":"s need tags")+" (not in your list)";
+    $("viewBtn").classList.toggle("on",!!filt()); $("viewBtn").textContent=filt()?(view_.show?"Showing all ▾":"My list ▾"):"Show ▾"; }
+
+  // ---------- earning (called from help.js, fixes.js, app.js inside their own updateShared) ----------
+  const earnIn=(d,kind,ref,text)=>PLX.earnIn(d,ME.id,kind,ref,text);
+  const unearnIn=(d,kind,ref)=>ME.id&&PLX.unearnIn(d,ME.id,kind,ref);
+
+  // ---------- Alt+Enter panel: signed-in profile + time (1 token = minutesPerToken of actual use) ----------
+  // The clock runs only while the panel is open, the window is in front and a key or the mouse was used in the last minute.
+  // Time used is saved every minute and on close; when it runs out the next token is used, or the panel closes (saved).
+  const IDLE=60e3; let lastKey=0;
+  ["keydown","pointerdown","pointermove","wheel"].forEach(ev=>window.addEventListener(ev,()=>{ lastKey=Date.now(); },{capture:true,passive:true}));
+  async function startPlay(){
+    if(!ME.id) return {why:"Sign in first: Switch player at the top."};
+    let x=null; await updateShared(d=>{ x=PLX.playIn(d,ME.id,secPer()); if(x) x={...x}; },true);
+    if(x) return {x};
+    const a=acct(); return {why:"PRAWN needs a token: 1 token = "+mins(secPer())+" of play. You have "+tok(a.bal)+(a.pending?" ("+a.pending+" waiting for the manager's OK)":"")+"."};
+  }
+  const saveUsed=(id,used)=>updateShared(d=>PLX.useIn(d,id,used),true);
+  function locked(h,why){
+    h.innerHTML=`<div class="ar-lock"><h2>INSERT TOKEN</h2><p>${esc(why)}</p><p>Earn tokens: Help → Suggest an improvement, report a problem, fix a name in Edit, or add a sample tag. The manager OKs each one.</p><p class="ar-keys">Esc to close</p></div>`;
+    const k=e=>{ if(e.key==="Escape"&&!e.shiftKey){ e.preventDefault(); e.stopImmediatePropagation(); if(window.PROBE) PROBE.close(); } };
+    window.addEventListener("keydown",k,true); return ()=>window.removeEventListener("keydown",k,true); }
+  // the Alt+Enter menu card (probe.js calls slot.decorate): tokens under its entry, greyed out with no tokens or time left
+  const EARN=["Help → <b>Suggest an improvement</b>: an idea for the tool or the shop",
+    "Help → describe a <b>problem</b> the Help box couldn't fix",
+    "<b>Fix a name</b> in the Edit panel (make, model, caliber, what it is…)",
+    "Add a <b>sample tag</b> (Sizes ✎ → Add sample)"];
+  function decorate(b){
+    const a=acct(), can=!!ME.id&&(a.bal>0||a.left>0), c=n=>tok(n).replace(/^./,x=>x.toUpperCase());
+    b.classList.toggle("pr-dim",!can);
+    const box=document.createElement("div"); box.className="pr-tok";
+    box.innerHTML=!ME.id?"<div>Sign in first</div>":`<div>Tokens: ${a.bal}${a.left?" · "+mins(a.left)+" left":""}</div>`+(a.pending?`<div class="pr-sub">${a.pending} waiting for OK</div>`:"")
+      +(noteLine(a)?`<div class="pr-sub">${esc(noteLine(a))}</div>`:"")
+      +`<button class="pr-more">Obtaining more tokens</button><div class="pr-how"><p>1 token = ${mins(secPer())} of play. The clock only runs while you play.</p>`
+      +(free()?`<p>${c(free())} free every week (when you sign in).</p>`:"")
+      +`<p>Earn more when the manager OKs something you sent:</p><ul>${EARN.map(x=>"<li>"+x+"</li>").join("")}</ul></div>`;
+    b.after(box); const more=box.querySelector(".pr-more");
+    if(more) more.onclick=e=>{ e.stopPropagation(); box.classList.toggle("pr-open"); };
+  }
+  if(typeof TIDE!=="undefined"&&TIDE.slot){ const run0=TIDE.slot.run; TIDE.slot.decorate=decorate;
+    TIDE.slot.run=async h=>{
+      const r=await startPlay(); if(r.why) return locked(h,r.why);
+      const stop=await run0(h); refresh(); lastKey=Date.now();
+      const S={x:r.x,used:+r.x.used||0,saved:+r.x.used||0,over:false};
+      const clock=document.createElement("div"); clock.className="ar-clock"; (h.closest(".pr-ov")||h).appendChild(clock);
+      const playing=()=>!document.hidden&&document.hasFocus()&&Date.now()-lastKey<IDLE;
+      const show=()=>{ const l=Math.max(0,S.x.sec-S.used), a=acct();
+        clock.textContent="⏱ "+Math.floor(l/60)+":"+String(Math.floor(l%60)).padStart(2,"0")+(playing()?"":" paused")+(a.bal?"  +"+tok(a.bal):"");
+        clock.classList.toggle("paused",!playing()); clock.classList.toggle("low",l<120&&!a.bal); };
+      const iv=setInterval(async()=>{
+        if(S.over) return; if(playing()) S.used++;
+        if(S.used-S.saved>=60){ S.saved=S.used; saveUsed(S.x.id,S.used); }
+        if(S.used>=S.x.sec){ S.over=true; await saveUsed(S.x.id,S.used); S.saved=S.used;
+          const n=await startPlay();                                       // next token, if they have one
+          if(n.x){ S.x=n.x; S.used=S.saved=+n.x.used||0; S.over=false; refresh(); }
+          else { clock.textContent="Time's up! Saved."; clock.classList.add("low"); setTimeout(()=>{ if(window.PROBE) PROBE.close(); },2500); return; } }
+        show(); },1000);
+      show();
+      return ()=>{ clearInterval(iv); clock.remove(); if(S.used>S.saved) saveUsed(S.x.id,S.used); try{ stop&&stop(); }catch(e){} refresh(); };
+    }; }
+
+  // ---------- manager console: pending / approve / reject / players / week (fixes.js runCmd) ----------
+  let plist=[];
+  const pname=id=>((SH.data.profiles||[]).find(p=>p.id===id)||{name:id}).name;
+  const pline=(x,n)=>String(n).padStart(3)+"  "+new Date(x.at).toLocaleDateString()+"  "+pname(x.p).padEnd(12)+" "+(KIND[x.kind]||x.kind).padEnd(12)+' "'+String(x.text||x.ref||"").slice(0,60)+'"';
+  const CMDS=['pending                                   things staff sent, waiting for your OK (tokens)',
+    'approve <#> [note] / reject <#> [note]    pay tokens.reward for it / pay 0 (the note shows to them)',
+    'players                                   balance and waiting count per player',
+    'week [n]                                  approved items per player per week (last n weeks)'];
+  async function cmd(c,a){
+    if(c==="pending"){ plist=(SH.data.tokens||[]).filter(x=>x.status==="pending"&&!x.deleted).sort((x,y)=>x.at-y.at);
+      if(!plist.length) cprint("Nothing waiting.","dim"); else plist.forEach((x,i)=>cprint(pline(x,i+1))); return true; }
+    if(c==="approve"||c==="reject"){ const x=plist[+a[1]-1]; if(!x){ cprint("No #"+(a[1]||"")+" — type pending first","bad"); return true; }
+      const note=a.slice(2).join(" "), ok=c==="approve", r=reward(x.kind); let done=false;
+      await updateShared(d=>{ done=PLX.decideIn(d,x.id,ok,r,note,typeof pcName==="function"?pcName():""); });
+      if(!done) cprint("#"+a[1]+" was already decided (maybe on another computer) — nothing paid twice. Type pending.","bad");
+      else cprint((ok?"Approved: +"+tok(r)+" to ":"Rejected: 0 tokens to ")+pname(x.p)+(note?' — "'+note+'"':""),"ok");
+      refresh(); return true; }
+    if(c==="players"){ const l=profiles(); if(!l.length) cprint("No players yet.","dim");
+      l.forEach(p=>{ const q=acct(p.id); cprint(p.name.padEnd(20)+" "+tok(q.bal).padEnd(10)+" "+q.pending+" waiting"); }); return true; }
+    if(c==="week"){ PLX.weeks(SH.data.tokens,+a[1]||4).forEach(w=>{ const l=Object.entries(w.by).sort((x,y)=>y[1]-x[1]);
+        cprint("Week of "+new Date(w.from).toLocaleDateString()+": "+(l.length?l.map(([p,n])=>pname(p)+" "+n).join(" · ")+" (total "+l.reduce((s,x)=>s+x[1],0)+")":"none")); }); return true; }
+    return false; }
+
+  // first screen on every launch: data from this computer's copy now; the shared file catches up behind it
+  showSignOn();
+  return {hides, hiddenLine, refresh, earnIn, unearnIn, cmd, CMDS, me, showSignOn, showHub};
 })();
 
 </script>
@@ -6685,7 +7096,9 @@ var TIDE=(function(){
     const g=document.createElement("div"); g.className="pr-grid";
     slots.forEach((s,i)=>{
       const b=document.createElement("button"); b.className="pr-slot";
-      b.textContent=s.label; b.onclick=()=>pick(i); g.appendChild(b);
+      b.textContent=s.label; b.onclick=()=>pick(i);
+      const cell=document.createElement("div"); cell.className="pr-cell"; cell.appendChild(b); g.appendChild(cell);
+      if(s.decorate) try{ s.decorate(b); }catch(e){}                   // tokens under it (players.js)
     });
     P.view.appendChild(g); sel(P.i);
   }
@@ -6720,6 +7133,8 @@ var TIDE=(function(){
   function close(){
     if(!P) return; if(P.stop) P.stop(); window.removeEventListener("keydown",nav,true); P.ov.remove(); P=null;
   }
+
+  window.PROBE={open:i=>{ open(); if(i!=null) pick(i); }, close};   // players.js (token screens)
 
   document.addEventListener("keydown",e=>{
     if(!P&&e.altKey&&e.key==="Enter"){ e.preventDefault(); open(); return; }
