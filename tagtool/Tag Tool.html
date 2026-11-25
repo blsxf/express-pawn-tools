@@ -7,7 +7,7 @@
 <script>
 // ---- self-update: checks the public mirror when online, keeps the newest build on this computer ----
 // Newer build saved earlier -> run that instead of this file. Add ?local to the address to skip it.
-var TT_BUILD=1795367172205;
+var TT_BUILD=1795632804057;
 (function(){
   var REMOTE="https://raw.githubusercontent.com/blsxf/express-pawn-tools/main/tagtool/", KEY="tagtool.update";
   function db(){ return new Promise(function(res,rej){ var r=indexedDB.open("tagtool",1);
@@ -602,6 +602,7 @@ button.xp-row{cursor:pointer}button.xp-row:hover{border-color:#2f6aa5}.xp-row.on
     <button class="chip" id="needOnly" title="Items already tagged at this price" hidden>Show all</button>
     <button class="chip" id="toggleAll" data-ui="selall" data-ui-name="Check all / none">Uncheck all</button>
     <button class="chip" id="markAll" title="Mark every item in this report as already tagged" hidden>Mark all tagged</button>
+    <button class="chip" id="layBox" title="Type the layaway totals from the Price Items sheet" hidden>Layaway</button>
     <button class="chip" id="flip" title="Show the back of the tags">Show backs</button>
     <button class="chip" id="add" data-ui="add" data-ui-name="Add button">+ Add</button>
   </div>
@@ -1623,6 +1624,21 @@ const MODEL_FIXES=[
   {brand:/^Browning$/, model:/^Buck Mark Micro Bull Barrel/i, to:"Buck Mark Micro Bull"},
 ];
 
+// PS5: "PlayStation 5" + Pro / Slim + Disc / Digital + storage. Switch: Original (HAC-001) / OLED (HEG-001) / Lite (HDH-001); Switch 2 untouched.
+// null = not one of these (model kept as is)
+// Only when every word is a console word: "PS5 DualSense Controller", "Switch Joy-Con", games keep their names.
+function consoleName(brand,model){ const u=" "+String(model||"").toUpperCase()+" ";
+  const only=extra=>!u.replace(/\b\d+\s?(?:GB|TB)\b/g," ").split(/[\s\-()\/,]+/).filter(Boolean).some(w=>!extra.has(w));
+  if(/\bPS5\b|PLAYSTATION\s*5/.test(u)&&(/^Sony$/i.test(brand)||/PLAYSTATION/.test(u))
+    &&only(new Set(["PS5","PLAYSTATION","5","SYSTEM","CONSOLE","SLIM","PRO","DISC","DIGITAL","EDITION","SONY","WHITE","BLACK"]))){
+    const ed=/\bPRO\b/.test(u)?"Pro":/\bSLIM\b/.test(u)?"Slim":"", ty=/\bDIGITAL\b/.test(u)?"Digital":/\bDISC\b/.test(u)?"Disc":"";
+    const g=u.match(/\b(\d+)\s?(GB|TB)\b/), st=ed==="Slim"?"1TB":g?g[1]+g[2]:"";
+    return ["PlayStation 5",ed,ty,st].filter(Boolean).join(" "); }
+  if(/^Nintendo$/i.test(brand)&&/\bSWITCH\b|\bHAC-?001|\bHEG-?001|\bHDH-?001/.test(u)&&!/\bSWITCH\s*2\b|\bBEE-?001/.test(u)
+    &&only(new Set(["SWITCH","NINTENDO","HANDHELD","CONSOLE","SYSTEM","OLED","LITE","ORIGINAL","HAC","HEG","HDH","001","01","HAC001","HEG001","HDH001","V1","V2","GRAY","GREY","NEON","WHITE","BLACK"])))
+    return /\bOLED\b|\bHEG-?001/.test(u)?"Switch OLED":/\bLITE\b|\bHDH-?001/.test(u)?"Switch Lite":"Original Switch";
+  return null; }
+
 // knowledge-base key: Bravo's own maker + model, as typed (cleaned names change with code and edits).
 // None when either is blank or Bravo cut it short ("…"): one answer must never land on every bare "Fender".
 const kbKeyOf=(mfr,model)=>{ if(/…|\.\.\.$/.test(mfr)||/…|\.\.\.$/.test(model)) return "";
@@ -1690,7 +1706,9 @@ function toTag(r){
   // coins / proof sets: the year is what buyers look for
   if(!conflict&&/\bPROOF\b|\bMINT SET|\bCOINS?\b|\bSILVER EAGLE|\bMORGAN\b/.test(item+" "+String(r.model+" "+r.category).toUpperCase())&&!/\b(?:1[789]|20)\d\d\b/.test(item+" "+r.model))
     conflict="No year in Bravo's description";
-  return {include:true, brand, model, caliber, extras:parseExtras(r.desc), accessories:parseAccessories(r.desc,r.mfr+" "+r.model,r.category,r.price), what, notes, quality, kbKey, whatKnown:w!==null, conflict, checked:"", finish, category:r.category||"", price:r.price, cost:r.cost, number:r.number, label:r.label, more:r.more||{}, ...specsOf(r),
+  // 3b) consoles (xf, 11-25-2026): one way to say each, no codes or filler. Storage only from Bravo's text, except PS5 Slim = 1TB (Sony spec)
+  const con=consoleName(brand,model); let notesC=notes; if(con){ model=con; notesC=notes.replace(/\b\d+\s?(?:GB|TB)\b/gi," ").replace(/\s+/g," ").trim(); }
+  return {include:true, brand, model, caliber, extras:parseExtras(r.desc), accessories:parseAccessories(r.desc,r.mfr+" "+r.model,r.category,r.price), what, notes:notesC, quality, kbKey, whatKnown:w!==null, conflict, checked:"", finish, category:r.category||"", price:r.price, cost:r.cost, number:r.number, label:r.label, more:r.more||{}, ...specsOf(r),
           raw:[r.mfr, r.model, r.desc, r.caliberRaw].filter(Boolean).join(" | ")};
 }
 
@@ -1721,7 +1739,19 @@ const layOf = t => layaway(t.price||0,layOver(t));
 // no price (Bravo's Price cell blank or unreadable): the tag would print $0 and $0 layaway
 const priceNote = t => (+t.price||0)>0?"":"No price: this tag would print $0 — fix the price in Bravo or on the Edit panel";
 function layNote(t){ const o=layOver(t), r=layaway(t.price||0).total, p=t.price||0;
-  return o>r?"Layaway total "+fmt$(o)+" is above the usual "+fmt$(r)+" — typo?":o&&o<p?"Layaway total "+fmt$(o)+" is below the price "+fmtP(p)+" — typo?":""; }
+  return o>r?"Layaway total "+fmt$(o)+" is above the usual "+fmt$(r)+" — typo?":o&&o<=p?"Layaway total "+fmt$(o)+" is "+(o<p?"below":"the same as")+" the price "+fmtP(p)+" — typo?":""; }
+// set a hand-typed layaway total (Edit panel, Layaway box); blank = back to the rule. false = nothing changed
+function setLay(t,v){ const m=money(v), lt=m>0?String(Math.round(m)):"", lf=m>0?String(t.price||0):"";
+  if(lt===(t.layTotal||"")&&lf===(t.layFor||"")) return false; t.layTotal=lt; t.layFor=lf; return true; }
+// ---- price history (shared "prices", 11-25-2026): one entry per item # + printed price; no customer, cost or serial ----
+const priceKey=(n,p)=>n+"@"+Math.round((+p||0)*100);
+const modelKey=t=>{ const k=x=>String(x||"").toLowerCase().replace(/[^a-z0-9]/g,""); return k(t.model)?k(t.brand)+"|"+k(t.model):""; };
+function priceRec(t,now){ const l=layOf(t);
+  return {n:t.number,cat:t.category||"",make:t.brand||"",model:t.model||"",p:+t.price||0,lay:l.total,typed:!!layOver(t),t:now}; }
+// newest price for the same make + model, from another item or an earlier price of this one (blank model: none, too vague)
+function lastPriced(t,prices){ const mk=modelKey(t), own=priceKey(t.number,t.price); if(!mk) return null; let best=null;
+  for(const k in prices||{}){ const r=prices[k]; if(!r||k===own||modelKey({brand:r.make,model:r.model})!==mk) continue; if(!best||(r.t||0)>(best.t||0)) best=r; }
+  return best; }
 
 // ---- graphics adapters: same drawing code goes to screen and to PDF ----
 function canvasG(ctx){
@@ -1765,7 +1795,9 @@ function fitRow(g,str,cx,top,maxW,h,scale,wrap,col){
   if(wrap && words.length>1 && g.fitSize(str,maxW,h*scale)<h*.42){
     let best=null;
     const commas=words.some((w,i)=>i<words.length-1&&w.endsWith(","))||words.includes("w/");   // ...or before "w/"    // a list ("Bag, 2 Batteries"): break only between items
-    for(let i=1;i<words.length;i++){ if(commas&&!words[i-1].endsWith(",")&&words[i]!=="w/") continue; const a=words.slice(0,i).join(" "),b=words.slice(i).join(" ");
+    for(let i=1;i<words.length;i++){ if(commas&&!words[i-1].endsWith(",")&&words[i]!=="w/") continue;
+      if(words[i].length===1) continue;                         // never a lone letter/digit starting line 2 ("Xbox Series / S", "PlayStation / 5")
+      const a=words.slice(0,i).join(" "),b=words.slice(i).join(" ");
       const sz=Math.min(g.fitSize(a,maxW,h*.42),g.fitSize(b,maxW,h*.42)), bal=-Math.abs(a.length-b.length);
       const w=words[i]==="w/";                                  // a break before "w/" wins unless it costs >15% text size
       if(!best||(w&&!best[4]&&sz>=best[2]*.85)||(!(best[4]&&!w&&sz<best[2]/.85)&&(sz>best[2]+.01||(Math.abs(sz-best[2])<=.01&&bal>best[3])))) best=[a,b,sz,bal,w];}
@@ -2365,7 +2397,7 @@ const SH = { dir:null, ok:false, data:null };
 //      A delete in these four is a tombstone {id,t,deleted:true}, kept forever: it beats a live copy whatever the times, so another
 //      computer (or a wrong clock) can never bring it back.
 const blankData = () => ({ v:1, rules:[], items:{}, tagTypes:[], samples:[], kb:{}, printed:{}, tickets:[], helpPhrases:[], profiles:[], tokens:[], mgr:{},
-  tgPhrases:[], tgMiss:[], tgHits:[], designs:[] });
+  tgPhrases:[], tgMiss:[], tgHits:[], designs:[], prices:{} });
 
 // small key-value store in the browser to remember the folder
 function idb(){ return new Promise((res,rej)=>{ const r=indexedDB.open("tagtool",1);
@@ -2388,15 +2420,16 @@ function mergeData(a,b){
     if(!cur||(v.t||0)>(cur.t||0)){ out.items[n]=out.items[n]||{}; out.items[n][k]=v; } }
   for(const src of [a.kb||{},b.kb||{}]) for(const k in src){ const cur=out.kb[k], v=src[k]; if(!cur||(v.t||0)>(cur.t||0)) out.kb[k]=v; }
   for(const src of [a.printed||{},b.printed||{}]) for(const k in src){ const cur=out.printed[k], v=src[k]; if(!cur||(v.t||0)>(cur.t||0)) out.printed[k]=v; }
+  for(const src of [a.prices||{},b.prices||{}]) for(const k in src){ const cur=out.prices[k], v=src[k]; if(v&&(!cur||(v.t||0)>(cur.t||0))) out.prices[k]=v; }   // price history: kept whole, never trimmed
   for(const src of [a.mgr||{},b.mgr||{}]) for(const k in src){ const cur=out.mgr[k], v=src[k]; if(v&&(!cur||(v.t||0)>(cur.t||0))) out.mgr[k]=v; }
   for(const src of [a,b]) for(const k in src) if(!(k in out)) out[k]=src[k];   // a part a newer build added: keep it, never drop it
   return out;
 }
 const cache={ get(){ try{ return Object.assign(blankData(),JSON.parse(localStorage.getItem("tagtool.shared"))||{}); }catch(e){ return blankData(); } },
-              // browser storage full (big sample pictures/PDFs): keep a copy without the samples (only removals), which come back
+              // browser storage full (big sample pictures/PDFs, years of price history): keep a copy without the samples + price history (only removals), which come back
               // from the shared file. Left out, not emptied: an empty copy with the same time could win a merge and spread.
               set(d){ try{ localStorage.setItem("tagtool.shared",JSON.stringify(d)); return true; }catch(e){
-                try{ localStorage.setItem("tagtool.shared",JSON.stringify({...d,samples:(d.samples||[]).filter(s=>!s.data),tickets:(d.tickets||[]).map(({pic,...x})=>x)})); }catch(e2){}
+                try{ localStorage.setItem("tagtool.shared",JSON.stringify({...d,samples:(d.samples||[]).filter(s=>!s.data),tickets:(d.tickets||[]).map(({pic,...x})=>x),prices:{}})); }catch(e2){}
                 if(!cache.warned&&typeof toast==="function"){ cache.warned=true; toast("This computer's browser storage is full: sample pictures are kept only in the shared folder",true); }
                 return false; } } };
 SH.data=cache.get();
@@ -2673,7 +2706,8 @@ function needMsg(){ const a=tags.filter(t=>t._need==="new"&&t.include).length, b
   return a+b?"✓ "+plural(a+b,"tag")+" needed"+(a&&b?": "+a+" new · "+b+" new price"+(b>1?"s":""):b?" (new price"+(b>1?"s":"")+")":""):"✓ All tagged — nothing new in this report"; }
 // remember what got printed (every computer sees it)
 function markPrinted(list){ const now=Date.now(), l=list.filter(t=>t.number&&!t.hand); if(!l.length) return;
-  updateShared(d=>{ d.printed=d.printed||{}; l.forEach(t=>d.printed[t.number]={p:t._bp??t.price,t:now}); });
+  updateShared(d=>{ d.printed=d.printed||{}; d.prices=d.prices||{}; l.forEach(t=>{ d.printed[t.number]={p:t._bp??t.price,t:now};
+    if((+t.price||0)>0) d.prices[priceKey(t.number,t.price)]=priceRec(t,now); }); });   // price history: Edit panel "Last priced"
   l.forEach(t=>{ t._need=""; t.include=false; t._was=null; }); }
 // the print box can't tell printed from cancelled: ask, so a cancelled print never drops tags off the list
 function askPrinted(list){ const l=list.filter(t=>t.number&&!t.hand); if(!l.length) return;
@@ -2713,6 +2747,7 @@ function view(){
   $("typeWarn").textContent=noType.length?plural(noType.length,"tag")+" will print NEW! but Bravo's Type is blank"+(tags.some(t=>(t.more||{}).intake)?"":" (no Type column in this report)")
     +": check "+noType.slice(0,3).map(t=>t.number).join(", ")+(noType.length>3?"…":"")+" weren't pawned or bought. Pawned / bought items are never NEW: set Condition on the Edit panel.":"";
   $("empty").hidden=has; $("tagsView").hidden=$("tools").hidden=$("bar").hidden=!has;
+  $("layBox").hidden=!layGuns().length;
   $("flip").textContent=showBack?"Show fronts":"Show backs"; $("flip").classList.toggle("on",showBack);
   const nAll=tags.filter(t=>!t._need&&!t.include).length; $("needOnly").hidden=!hasHistory()||!nAll;
   $("needOnly").textContent=onlyNeed?"Show all ("+nAll+" tagged)":"Hide tagged"; $("markAll").hidden=!has||hasHistory()&&!tags.some(t=>t._need);
@@ -2783,6 +2818,7 @@ function drawCard(c){
 function redrawCard(i){ const c=cards().find(c=>c._i===i); if(c&&c._cv) drawCard(c); }
 function redrawAll(){ cards().forEach(c=>{ if(c._cv) drawCard(c); }); }
 $("flip").onclick=()=>{ showBack=!showBack; view(); };
+$("layBox").onclick=()=>openLayBox();
 
 // ---------- bottom bar ----------
 // one PDF for the whole run: each tag type on its own sheets
@@ -2828,6 +2864,7 @@ function openEditor(i){
       <div class="row2">${f("price","Price",t.price||"",1)}${f("cost","Cost",isFinite(t.cost)?t.cost:"",1)}</div>
       <div class="field"><label>Layaway total</label><input data-k="layTotal" value="${esc(layOver(t)||"")}" inputmode="decimal" placeholder="${esc(fmt$(layaway(t.price||0).total))} (usual)"></div>
       <div class="raw" id="edLay"></div>
+      ${(r=>r?`<div class="raw">Last priced: ${esc([r.make,r.model].filter(Boolean).join(" ")+" "+r.n+" · "+fmtP(r.p)+" · layaway "+fmt$(r.lay)+(r.typed?" (typed)":"")+" · "+new Date(r.t).toLocaleDateString("en-US"))}</div>`:"")(lastPriced(t,SH.data.prices))}
       ${f("number","Item #",t.number||"")}
       ${t.category?`<div class="raw">Bravo category: ${esc(t.category)}</div>`:""}
       ${t.raw?`<div class="raw">Bravo: ${esc(t.raw)}</div>`:""}
@@ -2850,7 +2887,7 @@ function openEditor(i){
     const k=inp.dataset.k, v=inp.value;
     if(k==="price"){ const m=money(v); t.price=isFinite(m)?m:0; }
     else if(k==="cost"){ const m=money(v); t.cost=isFinite(m)?m:NaN; }
-    else if(k==="layTotal"){ const m=money(v); t.layTotal=m>0?String(Math.round(m)):""; t.layFor=m>0?String(t.price||0):""; rememberEdit(t,"layTotal"); rememberEdit(t,"layFor"); }
+    else if(k==="layTotal"){ if(setLay(t,v)){ rememberEdit(t,"layTotal"); rememberEdit(t,"layFor"); } }
     else if(k!=="number"){ // blocked wording (taginator.js claimCheck): not saved, reason under the box; Bravo's own words don't count
       if(!("_was" in inp)) inp._was=inp.defaultValue;                                // what the box showed (incl. design defaults)
       const no=claimCheck(v,{gun:tgGun(t),used:usedIntake(t),brands:tgBrands(t),max:200},inp._was); inp.classList.toggle("bad",!!no);
@@ -2870,6 +2907,26 @@ function openEditor(i){
   $("edHelp").onclick=()=>openHelp(i);
   $("edX").onclick=closeDrawer; $("edDone").onclick=()=>{ prawn("edit"); closeDrawer(); };
   const first=$("drawer").querySelector("input"); if(first) setTimeout(()=>first.focus(),50);
+}
+
+// ---------- Layaway box (11-25-2026): Zach's hand-written layaway totals off the Price Items sheet, typed in one go ----------
+// Guns that print in this run (layaway on the back), in the report's own order: sort the Bravo report like the sheet.
+// One box each (blank = usual ×1.10), Enter moves down. Saves the same per-item override as the Edit panel, no token.
+const layGuns=()=>sel().filter(t=>!kindOf(t.kind).extrasOnFront);
+function openLayBox(){
+  const list=layGuns(); if(!list.length) return toast("No gun tags checked in this run",true);
+  openDrawer(`<div class="top"><h3>Layaway totals</h3><button class="x" id="lbX">✕</button></div>
+    <div class="body"><div class="raw">Type the top number from the sheet. Blank = usual ×1.10. Enter = next.</div>
+    ${list.map((t,j)=>`<div class="field lbrow"><label>${esc([t.number,t.brand,t.model].filter(Boolean).join(" · "))} — price <b>${esc(fmtP(t.price||0))}</b></label>
+      <input data-j="${j}" value="${esc(layOver(t)||"")}" inputmode="decimal" placeholder="${esc(fmt$(layaway(t.price||0).total))} (usual)"><div class="raw lbnote"></div></div>`).join("")}
+    </div><div class="foot"><button class="btn primary grow" id="lbDone">Done</button></div>`);
+  const ins=[...$("drawer").querySelectorAll("input[data-j]")];
+  const note=(inp,t)=>{ const n=layNote(t); inp.classList.toggle("bad",!!n); inp.parentNode.querySelector(".lbnote").textContent=n?"! "+n+" (still prints)":""; };
+  ins.forEach((inp,j)=>{ const t=list[j]; note(inp,t);
+    inp.oninput=()=>{ if(setLay(t,inp.value)){ rememberEdit(t,"layTotal",1); rememberEdit(t,"layFor",1); } checkOne(t); note(inp,t); redrawCard(tags.indexOf(t)); };
+    inp.onkeydown=e=>{ if(e.key!=="Enter") return; e.preventDefault(); const nx=ins[j+1]; if(nx){ nx.focus(); nx.select(); } else $("lbDone").focus(); }; });
+  $("lbX").onclick=$("lbDone").onclick=()=>{ closeDrawer(); view(); };
+  if(ins[0]) setTimeout(()=>ins[0].focus(),50);
 }
 
 // ---------- screen parts hidden in CONFIG.hidden ----------
@@ -3165,11 +3222,12 @@ const kbLinks=t=>{ const q=encodeURIComponent([t.brand,(t.src&&t.src.model)||t.m
 
 // called when someone edits a name in the Edit panel (saved after a short pause)
 const pendingEdits={}; let editTimer;
-function rememberEdit(t,k){
+// noTok: no token for it (Layaway box: typing Zach's sheet numbers is routine, xf 11-25-2026)
+function rememberEdit(t,k,noTok){
   if(k==="what") kbSet(t,t.what);
   if(!t.number||MONEYKEYS.has(k)||k==="what"&&t.kbKey) return;
   const from=(t._base||{})[k]??"", to=String(t[k]);
-  pendingEdits[t.number+"\u0000"+k]={n:t.number,k,from,to};
+  pendingEdits[t.number+"\u0000"+k]={n:t.number,k,from,to,noTok:!!noTok};
   clearTimeout(editTimer); editTimer=setTimeout(flushEdits,700);
 }
 function flushEdits(){
@@ -3179,7 +3237,7 @@ function flushEdits(){
   updateShared(d=>{ d.kb=d.kb||{}; for(const [k,v] of kb){ d.kb[k]={...v,t:Date.now()}; if(pl) pl.earnIn(d,"fix","kb:"+k,"What it is: "+k+" = "+v.what); }
     for(const e of list){ d.items[e.n]=d.items[e.n]||{};
     d.items[e.n][e.k]=e.to===e.from?{deleted:true,t:Date.now()}:{from:e.from,to:e.to,t:Date.now()};
-    if(pl){ if(e.to===e.from) pl.unearnIn(d,"fix",e.n+":"+e.k); else pl.earnIn(d,"fix",e.n+":"+e.k,e.n+" "+e.k+': "'+e.from+'" -> "'+e.to+'"'); } } });
+    if(pl&&!e.noTok){ if(e.to===e.from) pl.unearnIn(d,"fix",e.n+":"+e.k); else pl.earnIn(d,"fix",e.n+":"+e.k,e.n+" "+e.k+': "'+e.from+'" -> "'+e.to+'"'); } } });
 }
 
 // ---------- manager console (Ctrl+Shift+F) ----------
