@@ -7,7 +7,7 @@
 <script>
 // ---- self-update: checks the public mirror when online, keeps the newest build on this computer ----
 // Newer build saved earlier -> run that instead of this file. Add ?local to the address to skip it.
-var TT_BUILD=1795632804057;
+var TT_BUILD=1795632967101;
 (function(){
   var REMOTE="https://raw.githubusercontent.com/blsxf/express-pawn-tools/main/tagtool/", KEY="tagtool.update";
   function db(){ return new Promise(function(res,rej){ var r=indexedDB.open("tagtool",1);
@@ -572,6 +572,22 @@ button.xp-row{cursor:pointer}button.xp-row:hover{border-color:#2f6aa5}.xp-row.on
 .si-box{position:relative;width:300px;max-width:calc(100vw - 32px);background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:34px 24px 16px;box-shadow:0 20px 50px rgba(0,0,0,.45)}
 .si-x{position:absolute;top:8px;right:8px;width:30px;height:30px;border:0;border-radius:8px;background:none;color:var(--acc);font-size:16px;padding:0}
 .si-x:hover,.si-x:focus-visible{background:var(--panel2);outline:0}
+/* sign-in flow motion (11-25-2026): screens ease in, hub tiles wake on sign-in, cards nudge when a tile is clicked first */
+@keyframes siIn{from{opacity:0}}
+@keyframes siUp{from{opacity:0;transform:translateY(8px)}}
+@keyframes siPop{from{opacity:0;transform:translateY(6px) scale(.97)}}
+@keyframes siNudge{30%{transform:translateX(6px)}60%{transform:translateX(-3px)}}
+#signon:not([hidden]){animation:siIn .18s ease-out}
+#signon:not([hidden]) .si-main{animation:siUp .24s ease-out}
+.si-dim:not([hidden]){animation:siIn .14s ease-out}.si-dim:not([hidden]) .si-box{animation:siPop .18s ease-out}
+.si-hub{transition:opacity .2s ease}.si-main.out .si-hub{opacity:.55}
+.si-cards.nudge{animation:siNudge .32s ease-in-out}.si-cards.nudge .si-card[data-id]{border-color:var(--acc)}
+.si-tile{transition:border-color .15s,transform .15s,box-shadow .15s}
+.si-tile:not(.off):hover,.si-tile:not(.off):focus-visible{transform:translateY(-2px);box-shadow:0 10px 24px rgba(0,0,0,.25)}
+.si-main.out .si-tile:hover{transform:none;box-shadow:none}
+.si-card{transition:border-color .15s,background .15s}
+body.tt-in>header,body.tt-in #empty,body.tt-in #tagsView{animation:siUp .22s ease-out}
+@media (prefers-reduced-motion:reduce){#signon,#signon *,.si-dim,.si-box,body.tt-in>header,body.tt-in #empty,body.tt-in #tagsView{animation:none!important;transition:none!important}}
 #soName{display:block;width:100%;background:transparent;border:0;border-bottom:2px solid var(--acc);outline:0;padding:6px 2px;font-size:20px;color:var(--ink);caret-color:var(--acc)}
 .si-err{min-height:20px;margin-top:6px;font-size:13px;color:var(--bad)}
 .ar-lock{color:#fff;text-align:center;max-width:520px;font-size:18px;padding:20px}
@@ -7433,24 +7449,31 @@ if(typeof document!=="undefined") PL=(()=>{
     PLX.seedIn(SH.data,ids); updateShared(d=>PLX.seedIn(d,ids),true); }
   function showSignOn(box){
     try{ if(typeof closeDrawer==="function") closeDrawer(); $("signon").hidden=false; render();
-      if(box!==false) openBox(); else closeBox(); }
+      // the name box only when there's nobody to pick (or + Add profile); otherwise the cards: last one here has focus, Enter = them
+      if(box!==false&&!profiles().length) openBox(); else { closeBox(); focusStart(); } }
     catch(e){ $("signon").hidden=true; toast("Couldn't show the sign-in screen — the tool works as usual",true); } }   // never trap anyone behind it
   function openBox(){ $("siDim").hidden=false; $("soName").value=""; $("siErr").textContent=""; $("siMenu").hidden=true; setTimeout(()=>$("soName").focus(),0); }
   function closeBox(){ $("siDim").hidden=true; }
+  // keyboard path: start = your card (Enter), signed in = [1] Manual Tag Tool (Enter)
+  function focusStart(){ setTimeout(()=>{ if($("signon").hidden||boxOpen()) return;
+    const el=ME.id?$("signon").querySelector('.si-tile[data-h="tool"]'):$("siCards").querySelector(".si-card[data-id]"); if(el) el.focus({preventScroll:true}); },0); }
   function render(){
     const p=me(), l=profiles();
     $("siWho").hidden=!p; if(p){ $("siName").textContent=p.name; $("siStar").hidden=!isMgr(); }
     $("siCon").hidden=!isMgr();
-    $("hubHi").textContent=p?"Hi, "+p.name:"Sign in to start";
+    $("hubHi").textContent=p?"Hi, "+p.name:l.length?"Pick your name to start":"Sign in to start";
+    $("signon").querySelector(".si-main").classList.toggle("out",!p);
     // signed in: the whole profile column slides away to the left (› brings it back, ‹ hides it); nobody signed in: it stays out
     const shut=!!p&&!CARDS.open;
     $("siLeft").classList.toggle("shut",shut); $("siPop").hidden=!shut; $("siHide").hidden=!p;
+    const fid=$("siCards").contains(document.activeElement)&&document.activeElement.dataset.id;   // keep focus through a redraw (shared sync)
     $("siCards").innerHTML=l.map(x=>`<button class="si-card${x.id===ME.id?" on":""}" data-id="${esc(x.id)}"><span class="si-ini">${esc(initials(x.name))}</span><b>${esc(x.name)}</b>${isMgr(x.id)?`<span class="si-mgr" title="Manager">☆</span>`:""}</button>`).join("")
       +(l.length<PLX.MAXP?`<button class="si-card si-add" id="siAdd"><span class="si-ini">+</span><b>Add profile</b></button>`:"");
     $("siCards").querySelectorAll("[data-id]").forEach(b=>b.onclick=()=>{
       if(b.dataset.id===ME.id){ CARDS.open=false; return render(); }               // already you: just tuck the list away
       const x=l.find(y=>y.id===b.dataset.id); if(x) signIn(x.name); });
     if($("siAdd")) $("siAdd").onclick=openBox;
+    if(fid){ const b=$("siCards").querySelector('[data-id="'+CSS.escape(fid)+'"]'); if(b) b.focus({preventScroll:true}); }
     soMsg(); }
   function soMsg(){
     const m=$("soMsg"); if(!m) return; const can=!!window.showDirectoryPicker;
@@ -7479,13 +7502,18 @@ if(typeof document!=="undefined") PL=(()=>{
       p.used=p.t=Date.now(); };
     add(SH.data);                                                    // on screen at once; the save follows
     updateShared(d=>{ add(d); PLX.weeklyIn(d,id,free()); },true);
-    CARDS.open=false; closeBox(); refresh(); if(typeof tags!=="undefined"&&tags.length) view(); }
-  function logOut(){ lockConsole(); ME.id=null; ME.name=null; view_.show=false; refresh(); if(typeof tags!=="undefined"&&tags.length) view(); openBox(); }
+    CARDS.open=false; closeBox(); refresh(); if(typeof tags!=="undefined"&&tags.length) view(); focusStart(); }
+  function logOut(){ lockConsole(); ME.id=null; ME.name=null; view_.show=false; refresh(); if(typeof tags!=="undefined"&&tags.length) view();
+    if(profiles().length){ closeBox(); focusStart(); } else openBox(); }
   // the console unlocks for one manager at a time: a different profile (or nobody) locks it again
   function lockConsole(){ if(typeof CON==="undefined") return; CON.unlocked=false; CON.pin=null; $("conOut").innerHTML=""; $("conIn").type="text"; if(CON.open) closeConsole(); }
+  // nobody signed in: point at the cards (a nudge, then your card has focus); no cards yet: the name box
+  function needName(){ if(!profiles().length) return openBox(); const c=$("siCards"); c.classList.remove("nudge"); void c.offsetWidth; c.classList.add("nudge"); clearTimeout(needName.t); needName.t=setTimeout(()=>c.classList.remove("nudge"),900); focusStart(); }
+  // into the tool: the screen goes, the tool's own screen eases in (CSS .tt-in)
+  function leave(){ $("signon").hidden=true; const b=document.body; b.classList.remove("tt-in"); void b.offsetWidth; b.classList.add("tt-in"); }
   function hubGo(h){
-    if(h==="tool"){ if(!ME.id) return openBox(); $("signon").hidden=true; return; }
-    if(h==="tagi"){ if(!ME.id) return openBox(); $("signon").hidden=true; if(typeof openTaginator==="function") openTaginator(); } }
+    if(h==="tool"){ if(!ME.id) return needName(); leave(); return; }
+    if(h==="tagi"){ if(!ME.id) return needName(); leave(); if(typeof openTaginator==="function") openTaginator(); } }
   $("signon").querySelectorAll(".si-tile").forEach(t=>t.onclick=()=>hubGo(t.dataset.h));
   $("siX").onclick=closeBox; $("siOut").onclick=logOut;
   $("siDim").addEventListener("mousedown",e=>{ if(e.target===$("siDim")){ e.preventDefault(); $("soName").focus(); } });   // clicks outside the box do nothing
