@@ -1,0 +1,34 @@
+[
+  {
+    "id": "swappa",
+    "name": "Swappa (Blacklist)",
+    "subtitle": "ESN & Blacklist Check",
+    "url": "https://swappa.com/imei",
+    "color": "#22c55e",
+    "fallbackSearchUrl": "https://www.google.com/search?q=Swappa+free+IMEI+check"
+  },
+  {
+    "id": "tmobile",
+    "name": "T-Mobile BYOD",
+    "subtitle": "Network & Finance Status",
+    "url": "https://www.t-mobile.com/resources/bring-your-own-phone",
+    "color": "#e20074",
+    "fallbackSearchUrl": "https://www.google.com/search?q=T-Mobile+BYOD+IMEI+check"
+  },
+  {
+    "id": "verizon",
+    "name": "Verizon BYOD",
+    "subtitle": "Compatibility & Lock Check",
+    "url": "https://www.verizon.com/sales/prepaid/byod/enterDeviceIMEI.html",
+    "color": "#ee1c25",
+    "fallbackSearchUrl": "https://www.google.com/search?q=Verizon+BYOD+IMEI+check"
+  },
+  {
+    "id": "att",
+    "name": "AT&T BYOD",
+    "subtitle": "IMEI Compatibility Finder",
+    "url": "https://www.att.com/wireless/imei-finder/",
+    "color": "#009fdb",
+    "fallbackSearchUrl": "https://www.google.com/search?q=AT%26T+BYOD+IMEI+check"
+  }
+]

@@ -1,0 +1,19 @@
+{
+  "name": "Express Pawn IMEI Tool",
+  "short_name": "IMEI Tool",
+  "description": "Offline-first pawn shop counter tool to validate 15-digit IMEIs and launch carrier checks.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#111110",
+  "theme_color": "#111110",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%23111110'/%3E%3Crect x='28' y='28' width='456' height='456' rx='88' fill='%231a1917' stroke='%23383631' stroke-width='8'/%3E%3Ccircle cx='396' cy='116' r='26' fill='%23f59e0b'/%3E%3Crect x='158' y='118' width='196' height='276' rx='28' fill='none' stroke='%23f3efe6' stroke-width='22'/%3E%3Cline x1='224' y1='154' x2='288' y2='154' stroke='%239a9488' stroke-width='12' stroke-linecap='round'/%3E%3Ccircle cx='256' cy='356' r='12' fill='%23f59e0b'/%3E%3Cpath d='M214 252l28 28 58-58' fill='none' stroke='%2338c98a' stroke-width='22' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

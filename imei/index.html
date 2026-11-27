@@ -1,0 +1,1463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="IMEI Tool">
+<meta name="theme-color" content="#111110">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23111110'/%3E%3Crect x='4' y='4' width='56' height='56' rx='12' fill='%231a1917' stroke='%23383631' stroke-width='2'/%3E%3Ccircle cx='49' cy='15' r='4' fill='%23f59e0b'/%3E%3Crect x='20' y='15' width='24' height='34' rx='4' fill='none' stroke='%23f3efe6' stroke-width='3'/%3E%3Cpath d='M26 32l4 4 8-8' fill='none' stroke='%2338c98a' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<title>IMEI Tool · Express Pawn</title>
+<style>
+  :root {
+    --bg: #111110;
+    --bg-grad: radial-gradient(960px 480px at 85% -10%, rgba(245, 158, 11, 0.10), transparent 60%),
+               radial-gradient(760px 420px at -10% 100%, rgba(245, 236, 220, 0.04), transparent 55%);
+    --surface: #1a1917;
+    --surface-2: #23221f;
+    --surface-hover: #2c2a26;
+    --bevel: inset 0 1px 0 rgba(255, 250, 240, 0.06);
+    --shadow: 0 2px 12px rgba(0, 0, 0, 0.34);
+    --line: rgba(245, 240, 230, 0.09);
+    --line-strong: rgba(245, 240, 230, 0.18);
+    --text: #f3efe6;
+    --muted: #9a9488;
+    --dim: #6b665c;
+    --accent: #f59e0b;
+    --accent-soft: rgba(245, 158, 11, 0.15);
+    --ok: #38c98a;
+    --ok-soft: rgba(56, 201, 138, 0.14);
+    --bad: #f25f5c;
+    --bad-soft: rgba(242, 95, 92, 0.14);
+    --radius: 16px;
+    --sans: "Segoe UI Variable", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Cascadia Code", monospace;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  * {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    min-height: 100dvh;
+    background-color: var(--bg);
+    background-image: var(--bg-grad);
+    background-attachment: fixed;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  .app {
+    min-height: 100dvh;
+    max-width: 560px;
+    margin: 0 auto;
+    padding: max(16px, env(safe-area-inset-top)) 14px calc(76px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- HEADER ---------- */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .brand-badge {
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    box-shadow: var(--bevel), var(--shadow);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent);
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .brand-badge::after {
+    content: "";
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+    position: absolute;
+    top: 6px;
+    right: 6px;
+  }
+
+  .brand-title {
+    font-size: 16px;
+    font-weight: 720;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+
+  .brand-sub {
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 32px;
+    padding: 0 11px;
+    border-radius: 999px;
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    box-shadow: var(--bevel);
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--text);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .status-pill.offline {
+    border-color: rgba(245, 158, 11, 0.45);
+    background: rgba(245, 158, 11, 0.12);
+    color: #fbbf24;
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--ok);
+    box-shadow: 0 0 8px rgba(56, 201, 138, 0.65);
+  }
+
+  .status-pill.offline .status-dot {
+    background: var(--accent);
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.7);
+  }
+
+  /* ---------- CARDS ---------- */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--bevel), var(--shadow);
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .sec-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .sec-label {
+    font-size: 11px;
+    font-weight: 720;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .sec-label::before {
+    content: "";
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  .sec-meta {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  /* ---------- IMEI INPUT ---------- */
+  .imei-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .imei-input {
+    width: 100%;
+    height: 56px;
+    padding: 0 14px;
+    border-radius: 13px;
+    border: 1.5px solid var(--line-strong);
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 20px; /* >= 18px prevents iOS Safari auto-zoom */
+    font-weight: 680;
+    letter-spacing: 0.08em;
+    outline: none;
+    transition: border-color 0.16s var(--ease), box-shadow 0.16s var(--ease), background 0.16s;
+  }
+
+  .imei-input::placeholder {
+    color: var(--dim);
+    font-family: var(--sans);
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  .imei-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+
+  .imei-input.state-valid {
+    border-color: var(--ok);
+    box-shadow: 0 0 0 3px var(--ok-soft);
+  }
+
+  .imei-input.state-invalid {
+    border-color: var(--bad);
+    box-shadow: 0 0 0 3px var(--bad-soft);
+  }
+
+  .validation-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 24px;
+    flex-wrap: wrap;
+  }
+
+  .val-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 680;
+    padding: 4px 10px;
+    border-radius: 8px;
+    background: var(--surface-2);
+    color: var(--muted);
+    border: 1px solid var(--line);
+  }
+
+  .val-badge.valid {
+    background: var(--ok-soft);
+    border-color: rgba(56, 201, 138, 0.38);
+    color: var(--ok);
+  }
+
+  .val-badge.invalid {
+    background: var(--bad-soft);
+    border-color: rgba(242, 95, 92, 0.42);
+    color: #ff8582;
+  }
+
+  .formatted-readout {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+
+  .formatted-readout .chk-ok { color: var(--ok); font-weight: 700; }
+  .formatted-readout .chk-bad { color: var(--bad); font-weight: 700; }
+
+  .progress-track {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--bg);
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: var(--accent);
+    transition: width 0.14s var(--ease), background-color 0.16s;
+  }
+
+  .progress-fill.valid { background: var(--ok); }
+  .progress-fill.invalid { background: var(--bad); }
+
+  /* ---------- ACTION BUTTONS ---------- */
+  .btn-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+  }
+
+  .btn {
+    appearance: none;
+    min-height: 44px;
+    padding: 0 12px;
+    border-radius: 11px;
+    border: 1px solid var(--line-strong);
+    background: var(--surface-2);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13.5px;
+    font-weight: 650;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    text-decoration: none;
+    transition: background 0.14s, border-color 0.14s, transform 0.12s, opacity 0.14s;
+  }
+
+  .btn:hover:not(:disabled) {
+    background: var(--surface-hover);
+  }
+
+  .btn:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .btn.pri {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #141210;
+    font-weight: 720;
+  }
+
+  .btn.pri:hover:not(:disabled) {
+    filter: brightness(1.08);
+    background: var(--accent);
+  }
+
+  .btn.ok {
+    background: rgba(56, 201, 138, 0.16);
+    border-color: rgba(56, 201, 138, 0.42);
+    color: var(--ok);
+  }
+
+  .btn.ok:hover:not(:disabled) {
+    background: rgba(56, 201, 138, 0.24);
+  }
+
+  .btn.danger {
+    background: rgba(242, 95, 92, 0.12);
+    border-color: rgba(242, 95, 92, 0.34);
+    color: #ff8582;
+  }
+
+  .btn.sm {
+    min-height: 34px;
+    padding: 0 10px;
+    font-size: 12px;
+    border-radius: 9px;
+  }
+
+  /* ---------- CARRIER LAUNCHER ---------- */
+  .carriers-section.offline-dim .carrier-list,
+  .carriers-section.offline-dim .open-all-wrap {
+    opacity: 0.42;
+  }
+
+  .offline-notice {
+    display: none;
+    padding: 9px 12px;
+    border-radius: 10px;
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    color: #fcd34d;
+    font-size: 12.5px;
+    font-weight: 560;
+  }
+
+  .carriers-section.offline-dim .offline-notice {
+    display: block;
+  }
+
+  .carrier-list {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    transition: opacity 0.18s;
+  }
+
+  .carrier-row {
+    display: grid;
+    grid-template-columns: 1fr 52px;
+    gap: 8px;
+  }
+
+  .carrier-link {
+    min-height: 56px;
+    padding: 10px 14px;
+    border-radius: 13px;
+    border: 1px solid var(--line-strong);
+    background: var(--surface-2);
+    color: var(--text);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    position: relative;
+    overflow: hidden;
+    transition: background 0.14s, border-color 0.14s, transform 0.12s, opacity 0.14s;
+  }
+
+  .carrier-link::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--carrier-color, var(--accent));
+  }
+
+  .carrier-link:not([aria-disabled="true"]):hover {
+    background: var(--surface-hover);
+    border-color: rgba(245, 240, 230, 0.28);
+  }
+
+  .carrier-link:not([aria-disabled="true"]):active {
+    transform: scale(0.985);
+  }
+
+  .carrier-link.checked {
+    border-color: rgba(56, 201, 138, 0.45);
+    background: rgba(56, 201, 138, 0.08);
+  }
+
+  .carrier-link[aria-disabled="true"],
+  .fallback-link[aria-disabled="true"] {
+    opacity: 0.38;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  .carrier-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding-left: 4px;
+  }
+
+  .carrier-name {
+    font-size: 15px;
+    font-weight: 680;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .carrier-sub {
+    font-size: 11.5px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .carrier-state {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 9px;
+    border-radius: 999px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--muted);
+  }
+
+  .carrier-link.checked .carrier-state {
+    background: var(--ok-soft);
+    color: var(--ok);
+    border: 1px solid rgba(56, 201, 138, 0.35);
+  }
+
+  .fallback-link {
+    min-height: 56px;
+    border-radius: 13px;
+    border: 1px solid var(--line-strong);
+    background: var(--surface-2);
+    color: var(--text);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    transition: background 0.14s, border-color 0.14s, transform 0.12s, opacity 0.14s;
+  }
+
+  .fallback-link:not([aria-disabled="true"]):hover {
+    background: var(--surface-hover);
+    border-color: rgba(245, 240, 230, 0.28);
+  }
+
+  .fallback-link:not([aria-disabled="true"]):active {
+    transform: scale(0.95);
+  }
+
+  .open-all-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 2px;
+  }
+
+  .ios-note {
+    margin: 0;
+    font-size: 11.5px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  /* ---------- OFFLINE QUEUE / RECENT ---------- */
+  .queue-card.offline-highlight {
+    border-color: rgba(245, 158, 11, 0.55);
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.14), var(--shadow);
+  }
+
+  .queue-form {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+  }
+
+  .note-input {
+    width: 100%;
+    height: 44px;
+    padding: 0 12px;
+    border-radius: 11px;
+    border: 1px solid var(--line-strong);
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 16px; /* prevents iOS Safari zoom */
+    outline: none;
+  }
+
+  .note-input::placeholder {
+    color: var(--dim);
+    font-size: 14px;
+  }
+
+  .note-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+
+  .queue-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .queue-empty {
+    padding: 14px 10px;
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--dim);
+    border: 1px dashed var(--line);
+    border-radius: 12px;
+  }
+
+  .queue-item {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .queue-item.active-imei {
+    border-color: rgba(245, 158, 11, 0.45);
+  }
+
+  .queue-item-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .queue-imei {
+    font-family: var(--mono);
+    font-size: 14.5px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: var(--text);
+  }
+
+  .queue-meta {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+    word-break: break-word;
+  }
+
+  .queue-tag {
+    font-size: 11px;
+    font-weight: 680;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .queue-tag.done {
+    background: var(--ok-soft);
+    color: var(--ok);
+  }
+
+  .queue-tag.queued {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  .queue-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 6px;
+  }
+
+  /* ---------- TOAST ---------- */
+  .toast {
+    position: fixed;
+    left: 50%;
+    top: max(14px, env(safe-area-inset-top));
+    transform: translate(-50%, -18px);
+    background: #f3efe6;
+    color: #121110;
+    font-size: 13px;
+    font-weight: 680;
+    padding: 10px 16px;
+    border-radius: 999px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.16s var(--ease), transform 0.2s var(--ease);
+    z-index: 9999;
+    max-width: calc(100vw - 28px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
+  .text-btn {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 620;
+    padding: 3px 6px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  .text-btn:hover {
+    color: var(--text);
+    background: var(--surface-2);
+  }
+
+  @media (max-width: 400px) {
+    .queue-form {
+      grid-template-columns: 1fr;
+    }
+    .btn-row {
+      grid-template-columns: 1fr 1fr;
+    }
+    .btn-row .next-btn {
+      grid-column: 1 / -1;
+    }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <!-- Header -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-badge" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="5" y="2" width="14" height="20" rx="2.5"/>
+          <path d="M9.5 11.5 11.5 13.5 15 9.5"/>
+          <line x1="12" y1="18" x2="12.01" y2="18"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-title">IMEI Tool</div>
+        <div class="brand-sub">Express Pawn Counter Check</div>
+      </div>
+    </div>
+    <div id="onlinePill" class="status-pill" role="status" aria-live="polite">
+      <span class="status-dot" aria-hidden="true"></span>
+      <span id="onlineText">Online</span>
+    </div>
+  </header>
+
+  <!-- IMEI Input & Validation Card -->
+  <section class="card" aria-label="IMEI Input">
+    <div class="sec-head">
+      <span class="sec-label">Device IMEI</span>
+      <span class="sec-meta num" id="digitCounter">0 / 15</span>
+    </div>
+
+    <div class="imei-input-wrap">
+      <input
+        id="imeiInput"
+        class="imei-input num"
+        type="text"
+        inputmode="numeric"
+        pattern="[0-9]*"
+        maxlength="15"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        spellcheck="false"
+        placeholder="Type, paste, or scan 15-digit IMEI"
+        aria-label="15-digit IMEI number"
+      >
+    </div>
+
+    <div class="progress-track" aria-hidden="true">
+      <div id="progressFill" class="progress-fill"></div>
+    </div>
+
+    <div class="validation-row">
+      <div id="valBadge" class="val-badge">Dial *#06# on phone to view IMEI</div>
+      <div id="formattedReadout" class="formatted-readout num"></div>
+    </div>
+
+    <div class="btn-row">
+      <button id="copyBtn" type="button" class="btn ok" disabled>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        Copy
+      </button>
+      <button id="pasteBtn" type="button" class="btn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
+        Paste
+      </button>
+      <button id="nextPhoneBtn" type="button" class="btn next-btn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        Next Phone
+      </button>
+    </div>
+  </section>
+
+  <!-- 4-Carrier Launcher Card -->
+  <section id="carriersSection" class="card carriers-section" aria-label="Carrier Checks">
+    <div class="sec-head">
+      <span class="sec-label">Carrier &amp; Blacklist Checks</span>
+      <span id="checkedProgress" class="sec-meta num">0 / 4 checked</span>
+    </div>
+
+    <div class="offline-notice">
+      You are offline. Save this IMEI to the Offline Queue below to run carrier checks when connection returns.
+    </div>
+
+    <div id="carrierList" class="carrier-list"></div>
+
+    <div class="open-all-wrap">
+      <button id="openAllBtn" type="button" class="btn" disabled>
+        Copy &amp; Open All 4 (Desktop / Android)
+      </button>
+      <p class="ios-note">iOS Home Screen mode requires tapping carriers one by one.</p>
+    </div>
+  </section>
+
+  <!-- Offline Queue & Recent IMEIs Card -->
+  <section id="queueCard" class="card queue-card" aria-label="Offline Queue and Recent IMEIs">
+    <div class="sec-head">
+      <span class="sec-label">Offline Queue &amp; Recent</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span id="queueCount" class="sec-meta num">0 saved</span>
+        <button id="clearQueueBtn" type="button" class="text-btn" style="display:none">Clear All</button>
+      </div>
+    </div>
+
+    <div class="queue-form">
+      <input
+        id="noteInput"
+        class="note-input"
+        type="text"
+        maxlength="60"
+        autocomplete="off"
+        placeholder="Optional note (e.g. iPhone 15 - John)"
+        aria-label="Optional customer or device note"
+      >
+      <button id="saveQueueBtn" type="button" class="btn" disabled>
+        Save to Offline Queue
+      </button>
+    </div>
+
+    <div id="queueList" class="queue-list"></div>
+  </section>
+</main>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  const LS_QUEUE = "ep_imei_queue_v1";
+  const LS_CARRIERS = "ep_imei_carriers_v1";
+  const REMOTE_CARRIERS_URL = "https://raw.githubusercontent.com/blsxf/express-pawn-tools/main/imei/carriers.json";
+
+  const DEFAULT_CARRIERS = [
+    {
+      id: "swappa",
+      name: "Swappa (Blacklist)",
+      subtitle: "ESN & Blacklist Check",
+      url: "https://swappa.com/imei",
+      color: "#22c55e",
+      fallbackSearchUrl: "https://www.google.com/search?q=Swappa+free+IMEI+check"
+    },
+    {
+      id: "tmobile",
+      name: "T-Mobile BYOD",
+      subtitle: "Network & Finance Status",
+      url: "https://www.t-mobile.com/resources/bring-your-own-phone",
+      color: "#e20074",
+      fallbackSearchUrl: "https://www.google.com/search?q=T-Mobile+BYOD+IMEI+check"
+    },
+    {
+      id: "verizon",
+      name: "Verizon BYOD",
+      subtitle: "Compatibility & Lock Check",
+      url: "https://www.verizon.com/sales/prepaid/byod/enterDeviceIMEI.html",
+      color: "#ee1c25",
+      fallbackSearchUrl: "https://www.google.com/search?q=Verizon+BYOD+IMEI+check"
+    },
+    {
+      id: "att",
+      name: "AT&T BYOD",
+      subtitle: "IMEI Compatibility Finder",
+      url: "https://www.att.com/wireless/imei-finder/",
+      color: "#009fdb",
+      fallbackSearchUrl: "https://www.google.com/search?q=AT%26T+BYOD+IMEI+check"
+    }
+  ];
+
+  // DOM refs
+  const imeiInput = document.getElementById("imeiInput");
+  const digitCounter = document.getElementById("digitCounter");
+  const progressFill = document.getElementById("progressFill");
+  const valBadge = document.getElementById("valBadge");
+  const formattedReadout = document.getElementById("formattedReadout");
+  const copyBtn = document.getElementById("copyBtn");
+  const pasteBtn = document.getElementById("pasteBtn");
+  const nextPhoneBtn = document.getElementById("nextPhoneBtn");
+  const carriersSection = document.getElementById("carriersSection");
+  const checkedProgress = document.getElementById("checkedProgress");
+  const carrierList = document.getElementById("carrierList");
+  const openAllBtn = document.getElementById("openAllBtn");
+  const onlinePill = document.getElementById("onlinePill");
+  const onlineText = document.getElementById("onlineText");
+  const queueCard = document.getElementById("queueCard");
+  const noteInput = document.getElementById("noteInput");
+  const saveQueueBtn = document.getElementById("saveQueueBtn");
+  const queueList = document.getElementById("queueList");
+  const queueCount = document.getElementById("queueCount");
+  const clearQueueBtn = document.getElementById("clearQueueBtn");
+  const toastEl = document.getElementById("toast");
+
+  // State
+  let carriers = loadCachedCarriers();
+  let queue = loadQueue();
+  let currentImei = "";
+  let checkedSet = new Set();
+  let toastTimer = null;
+  let clearConfirmTimer = null;
+  let clearConfirmArmed = false;
+
+  // ---------- LUHN VALIDATION ----------
+  function isValidLuhn15(digits) {
+    if (!/^\d{15}$/.test(digits)) return false;
+    let sum = 0;
+    for (let i = 0; i < 15; i++) {
+      let n = digits.charCodeAt(i) - 48;
+      // Double every second digit from the left (indices 1, 3, 5, 7, 9, 11, 13)
+      if (i % 2 === 1) {
+        n *= 2;
+        if (n > 9) n -= 9;
+      }
+      sum += n;
+    }
+    return sum % 10 === 0;
+  }
+
+  function extractImeiDigits(raw) {
+    const str = String(raw || "");
+    // If a pasted receipt/label has multiple numbers, prefer an exact 15-digit valid IMEI token
+    const matches = str.match(/\d{15,16}/g);
+    if (matches) {
+      for (const m of matches) {
+        if (m.length === 15 && isValidLuhn15(m)) return m;
+      }
+    }
+    return str.replace(/\D+/g, "").slice(0, 15);
+  }
+
+  function formatImeiDisplay(digits) {
+    if (!digits) return "";
+    const p1 = digits.slice(0, 8);
+    const p2 = digits.slice(8, 14);
+    const p3 = digits.slice(14, 15);
+    let out = p1;
+    if (p2) out += " · " + p2;
+    if (p3) out += " · " + p3;
+    return out;
+  }
+
+  // ---------- CLIPBOARD (SYNCHRONOUS-START, IOS-SAFE) ----------
+  function fallbackCopyExec(text) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.setAttribute("inputmode", "none");
+    ta.style.position = "fixed";
+    ta.style.top = "-9999px";
+    ta.style.left = "-9999px";
+    ta.style.fontSize = "16px";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    const sel = document.getSelection();
+    const prevRange = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+    ta.focus({ preventScroll: true });
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch {}
+    ta.remove();
+    if (prevRange && sel) {
+      try { sel.removeAllRanges(); sel.addRange(prevRange); } catch {}
+    }
+    return ok;
+  }
+
+  function copyImeiSync(text) {
+    if (!text) return;
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+      try {
+        navigator.clipboard.writeText(text).catch(() => {
+          fallbackCopyExec(text);
+        });
+        return;
+      } catch {
+        // fall through to execCommand
+      }
+    }
+    fallbackCopyExec(text);
+  }
+
+  // ---------- TOAST ----------
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove("show"), 2000);
+  }
+
+  // ---------- STORAGE ----------
+  function isValidCarrierList(arr) {
+    return Array.isArray(arr) && arr.length > 0 && arr.every(
+      (c) => c && typeof c.id === "string" && typeof c.name === "string" && typeof c.url === "string"
+    );
+  }
+
+  function loadCachedCarriers() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(LS_CARRIERS) || "null");
+      if (isValidCarrierList(parsed)) return parsed;
+    } catch {}
+    return DEFAULT_CARRIERS.slice();
+  }
+
+  function isHostedInHub() {
+    return Boolean(window.XF_RUNNING || document.getElementById("xfHubBackBtn"));
+  }
+
+  async function refreshCarriers() {
+    const candidates = isHostedInHub()
+      ? [REMOTE_CARRIERS_URL]
+      : ["./carriers.json", REMOTE_CARRIERS_URL];
+    for (const url of candidates) {
+      try {
+        const res = await fetch(url, { cache: "no-store" });
+        if (!res.ok) continue;
+        const data = await res.json();
+        if (isValidCarrierList(data)) {
+          carriers = data;
+          try { localStorage.setItem(LS_CARRIERS, JSON.stringify(data)); } catch {}
+          renderCarriers();
+          return;
+        }
+      } catch {
+        // Offline or cross-origin fallback — keep cached/default carriers
+      }
+    }
+  }
+
+  function loadQueue() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(LS_QUEUE) || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function persistQueue() {
+    try { localStorage.setItem(LS_QUEUE, JSON.stringify(queue)); } catch {}
+  }
+
+  function syncCheckedToQueue() {
+    if (!currentImei) return;
+    const item = queue.find((q) => q.imei === currentImei);
+    if (!item) return;
+    item.checked = Array.from(checkedSet);
+    if (item.checked.length >= carriers.length) {
+      item.offlineQueued = false;
+    }
+    persistQueue();
+    renderQueue();
+  }
+
+  // ---------- RENDER ----------
+  function isCurrentValid() {
+    return currentImei.length === 15 && isValidLuhn15(currentImei);
+  }
+
+  function updateValidationUI() {
+    const len = currentImei.length;
+    const valid = isCurrentValid();
+    const invalid15 = len === 15 && !valid;
+
+    digitCounter.textContent = `${len} / 15`;
+    progressFill.style.width = `${Math.min(100, (len / 15) * 100)}%`;
+    progressFill.classList.toggle("valid", valid);
+    progressFill.classList.toggle("invalid", invalid15);
+
+    imeiInput.classList.toggle("state-valid", valid);
+    imeiInput.classList.toggle("state-invalid", invalid15);
+
+    valBadge.classList.toggle("valid", valid);
+    valBadge.classList.toggle("invalid", invalid15);
+
+    if (len === 0) {
+      valBadge.textContent = "Dial *#06# on phone to view IMEI";
+      formattedReadout.textContent = "";
+    } else if (valid) {
+      valBadge.textContent = "✓ Valid 15-digit IMEI";
+      formattedReadout.innerHTML =
+        `${currentImei.slice(0, 8)} · ${currentImei.slice(8, 14)} · <span class="chk-ok">${currentImei.slice(14)}</span>`;
+    } else if (invalid15) {
+      valBadge.textContent = "✕ Invalid checksum — check for typo";
+      formattedReadout.innerHTML =
+        `${currentImei.slice(0, 8)} · ${currentImei.slice(8, 14)} · <span class="chk-bad">${currentImei.slice(14)}</span>`;
+    } else {
+      valBadge.textContent = `${15 - len} more digit${15 - len === 1 ? "" : "s"} needed`;
+      formattedReadout.textContent = formatImeiDisplay(currentImei);
+    }
+
+    copyBtn.disabled = !valid;
+    openAllBtn.disabled = !valid;
+    saveQueueBtn.disabled = !valid;
+
+    renderCarriers();
+    renderQueue();
+  }
+
+  function escHtml(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => (
+      { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+    ));
+  }
+
+  function renderCarriers() {
+    const valid = isCurrentValid();
+    const total = carriers.length;
+    let doneCount = 0;
+
+    carrierList.innerHTML = carriers.map((c) => {
+      const isChecked = valid && checkedSet.has(c.id);
+      if (isChecked) doneCount++;
+      const mainHref = valid ? ` href="${escHtml(c.url)}"` : "";
+      const fbHref = valid && c.fallbackSearchUrl ? ` href="${escHtml(c.fallbackSearchUrl)}"` : "";
+      const disAttr = valid ? "" : ' aria-disabled="true" tabindex="-1"';
+      const stateText = isChecked ? "Checked ✓" : "Copy & Open ↗";
+      return `
+        <div class="carrier-row">
+          <a
+            class="carrier-link${isChecked ? " checked" : ""}"
+            style="--carrier-color:${escHtml(c.color || "#f59e0b")}"
+            data-carrier-id="${escHtml(c.id)}"
+            data-carrier-name="${escHtml(c.name)}"
+            data-kind="main"
+            target="_blank"
+            rel="noopener noreferrer"
+            ${mainHref}${disAttr}
+          >
+            <span class="carrier-info">
+              <span class="carrier-name">${escHtml(c.name)}</span>
+              <span class="carrier-sub">${escHtml(c.subtitle || "Tap to copy IMEI & check")}</span>
+            </span>
+            <span class="carrier-state">${stateText}</span>
+          </a>
+          <a
+            class="fallback-link"
+            data-carrier-id="${escHtml(c.id)}"
+            data-carrier-name="${escHtml(c.name)}"
+            data-kind="fallback"
+            title="Google search fallback for ${escHtml(c.name)}"
+            aria-label="Google search fallback for ${escHtml(c.name)}"
+            target="_blank"
+            rel="noopener noreferrer"
+            ${fbHref}${disAttr}
+          >🔍</a>
+        </div>
+      `;
+    }).join("");
+
+    checkedProgress.textContent = `${doneCount} / ${total} checked`;
+    openAllBtn.textContent = `Copy & Open All ${total} (Desktop / Android)`;
+  }
+
+  function fmtTime(ts) {
+    try {
+      const d = new Date(ts);
+      const now = new Date();
+      const sameDay = d.toDateString() === now.toDateString();
+      return sameDay
+        ? d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+        : d.toLocaleDateString([], { month: "short", day: "numeric" });
+    } catch {
+      return "";
+    }
+  }
+
+  function renderQueue() {
+    queueCount.textContent = `${queue.length} saved`;
+    clearQueueBtn.style.display = queue.length >= 2 ? "inline-block" : "none";
+
+    if (queue.length === 0) {
+      queueList.innerHTML = `<div class="queue-empty">No queued or recent IMEIs yet. Enter a valid IMEI and tap Save to keep it handy.</div>`;
+      return;
+    }
+
+    const total = carriers.length;
+    queueList.innerHTML = queue.map((item) => {
+      const checkedCount = Array.isArray(item.checked) ? item.checked.length : 0;
+      const isActive = item.imei === currentImei;
+      let tagHtml = `<span class="queue-tag num">${checkedCount}/${total} checked</span>`;
+      if (checkedCount >= total && total > 0) {
+        tagHtml = `<span class="queue-tag done">All ${total} ✓</span>`;
+      } else if (item.offlineQueued && checkedCount === 0) {
+        tagHtml = `<span class="queue-tag queued">Offline Queue</span>`;
+      }
+      const metaParts = [];
+      if (item.note) metaParts.push(escHtml(item.note));
+      if (item.savedAt) metaParts.push(escHtml(fmtTime(item.savedAt)));
+
+      return `
+        <div class="queue-item${isActive ? " active-imei" : ""}" data-imei="${escHtml(item.imei)}">
+          <div class="queue-item-top">
+            <div>
+              <div class="queue-imei num">${escHtml(formatImeiDisplay(item.imei))}</div>
+              <div class="queue-meta">${metaParts.join(" · ") || "No note"}</div>
+            </div>
+            ${tagHtml}
+          </div>
+          <div class="queue-actions">
+            <button type="button" class="btn sm" data-action="load" data-imei="${escHtml(item.imei)}">Load</button>
+            <button type="button" class="btn sm" data-action="copy" data-imei="${escHtml(item.imei)}">Copy</button>
+            <button type="button" class="btn sm danger" data-action="delete" data-imei="${escHtml(item.imei)}" aria-label="Delete saved IMEI">Delete</button>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  function updateOnlineState() {
+    const online = navigator.onLine !== false;
+    onlinePill.classList.toggle("offline", !online);
+    onlineText.textContent = online ? "Online" : "Offline";
+    carriersSection.classList.toggle("offline-dim", !online);
+    queueCard.classList.toggle("offline-highlight", !online);
+    saveQueueBtn.classList.toggle("pri", !online);
+  }
+
+  // ---------- ACTIONS ----------
+  function setImeiValue(raw, preserveChecked) {
+    const digits = extractImeiDigits(raw);
+    const changed = digits !== currentImei;
+    currentImei = digits;
+    if (imeiInput.value !== digits) imeiInput.value = digits;
+    if (changed && !preserveChecked) {
+      checkedSet.clear();
+    }
+    updateValidationUI();
+  }
+
+  function saveCurrentToQueue() {
+    if (!isCurrentValid()) return;
+    const note = noteInput.value.trim();
+    const existingIdx = queue.findIndex((q) => q.imei === currentImei);
+    const entry = {
+      imei: currentImei,
+      note: note || (existingIdx >= 0 ? queue[existingIdx].note : ""),
+      savedAt: Date.now(),
+      offlineQueued: !navigator.onLine,
+      checked: Array.from(checkedSet)
+    };
+    if (existingIdx >= 0) {
+      queue.splice(existingIdx, 1);
+    }
+    queue.unshift(entry);
+    if (queue.length > 50) queue = queue.slice(0, 50);
+    persistQueue();
+    renderQueue();
+    showToast(navigator.onLine ? "Saved to queue" : "Saved to Offline Queue");
+  }
+
+  function resetForNextPhone() {
+    currentImei = "";
+    checkedSet.clear();
+    imeiInput.value = "";
+    noteInput.value = "";
+    updateValidationUI();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    imeiInput.focus();
+    showToast("Ready for next phone");
+  }
+
+  // ---------- EVENTS ----------
+  imeiInput.addEventListener("input", () => {
+    setImeiValue(imeiInput.value, false);
+  });
+
+  imeiInput.addEventListener("paste", (e) => {
+    const text = (e.clipboardData || window.clipboardData)?.getData("text");
+    if (typeof text === "string") {
+      e.preventDefault();
+      setImeiValue(text, false);
+    }
+  });
+
+  imeiInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (isCurrentValid()) {
+        copyImeiSync(currentImei);
+        showToast("IMEI copied to clipboard");
+      }
+    }
+  });
+
+  copyBtn.addEventListener("click", () => {
+    if (!isCurrentValid()) return;
+    copyImeiSync(currentImei);
+    showToast("Copied " + currentImei);
+  });
+
+  pasteBtn.addEventListener("click", async () => {
+    if (navigator.clipboard && typeof navigator.clipboard.readText === "function") {
+      try {
+        const text = await navigator.clipboard.readText();
+        const digits = extractImeiDigits(text);
+        if (!digits) {
+          showToast("No digits found on clipboard");
+          imeiInput.focus();
+          return;
+        }
+        setImeiValue(digits, false);
+        showToast(isCurrentValid() ? "Pasted valid IMEI" : "Pasted digits");
+        return;
+      } catch {
+        // Permission denied or iOS Safari restriction — focus input for native paste
+      }
+    }
+    imeiInput.focus();
+    showToast("Tap input and select Paste");
+  });
+
+  nextPhoneBtn.addEventListener("click", resetForNextPhone);
+
+  carrierList.addEventListener("click", (e) => {
+    const link = e.target.closest("a[data-carrier-id]");
+    if (!link) return;
+    if (!isCurrentValid() || link.getAttribute("aria-disabled") === "true") {
+      e.preventDefault();
+      return;
+    }
+    const id = link.dataset.carrierId;
+    const name = link.dataset.carrierName || "carrier";
+    const kind = link.dataset.kind;
+    // Synchronous clipboard initiation BEFORE browser switches tabs (iOS Safari safe)
+    copyImeiSync(currentImei);
+    checkedSet.add(id);
+    renderCarriers();
+    syncCheckedToQueue();
+    showToast(kind === "fallback" ? `Copied · Searching ${name}` : `Copied · Opening ${name}`);
+  });
+
+  openAllBtn.addEventListener("click", () => {
+    if (!isCurrentValid()) return;
+    copyImeiSync(currentImei);
+    let opened = 0;
+    let blocked = 0;
+    // Fire all window.open calls synchronously inside the user gesture.
+    // Do not pass "noopener" in features (which always returns null per spec), so we can accurately detect popup blocks.
+    for (const c of carriers) {
+      const win = window.open(c.url, "_blank");
+      if (win) {
+        try { win.opener = null; } catch {}
+        opened++;
+        checkedSet.add(c.id);
+      } else {
+        blocked++;
+      }
+    }
+    renderCarriers();
+    syncCheckedToQueue();
+    if (blocked > 0) {
+      showToast(`Opened ${opened}/${carriers.length} — allow pop-ups or tap carriers below`);
+    } else {
+      showToast(`Copied IMEI & opened all ${opened} carriers`);
+    }
+  });
+
+  saveQueueBtn.addEventListener("click", saveCurrentToQueue);
+
+  noteInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && isCurrentValid()) {
+      e.preventDefault();
+      saveCurrentToQueue();
+    }
+  });
+
+  queueList.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const imei = btn.dataset.imei;
+    const item = queue.find((q) => q.imei === imei);
+    if (!item) return;
+
+    if (action === "load") {
+      checkedSet = new Set(Array.isArray(item.checked) ? item.checked : []);
+      noteInput.value = item.note || "";
+      setImeiValue(item.imei, true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      showToast("Loaded " + item.imei);
+    } else if (action === "copy") {
+      copyImeiSync(item.imei);
+      showToast("Copied " + item.imei);
+    } else if (action === "delete") {
+      queue = queue.filter((q) => q.imei !== imei);
+      persistQueue();
+      renderQueue();
+      showToast("Deleted from queue");
+    }
+  });
+
+  clearQueueBtn.addEventListener("click", () => {
+    if (!clearConfirmArmed) {
+      clearConfirmArmed = true;
+      clearQueueBtn.textContent = "Confirm Clear?";
+      clearQueueBtn.style.color = "#ff8582";
+      clearTimeout(clearConfirmTimer);
+      clearConfirmTimer = setTimeout(() => {
+        clearConfirmArmed = false;
+        clearQueueBtn.textContent = "Clear All";
+        clearQueueBtn.style.color = "";
+      }, 3000);
+      return;
+    }
+    clearTimeout(clearConfirmTimer);
+    clearConfirmArmed = false;
+    clearQueueBtn.textContent = "Clear All";
+    clearQueueBtn.style.color = "";
+    queue = [];
+    persistQueue();
+    renderQueue();
+    showToast("Cleared saved IMEIs");
+  });
+
+  window.addEventListener("online", () => {
+    updateOnlineState();
+    refreshCarriers();
+  });
+  window.addEventListener("offline", updateOnlineState);
+
+  // ---------- SERVICE WORKER (STANDALONE ONLY — NEVER COLLIDE WITH XF-HUB) ----------
+  if (
+    "serviceWorker" in navigator &&
+    !isHostedInHub() &&
+    (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")
+  ) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch(() => {});
+    });
+  }
+
+  // ---------- INIT ----------
+  updateOnlineState();
+  updateValidationUI();
+  if (navigator.onLine !== false) {
+    refreshCarriers();
+  }
+})();
+</script>
+</body>
+</html>
