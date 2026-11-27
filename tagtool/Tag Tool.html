@@ -7,7 +7,7 @@
 <script>
 // ---- self-update: checks the public mirror when online, keeps the newest build on this computer ----
 // Newer build saved earlier -> run that instead of this file. Add ?local to the address to skip it.
-var TT_BUILD=1795785394264;
+var TT_BUILD=1795785722198;
 (function(){
   var REMOTE="https://raw.githubusercontent.com/blsxf/express-pawn-tools/main/tagtool/", KEY="tagtool.update";
   function db(){ return new Promise(function(res,rej){ var r=indexedDB.open("tagtool",1);
@@ -252,6 +252,8 @@ function TAG_SETTINGS(o){
   (function merge(dst,src,path){                      // then copy over the ones that fit
     for(var k in src){ var p=path?path+"."+k:k, v=src[k], d=dst[k];
       if(bad.indexOf(p)>=0) continue;
+      // 11-27-2026: ignore retired default in older shop "Tag Tool Settings.js" copies so PCs get "Sales Tax Included!" automatically
+      if(p==="words.frontLayaway"&&/^LAYAWAY ON BACK!?$/i.test(String(v||"").trim())) continue;
       if(d&&typeof d==="object"&&!Array.isArray(d)) merge(d,v,p); else dst[k]=v;
     }
   })(CONFIG,o||{},"");
